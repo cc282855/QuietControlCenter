@@ -1,0 +1,57 @@
+{
+  "run_id": "qcc-20260729-02",
+  "phase": "review",
+  "project": {
+    "name": "Quiet Control Center v7.24.3",
+    "risk": "standard",
+    "risk_reasons": [
+      "原生 WPF UI 改造需代码与视觉双重复审"
+    ],
+    "scope": [
+      "v2rayN\\v2rayN\\Views",
+      "v2rayN\\v2rayN\\Resources",
+      "v2rayN\\ServiceLib",
+      "v2rayN\\ServiceLib.Tests",
+      "artifacts\\qcc-win-x64",
+      ".codex\\state\\runs\\qcc-20260729-02\\implement"
+    ],
+    "acceptance_criteria": [
+      "代码无 P0-P2；ServiceLib 业务源码未改；build/test/publish 证据有效；两档截图无裁切且状态语义正确"
+    ]
+  },
+  "prior_audit_report": ".codex\\state\\runs\\qcc-20260729-02\\implement\\audit-report.json",
+  "roles": [
+    {
+      "name": "project_reviewer",
+      "task_id": "qcc-20260729-02-review-reviewer",
+      "stage": "review",
+      "mode": "read-only",
+      "task": "独立审查实际差异、边界条件和验证结果；项目目标：独立复审真实 UI 差异、构建测试发布证据、DPI 归一化截图与更新隔离。",
+      "expected_output": "独立审查结论、问题路径和剩余风险。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN\\Views",
+        "v2rayN\\v2rayN\\Resources",
+        "v2rayN\\ServiceLib",
+        "v2rayN\\ServiceLib.Tests",
+        "artifacts\\qcc-win-x64",
+        ".codex\\state\\runs\\qcc-20260729-02\\implement"
+      ]
+    },
+    {
+      "name": "project_qa",
+      "task_id": "qcc-20260729-02-review-qa",
+      "stage": "review",
+      "mode": "read-only",
+      "task": "只读检查测试覆盖、回归风险和验证路径；项目目标：独立复审真实 UI 差异、构建测试发布证据、DPI 归一化截图与更新隔离。",
+      "expected_output": "测试矩阵、回归风险和验证命令。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN\\Views",
+        "v2rayN\\v2rayN\\Resources",
+        "v2rayN\\ServiceLib",
+        "v2rayN\\ServiceLib.Tests",
+        "artifacts\\qcc-win-x64",
+        ".codex\\state\\runs\\qcc-20260729-02\\implement"
+      ]
+    }
+  ]
+}
