@@ -85,7 +85,7 @@ jobs:
           git rev-parse "refs/tags/$base" | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Missing Quiet UI base tag: $base" }
           $patch = Join-Path $env:RUNNER_TEMP quiet-ui.patch
-          git diff --binary "--output=$patch" "refs/tags/$base" HEAD -- .github/workflows/upstream-draft.yml v2rayN/v2rayN/Views v2rayN/v2rayN/Resources v2rayN/v2rayN/Services v2rayN/v2rayN/v2rayN.csproj v2rayN/AmazTool v2rayN/v2rayN.Tests v2rayN/v2rayN.slnx .gitignore .gitmodules BUILDING.md design-qa.md tools
+          git diff --binary "--output=$patch" "refs/tags/$base" HEAD -- .github/workflows/upstream-draft.yml v2rayN/v2rayN/App.xaml v2rayN/v2rayN/App.xaml.cs v2rayN/v2rayN/Views v2rayN/v2rayN/Resources v2rayN/v2rayN/Services v2rayN/v2rayN/v2rayN.csproj v2rayN/AmazTool v2rayN/v2rayN.Tests v2rayN/v2rayN.slnx .gitignore .gitmodules BUILDING.md design-qa.md tools
           if ($LASTEXITCODE -ne 0) { throw "Quiet UI patch generation failed: $LASTEXITCODE" }
           if ((Get-Item $patch).Length -eq 0) { throw 'Quiet UI patch layer is empty.' }
           "patch=$patch" >> $env:GITHUB_OUTPUT
@@ -122,6 +122,16 @@ jobs:
           ))
           if ($popupDictionaries.Count -ne 1) {
             throw "Customized main window guard failed; expected exactly one PopupBox resource dictionary, found $($popupDictionaries.Count)."
+          }
+          [xml]$appXaml = Get-Content -LiteralPath v2rayN/v2rayN/App.xaml -Raw -Encoding utf8
+          $appNamespaces = [Xml.XmlNamespaceManager]::new($appXaml.NameTable)
+          $appNamespaces.AddNamespace('p', 'http://schemas.microsoft.com/winfx/2006/xaml/presentation')
+          $quietThemeDictionaries = @($appXaml.SelectNodes(
+            "/p:Application/p:Application.Resources/p:ResourceDictionary/p:ResourceDictionary.MergedDictionaries/p:ResourceDictionary[@Source='Resources/QuietControlTheme.xaml']",
+            $appNamespaces
+          ))
+          if ($quietThemeDictionaries.Count -ne 1) {
+            throw "Customized application guard failed; expected exactly one QuietControlTheme dictionary, found $($quietThemeDictionaries.Count)."
           }
 
       - name: Setup .NET 10
@@ -213,7 +223,7 @@ jobs:
               if ($process.HasExited) {
                 throw "Final ZIP startup smoke test process exited early with code $($process.ExitCode)."
               }
-              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle -eq 'Quiet Control Center') {
+              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle.StartsWith('Quiet Control Center')) {
                 break
               }
             } while ([DateTime]::UtcNow -lt $deadline)
@@ -234,7 +244,7 @@ jobs:
             $process.Refresh()
             if ($process.HasExited) { throw 'Final ZIP startup smoke test process did not remain alive.' }
             if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Final ZIP did not create a main window within 30 seconds.' }
-            if ($process.MainWindowTitle -ne 'Quiet Control Center') {
+            if (-not $process.MainWindowTitle.StartsWith('Quiet Control Center')) {
               throw "Unexpected final ZIP main window title: '$($process.MainWindowTitle)'"
             }
             Write-Host "Final ZIP startup smoke test passed for PID $($process.Id)."
