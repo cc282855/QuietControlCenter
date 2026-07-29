@@ -21,4 +21,5 @@
   <Project Path="ServiceLib/ServiceLib.csproj" />
   <Project Path="v2rayN.Desktop/v2rayN.Desktop.csproj" />
   <Project Path="v2rayN/v2rayN.csproj" />
+  <Project Path="v2rayN.Tests/v2rayN.Tests.csproj" />
 </Solution>

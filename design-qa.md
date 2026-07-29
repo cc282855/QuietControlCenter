@@ -1,52 +1,23 @@
 # Quiet Control Center design QA
 
-## Visual source of truth
+Final inspection: 2026-07-29T12:53:17+08:00
+Reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-b51a56d2-1f5b-4dec-9020-8fa47bb6d75f.png`
 
-- Reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-b51a56d2-1f5b-4dec-9020-8fa47bb6d75f.png`
-- Reference dimensions: 1487 x 1058 px.
-- Final connected fixture: `.codex/state/runs/qcc-20260729-03/implement/qcc-connected-ultimate-1487x1058.png`
-- Final empty fixture: `.codex/state/runs/qcc-20260729-03/implement/qcc-empty-ultimate-1487x1058.png`
-- Final responsive fixture: `.codex/state/runs/qcc-20260729-03/implement/qcc-responsive-ultimate-1120x720.png`
-- Full side-by-side comparison: `.codex/state/runs/qcc-20260729-03/implement/comparison-reference-vs-verified.png` (2974 x 1058 px).
+All frames below were rendered by the final published `v2rayN.exe` at normalized 96 DPI, not copied from an earlier build:
 
-Captures were produced from disposable copies of the published application at
-150% system scale, then normalized to the stated 96-DPI logical target. The
-fixture database and local loopback server live only under the run evidence
-directory and are not included in `artifacts/qcc-win-x64`.
+- Connected safe-loopback, 1487×1058: `.codex/state/runs/qcc-20260729-04/implement/final-connected-1487x1058.png` — SHA-256 `BA8C42E2A5DF94AE293FDC1D200BF0A634AD904D78C563C6E73FFE9020CD5659`.
+- Empty state, 1487×1058: `.codex/state/runs/qcc-20260729-04/implement/final-empty-1487x1058.png` — SHA-256 `37B61261880136D56F48EAF2E8294AD8237BC26462AC627E532C6436053D6CB2`.
+- Responsive state, 1120×720: `.codex/state/runs/qcc-20260729-04/implement/final-responsive-1120x720.png` — SHA-256 `62B59A99696E335E287B95F981F6C098E9038C947A9721CDD31F3C69076EB87D`.
+- Reference/final side-by-side: `.codex/state/runs/qcc-20260729-04/implement/final-comparison-reference-connected.png` — SHA-256 `73633640161296D185927F410A56BCF95E82EAC0FAB37A6BA48926D63D934DD5`.
 
-## Comparison history
+Inspection found no clipping, unintended overlap, stale update wording, broken hierarchy, or missing primary controls. The 1120×720 frame preserves navigation, hero status, node table/empty state, details panel, and bottom controls. The connected frame uses a local-only SOCKS fixture and visibly reports `已连接`; the empty frame has no transient snackbar.
 
-1. `qcc-20260729-02`: first native implementation; empty table had no guidance,
-   the 1120 x 720 table truncated headers, inspector actions fell below the
-   fold, status copy contradicted itself, and official GUI replacement remained
-   reachable.
-2. `qcc-20260729-03` intermediate: added empty state, fixed inspector action
-   placement and narrow columns, then corrected fixture Unicode, selected-row
-   binding, and speed/delay units.
-3. `qcc-20260729-03` final: build/test/publish passed; wide connected, empty,
-   and responsive captures were inspected at original resolution.
+Fixture processes were terminated by exact spawned PID, the loopback listener on port 19080 was removed, and pre-existing PID 58048 remained present and untouched. Evidence is recorded in `final-artifact-audit.json`.
 
-## Explicit checks
+P0: none
 
-| Area | Result | Evidence / notes |
-| --- | --- | --- |
-| Typography | Pass | Chinese labels remain legible; hierarchy follows the reference with a strong hero title, detail headings, and restrained supporting copy. |
-| Spacing and layout | Pass | Left navigation, hero, node table, fixed inspector actions, five-part controls, and status strip preserve the reference hierarchy. |
-| Colors and semantic state | Pass | Blue primary, pale selection, green/orange/red delay semantics, and neutral disconnected state are consistent. |
-| Assets and icons | Pass | Material Design vector icons are consistent and scale cleanly; no missing raster asset is visible. |
-| Copy and content | Pass | “检查内核更新” states the safe scope; startup status uses one authoritative “未连接”; delay and speed include `ms` and `MB/s`. |
-| Empty state | Pass | Empty capture gives an explanation and a working “添加订阅” action. |
-| 1120 x 720 | Pass | Secondary table columns collapse; remaining headers are readable and all six inspector actions plus advanced settings are immediately discoverable. |
-| Long text | Pass | Address and status fields trim or scroll without overlapping adjacent controls. |
-| Connected-state parity | Pass | A disposable local VLESS server at `127.0.0.1:24443`, availability endpoint at `127.0.0.1:24444`, and client SOCKS inbound at `127.0.0.1:20808` produced a real core connection. The fixture-owned `xray.exe` listened on 20808, while the UI showed node “香港 01”, badge “已连接”, and the same 7 ms core state in the hero and status bar. |
+P1: none
 
-## Runtime and cleanup evidence
+P2: none
 
-- The local VLESS/HTTP/client loopback was a real end-to-end runtime fixture;
-  no production-only fake status hook was added.
-- Final cleanup found zero processes whose executable path was under the
-  disposable fixture and zero listeners on ports 20808, 24443, and 24444.
-- The user's pre-existing administrator instance PID 58048 remained alive and
-  was never touched.
-
-`final result: passed`
+final result: passed

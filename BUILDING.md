@@ -1,71 +1,45 @@
 # Quiet Control Center 7.24.3
 
-This repository pins the upstream v2rayN source at 7.24.3 and the required
-`v2rayN/GlobalHotKeys` submodule at commit
-`162d401dfe0140b41d1fa349b9aadb4060e739b1` from
-<https://github.com/2dust/GlobalHotKeys>.
+The customized UI is a maintained patch layer over upstream v2rayN. The official GUI is detection-only forever: the built-in update panel contains only core and Geo updates. A complete Quiet Control Center package is the only allowed GUI update.
 
-Clone reproducibly with:
+## Daily lifecycle
 
-```powershell
-git clone --recurse-submodules <quiet-control-center-repository>
-git -C v2rayN/GlobalHotKeys checkout 162d401dfe0140b41d1fa349b9aadb4060e739b1
+The single scheduler starts when the main window loads, checks immediately if the persisted 24-hour gate is due, and continues every 24 hours while the app is tray-resident. State is stored atomically at `%LOCALAPPDATA%\QuietControlCenter\update-state.json`. Corrupt state and implausible future timestamps recover as due. Network, JSON, permission, and timeout failures are silent and never block proxy startup. Concurrent checks coalesce.
+
+The official API `https://api.github.com/repos/2dust/v2rayN/releases/latest` only produces a notice. Official archives are never downloaded or passed to the updater.
+
+## Enable the custom signed channel
+
+The channel is dormant unless every field below exists in `%LOCALAPPDATA%\QuietControlCenter\update-channel.json`:
+
+```json
+{
+  "manifestUrl": "https://github.com/OWNER/REPOSITORY/releases/latest/download/quiet-update-manifest.json",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n...P-256 PUBLIC KEY ONLY...\n-----END PUBLIC KEY-----",
+  "expectedOwner": "OWNER",
+  "expectedRepository": "REPOSITORY"
+}
 ```
 
-Build and verify with .NET SDK 10:
+Never place a private key in the client or repository. Configure the matching P-256 private PEM only as the GitHub Actions secret `QCC_SIGNING_PRIVATE_KEY_PEM`. The workflow remains draft-only. Without that secret it emits an unsigned draft manifest, which every client rejects. A human must review the UI screenshots, provenance URL, hashes, and draft before publishing.
+
+The signed canonical bytes are UTF-8 lines in this exact order, ending with a newline: `schema`, `product`, `appVersion`, `platform`, `assetUrl`, lowercase `sha256`, `provenanceUrl`. URLs must be HTTPS, contain no credentials, and belong to the pinned owner/repository. The client streams the archive with a 512 MiB cap, checks the actual SHA-256, validates `qcc-package.json`, and rehashes every marked payload file before invoking the external helper.
+
+The helper accepts only `AmazTool qcc-upgrade <absolute-instruction.json>`. Legacy arbitrary ZIP invocation exits nonzero. The instruction, hash sidecar, package, and acknowledgement must use exact filenames inside `%TEMP%\QuietControlCenter\<random-guid>`; the helper binds the request to the exact originating PID, start time, executable path, and executable hash. It performs bounded, path-safe extraction on the installation volume. Only explicit mutable directories (`guiConfigs`, `guiLogs`, `logs`, and `binConfigs`) survive, and only when they do not collide with marker-owned paths or contain reparse points. Signed `bin` executables are always new-package-wins. The fully staged immutable tree is rehashed after preservation. Directory replacement is transactional and rolls back unless the new client emits the one-time startup acknowledgement. That acknowledgement commits the transaction; a locked backup is then left for deferred cleanup and can never roll back a running acknowledged version.
+
+`tools/package-qcc.ps1` removes runtime databases, logs, temporary directories, and generated configuration before producing `qcc-package.json`. The marker contains only relative immutable payload paths and hashes.
+
+## Reproducible build
+
+The required `v2rayN/GlobalHotKeys` submodule is pinned at `162d401dfe0140b41d1fa349b9aadb4060e739b1`.
 
 ```powershell
 dotnet restore v2rayN/v2rayN.slnx
 dotnet build v2rayN/v2rayN/v2rayN.csproj -c Release --no-restore
 dotnet test v2rayN/ServiceLib.Tests/ServiceLib.Tests.csproj -c Release --no-restore
+dotnet test v2rayN/v2rayN.Tests/v2rayN.Tests.csproj -c Release --no-restore
 dotnet publish v2rayN/v2rayN/v2rayN.csproj -c Release -r win-x64 --self-contained true -o artifacts/qcc-win-x64
+dotnet publish v2rayN/AmazTool/AmazTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/qcc-helper
 ```
 
-The in-app update panel intentionally updates only proxy cores and Geo data.
-It removes the upstream `ECoreType.v2rayN` GUI replacement item before the
-panel is shown. Update the customized client only by installing a complete
-Quiet Control Center package produced from this repository; never mix its UI
-files with an official v2rayN binary update.
-
-## Daily upstream detection and custom channel
-
-On startup the client schedules an anonymous, non-blocking query to the
-official GitHub Releases API. The check uses a five-second timeout and records
-`lastCheckedUtc` plus `latestSeenTag` in
-`%LOCALAPPDATA%\QuietControlCenter\update-state.json`; it runs at most once per
-24 hours. Offline, malformed, rate-limited, and unwritable-state failures are
-silent and cannot block proxy startup. An official release is detection-only:
-the application displays that a compatible Quiet Control Center package is
-required and never downloads or replaces the official GUI.
-
-An optional custom channel can be enabled by creating
-`%LOCALAPPDATA%\QuietControlCenter\update-channel.json`:
-
-```json
-{ "manifestUrl": "https://github.com/OWNER/REPOSITORY/releases/latest/download/quiet-update-manifest.json" }
-```
-
-The manifest contract is shown in `tools/quiet-update-manifest.example.json`.
-It requires an app version, `win-x64`, an HTTPS full-package URL, a 64-character
-SHA-256, and an HTTPS provenance URL. Signature metadata is reserved by the
-contract. The current client remains notification-only even for a valid custom
-manifest; it never auto-installs unsigned or unverified bytes. With no channel
-file, official detection plus a clear manual-package notice is the intended
-behavior.
-
-## Fork automation (not active until configured)
-
-`.github/workflows/upstream-draft.yml` checks upstream daily or accepts a
-manual tag. In a user-owned fork it derives the maintained Quiet UI patch layer
-from `QUIET_UI_BASE_TAG` (default `7.24.3`), checks out the exact new upstream
-tag, runs `git apply --check` and fails closed on conflicts, then restores,
-builds, tests, publishes, hashes, and creates a **draft** custom release.
-Publishing still requires human visual/provenance review. This repository has
-no supplied fork or credentials, so the workflow is an automation artifact,
-not a claim that a release channel is currently live.
-
-Run the deterministic update-policy checks locally with:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/verify-update-invariants.ps1
-```
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/verify-update-invariants.ps1` before packaging.

@@ -1,6 +1,7 @@
 using System.Reactive.Disposables;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MaterialDesignThemes.Wpf;
 using v2rayN.Base;
 using v2rayN.Manager;
@@ -14,6 +15,8 @@ public partial class MainWindow
     private readonly SerialDisposable _layoutBindingsDisposable = new();
     private CheckUpdateView? _checkUpdateView;
     private BackupAndRestoreView? _backupAndRestoreView;
+    private readonly CancellationTokenSource _quietUpdateCancellation = new();
+    private Task? _quietUpdateLoop;
 
     public MainWindow()
     {
@@ -225,6 +228,7 @@ public partial class MainWindow
 
     private async void Current_SessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
+        _quietUpdateCancellation.Cancel();
         Logging.SaveLog("Current_SessionEnding");
         StorageUI();
         await AppManager.Instance.AppExitAsync(false);
@@ -232,6 +236,7 @@ public partial class MainWindow
 
     private void Shutdown(bool obj)
     {
+        _quietUpdateCancellation.Cancel();
         Application.Current.Shutdown();
     }
 
@@ -445,15 +450,80 @@ public partial class MainWindow
             ShowHideWindow(false);
         }
         RestoreUI();
-        _ = CheckQuietUpdatesAsync();
+        WriteStartupAcknowledgement();
+        _quietUpdateLoop ??= RunQuietUpdateLoopAsync();
+        _ = CaptureQaFrameIfRequestedAsync();
     }
 
-    private async Task CheckQuietUpdatesAsync()
+    private async Task RunQuietUpdateLoopAsync()
     {
-        var notices = await new QuietUpdateService().CheckAsync(Utils.GetVersion());
-        foreach (var notice in notices)
+        var scheduler = new QuietUpdateScheduler(new QuietUpdateService(), new SystemQuietDelay());
+        try
         {
-            MainSnackbar.MessageQueue?.Enqueue(notice, null, null, null, false, true, TimeSpan.FromSeconds(12));
+            await scheduler.RunAsync(Utils.GetVersion(), async result =>
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    foreach (var notice in result.Notices)
+                        MainSnackbar.MessageQueue?.Enqueue(notice, null, null, null, false, true, TimeSpan.FromSeconds(12));
+                    if (result.UpgradeStarted)
+                    {
+                        StorageUI();
+                        _quietUpdateCancellation.Cancel();
+                        Application.Current.Shutdown();
+                    }
+                });
+            }, _quietUpdateCancellation.Token);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private static void WriteStartupAcknowledgement()
+    {
+        var args = Environment.GetCommandLineArgs();
+        var index = Array.IndexOf(args, "--qcc-startup-ack");
+        if (index < 0 || index + 2 >= args.Length || !Path.IsPathFullyQualified(args[index + 1])) return;
+        try
+        {
+            var ack = Path.GetFullPath(args[index + 1]);
+            var tempRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "QuietControlCenter"));
+            var workRoot = Path.GetDirectoryName(ack);
+            if (workRoot is not null
+                && string.Equals(Directory.GetParent(workRoot)?.FullName, tempRoot, StringComparison.OrdinalIgnoreCase)
+                && Guid.TryParseExact(Path.GetFileName(workRoot), "N", out _)
+                && string.Equals(Path.GetFileName(ack), "startup.ack", StringComparison.Ordinal)
+                && args[index + 2].Length == 48
+                && args[index + 2].All(Uri.IsHexDigit))
+                File.WriteAllText(ack, args[index + 2]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    private async Task CaptureQaFrameIfRequestedAsync()
+    {
+        var args = Environment.GetCommandLineArgs();
+        var index = Array.IndexOf(args, "--qcc-qa-capture");
+        if (index < 0 || index + 3 >= args.Length || !Path.IsPathFullyQualified(args[index + 1])
+            || !int.TryParse(args[index + 2], out var width) || !int.TryParse(args[index + 3], out var height)
+            || width is < 900 or > 2000 || height is < 600 or > 1400) return;
+        try
+        {
+            Width = width; Height = height; WindowState = WindowState.Normal;
+            UpdateLayout();
+            if (args.Contains("--qcc-qa-reload", StringComparer.Ordinal)) await ViewModel.Reload();
+            await Task.Delay(8000);
+            UpdateConnectionStateBadge();
+            UpdateLayout();
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(this);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            await using var stream = new FileStream(Path.GetFullPath(args[index + 1]), FileMode.Create, FileAccess.Write, FileShare.None);
+            encoder.Save(stream);
+        }
+        finally
+        {
+            _quietUpdateCancellation.Cancel();
+            Application.Current.Shutdown();
         }
     }
 
