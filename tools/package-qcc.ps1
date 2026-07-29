@@ -18,6 +18,10 @@ Get-ChildItem -LiteralPath $artifactRootResolved -File | ForEach-Object {
     if ($_.Name -ne 'qcc-package.json' -and $_.Extension -notin @('.exe', '.dll')) { Remove-Item -LiteralPath $_.FullName -Force }
 }
 Copy-Item -LiteralPath $Helper -Destination (Join-Path $Artifact 'AmazTool.exe') -Force
+$requiredRuntimeFiles = @('bin/xray/xray.exe', 'bin/sing_box/sing-box.exe', 'bin/mihomo/mihomo.exe')
+foreach ($relative in $requiredRuntimeFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Artifact $relative))) { throw "Required runtime payload is missing: $relative" }
+}
 $files = [ordered]@{}
 $artifactRoot = (Resolve-Path $Artifact).Path.TrimEnd('\') + '\'
 Get-ChildItem -LiteralPath $Artifact -File -Recurse |

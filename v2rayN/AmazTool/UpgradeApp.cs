@@ -263,7 +263,8 @@ internal static class UpgradeApp
             var escaped = workRoot.Replace("'", "''");
             var script = $"$p=Get-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue;if($p){{$p|Wait-Process}};Remove-Item -LiteralPath '{escaped}' -Recurse -Force -ErrorAction SilentlyContinue";
             var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-            _ = Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}")
+            var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+            _ = Process.Start(new ProcessStartInfo(powershell, $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}")
             { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden });
         }
         catch { }

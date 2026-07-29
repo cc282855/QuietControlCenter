@@ -6,6 +6,11 @@ on:
       upstream_tag:
         description: Upstream v2rayN tag (for example 7.24.4)
         required: false
+      force_rebuild:
+        description: Rebuild and repair an existing Quiet release
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "17 2 * * *"
 
@@ -27,6 +32,7 @@ jobs:
         shell: pwsh
         env:
           REQUESTED_TAG: ${{ inputs.upstream_tag }}
+          FORCE_REBUILD: ${{ inputs.force_rebuild }}
           BASE_TAG: ${{ vars.QUIET_UI_BASE_TAG }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -49,12 +55,28 @@ jobs:
             if ($candidates.Count -eq 0) { throw 'No semantic upstream release was found.' }
             $tag = ($candidates | Sort-Object Version, PublishedAt -Descending | Select-Object -First 1).Tag
           }
+          if ($tag -notmatch '^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') { throw "Invalid upstream tag: $tag" }
           "tag=$tag" >> $env:GITHUB_OUTPUT
           $releaseTag = "quiet-$tag"
-          if (gh release view $releaseTag --repo "${{ github.repository }}" 2>$null) {
-            "skip=true" >> $env:GITHUB_OUTPUT
-            Write-Host "Quiet release $releaseTag already exists; nothing to publish."
-            exit 0
+          $zipName = "QuietControlCenter-$tag-win-x64.zip"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $releaseJson = gh release view $releaseTag --repo "${{ github.repository }}" --json isDraft,assets 2>$null
+          $releaseExists = $LASTEXITCODE -eq 0
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($releaseExists -and $env:FORCE_REBUILD -ne 'true') {
+            $quietRelease = $releaseJson | ConvertFrom-Json
+            $expectedAssets = @($zipName, 'quiet-update-manifest.json')
+            $assets = @($quietRelease.assets)
+            $assetNames = @($assets | ForEach-Object name)
+            $complete = -not $quietRelease.isDraft -and $assets.Count -eq 2 -and
+              @($expectedAssets | Where-Object { $_ -notin $assetNames }).Count -eq 0 -and
+              @($assets | Where-Object { $_.state -ne 'uploaded' -or $_.digest -notmatch '^sha256:[0-9a-f]{64}$' }).Count -eq 0
+            if ($complete) {
+              "skip=true" >> $env:GITHUB_OUTPUT
+              Write-Host "Complete Quiet release $releaseTag already exists; nothing to publish."
+              exit 0
+            }
+            Write-Host "Quiet release $releaseTag is incomplete or still a draft; rebuilding it."
           }
           "skip=false" >> $env:GITHUB_OUTPUT
           $base = if ($env:BASE_TAG) { $env:BASE_TAG } else { '7.24.3' }
@@ -98,6 +120,36 @@ jobs:
           dotnet publish v2rayN/v2rayN/v2rayN.csproj -c Release -r win-x64 --self-contained true -o artifacts/qcc-win-x64
           dotnet publish v2rayN/AmazTool/AmazTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/qcc-helper
           Copy-Item artifacts/qcc-helper/AmazTool.exe artifacts/qcc-win-x64/AmazTool.exe -Force
+
+      - name: Import verified upstream runtime payload
+        if: steps.prepare.outputs.skip != 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tag = '${{ steps.prepare.outputs.tag }}'
+          $assetName = 'v2rayN-windows-64.zip'
+          $release = gh api "repos/2dust/v2rayN/releases/tags/$tag" | ConvertFrom-Json
+          $asset = @($release.assets | Where-Object name -eq $assetName)
+          if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].digest -notmatch '^sha256:[0-9a-f]{64}$') {
+            throw "Verified upstream asset is unavailable: $assetName"
+          }
+          New-Item -ItemType Directory -Path artifacts/upstream -Force | Out-Null
+          gh release download $tag --repo 2dust/v2rayN --pattern $assetName --dir artifacts/upstream
+          $archive = Join-Path artifacts/upstream $assetName
+          $actualDigest = 'sha256:' + (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualDigest -ne $asset[0].digest.ToLowerInvariant()) { throw 'Upstream runtime archive digest mismatch.' }
+          Expand-Archive -LiteralPath $archive -DestinationPath artifacts/upstream-expanded -Force
+          $binCandidates = @(Get-ChildItem -LiteralPath artifacts/upstream-expanded -Directory -Recurse | Where-Object Name -eq 'bin')
+          if ($binCandidates.Count -ne 1) { throw "Expected exactly one upstream bin directory; found $($binCandidates.Count)." }
+          Copy-Item -LiteralPath $binCandidates[0].FullName -Destination artifacts/qcc-win-x64 -Recurse -Force
+          if (-not (Test-Path artifacts/qcc-win-x64/bin/xray/xray.exe) -or
+              -not (Test-Path artifacts/qcc-win-x64/bin/sing_box/sing-box.exe) -or
+              -not (Test-Path artifacts/qcc-win-x64/bin/mihomo/mihomo.exe)) {
+            throw 'Required proxy cores are absent from the verified upstream runtime payload.'
+          }
 
       - name: Package and generate manifest
         if: steps.prepare.outputs.skip != 'true'
@@ -154,13 +206,40 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $releaseTag = "quiet-${{ steps.prepare.outputs.tag }}"
+          $zip = "${{ steps.package.outputs.zip }}"
+          $repository = "${{ github.repository }}"
+          $title = "Quiet Control Center ${{ steps.prepare.outputs.tag }}"
+          $notes = "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, runtime-payload, marker and signing gates passed."
+          $expectedAssets = @($zip, 'quiet-update-manifest.json')
           $PSNativeCommandUseErrorActionPreference = $false
-          gh release view $releaseTag --repo "${{ github.repository }}" *> $null
+          gh release view $releaseTag --repo $repository *> $null
           $releaseExists = $LASTEXITCODE -eq 0
           $PSNativeCommandUseErrorActionPreference = $true
           if ($releaseExists) {
-            gh release upload $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --clobber --repo "${{ github.repository }}"
-            gh release edit $releaseTag --draft=false --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed." --repo "${{ github.repository }}"
+            gh release edit $releaseTag --draft --title $title --notes $notes --repo $repository
           } else {
-            gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed." --repo "${{ github.repository }}"
+            gh release create $releaseTag --draft --title $title --notes $notes --repo $repository
+          }
+          $existing = gh release view $releaseTag --repo $repository --json assets | ConvertFrom-Json
+          foreach ($asset in @($existing.assets)) {
+            if ($asset.name -notin $expectedAssets) {
+              gh release delete-asset $releaseTag $asset.name --yes --repo $repository
+            }
+          }
+          gh release upload $releaseTag $zip quiet-update-manifest.json --clobber --repo $repository
+          $draft = gh release view $releaseTag --repo $repository --json isDraft,assets | ConvertFrom-Json
+          if (-not $draft.isDraft) { throw 'Release escaped draft state before verification.' }
+          $assets = @($draft.assets)
+          if ($assets.Count -ne 2) { throw "Expected exactly two release assets; found $($assets.Count)." }
+          foreach ($path in $expectedAssets) {
+            $asset = @($assets | Where-Object name -eq $path)
+            $expectedDigest = 'sha256:' + (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].digest.ToLowerInvariant() -ne $expectedDigest) {
+              throw "Release asset verification failed: $path"
+            }
+          }
+          gh release edit $releaseTag --draft=false --latest --title $title --notes $notes --repo $repository
+          $published = gh release view $releaseTag --repo $repository --json isDraft,isPrerelease,assets | ConvertFrom-Json
+          if ($published.isDraft -or $published.isPrerelease -or @($published.assets).Count -ne 2) {
+            throw 'Release publication verification failed.'
           }

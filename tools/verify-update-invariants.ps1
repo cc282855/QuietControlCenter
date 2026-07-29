@@ -23,8 +23,9 @@ Assert-True ($helper -match 'Directory\.Move\(install, backup\)' -and $helper -m
 Assert-True ($helper -notmatch 'new\[\] \{ "guiConfigs", "logs", "bin" \}') 'Immutable bin payload is incorrectly preserved old-wins.'
 Assert-True ($helper -match 'instruction\.sha256' -and $helper -match 'OriginExecutableSha256' -and $helper -match 'Guid\.TryParseExact') 'Instruction/work-root/origin binding is incomplete.'
 Assert-True ($helper -match 'deferred backup cleanup' -and $helper -match 'Reparse point in mutable data') 'Commit cleanup or reparse rejection is missing.'
-Assert-True ($workflow -match 'QCC_SIGNING_PRIVATE_KEY_PEM' -and $workflow -match '\-\-draft' -and $workflow -match '\-\-clobber') 'Draft/signing/rerun workflow contract is missing.'
+Assert-True ($workflow -match 'QCC_SIGNING_PRIVATE_KEY_PEM' -and $workflow -match 'release create.+\-\-draft' -and $workflow -match 'release edit.+\-\-draft=false' -and $workflow -match '\-\-clobber') 'Draft-first signing and repair contract is missing.'
 Assert-True ($workflow -match 'releases\?per_page=100' -and $workflow -match '\[Version\]\$Matches\.version') 'Highest semantic upstream release selection is missing.'
+Assert-True ($workflow -match 'v2rayN-windows-64\.zip' -and $workflow -match 'Upstream runtime archive digest mismatch' -and $workflow -match 'Required proxy cores are absent') 'Verified complete runtime payload import is missing.'
 Assert-True ($workflow -match 'actions/checkout@[0-9a-f]{40}' -and $workflow -match 'actions/setup-dotnet@[0-9a-f]{40}') 'Third-party actions are not pinned to full SHAs.'
 
 $manifest = Get-Content -Raw (Join-Path $root 'tools/quiet-update-manifest.example.json') | ConvertFrom-Json
@@ -32,4 +33,4 @@ Assert-True ($manifest.schema -eq 1 -and $manifest.product -eq 'QuietControlCent
 Assert-True ($manifest.sha256 -match '^[a-fA-F0-9]{64}$') 'Manifest SHA-256 is invalid.'
 Assert-True (([uri]$manifest.assetUrl).Scheme -eq 'https' -and ([uri]$manifest.assetUrl).UserInfo -eq '') 'Asset URL is unsafe.'
 
-'PASS: official detection-only, daily lifecycle, dormant signed channel, streamed hashes, path-safe transaction, rollback, and draft-only workflow.'
+'PASS: official detection-only, daily lifecycle, production signed channel, complete runtime payload, streamed hashes, path-safe transaction, rollback, and draft-first verified publication.'
