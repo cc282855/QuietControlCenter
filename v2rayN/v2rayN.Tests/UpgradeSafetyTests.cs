@@ -64,7 +64,9 @@ public sealed class UpgradeSafetyTests
     [Fact]
     public void ReadyPrecedesParentExitAndInstallSwap()
     {
-        var fixture = PackageFixture(new Dictionary<string, byte[]> { ["v2rayN.exe"] = File.ReadAllBytes(SystemExe("where.exe")) });
+        var fixture = PackageFixture(
+            new Dictionary<string, byte[]> { ["v2rayN.exe"] = File.ReadAllBytes(SystemExe("where.exe")) },
+            parentPingCount: 30);
         var readyObserved = false;
         var hooks = AckHooks(fixture);
 
@@ -223,7 +225,7 @@ public sealed class UpgradeSafetyTests
         return new(root, install, instruction, null, token);
     }
 
-    private static Fixture PackageFixture(Dictionary<string, byte[]> files)
+    private static Fixture PackageFixture(Dictionary<string, byte[]> files, int parentPingCount = 2)
     {
         var root = WorkRoot(); var install = Path.Combine(Directory.GetParent(root)!.FullName, "app-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(install);
         var oldExe = Path.Combine(install, "v2rayN.exe"); File.Copy(SystemExe("ping.exe"), oldExe); File.WriteAllText(Path.Combine(install, "sentinel.txt"), "old");
@@ -234,7 +236,7 @@ public sealed class UpgradeSafetyTests
             foreach (var pair in files) { var e = zip.CreateEntry(pair.Key); using var s = e.Open(); s.Write(pair.Value); hashes[pair.Key] = Convert.ToHexString(SHA256.HashData(pair.Value)); }
             var marker = zip.CreateEntry("qcc-package.json"); using var stream = marker.Open(); JsonSerializer.Serialize(stream, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = hashes });
         }
-        var parent = Process.Start(new ProcessStartInfo(oldExe, "-n 2 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true })!;
+        var parent = Process.Start(new ProcessStartInfo(oldExe, $"-n {parentPingCount} 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true })!;
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
         var instruction = WriteInstruction(root, install, package, parent, oldExe, "7.25.0", token);
         return new(root, install, instruction, parent, token);
