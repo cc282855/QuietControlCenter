@@ -1,0 +1,23 @@
+{
+  "audit_id": "qcc-20260729-02-discovery",
+  "run_id": "qcc-20260729-02",
+  "phase_id": "discovery",
+  "verdict": "INCONCLUSIVE",
+  "checked_roles": [
+    "project_explorer",
+    "project_qa"
+  ],
+  "reasons": [
+    {
+      "level": "inconclusive",
+      "code": "SNAPSHOT_METHOD",
+      "message": "仅支持 git-status-porcelain 快照。"
+    },
+    {
+      "level": "inconclusive",
+      "code": "GIT_STATUS",
+      "message": "无法读取当前 Git 状态：fatal: not a git repository (or any of the parent directories): .git。"
+    }
+  ],
+  "generated_at": "2026-07-29T02:21:57.382301+00:00"
+}

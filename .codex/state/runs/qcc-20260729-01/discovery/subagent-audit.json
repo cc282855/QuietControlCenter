@@ -1,0 +1,39 @@
+{
+  "audit_id": "qcc-20260729-01-discovery",
+  "run_id": "qcc-20260729-01",
+  "phase_id": "discovery",
+  "expected": [
+    {
+      "role": "project_explorer",
+      "agent_name": "project_explorer",
+      "task_id": "qcc-20260729-01-discovery-explorer",
+      "mode": "read-only",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib"
+      ]
+    },
+    {
+      "role": "project_qa",
+      "agent_name": "project_qa",
+      "task_id": "qcc-20260729-01-discovery-qa",
+      "mode": "read-only",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib"
+      ]
+    }
+  ],
+  "observed": [],
+  "runtime_policy": {
+    "parent_permission_mode": "fill-from-runtime",
+    "evidence_source": "Codex 子智能体面板、/agent 或等价运行时状态"
+  },
+  "workspace_snapshot": {
+    "method": "git-status-porcelain",
+    "before": "fill-before-spawn",
+    "after": "fill-after-results",
+    "changed": false
+  },
+  "results": []
+}

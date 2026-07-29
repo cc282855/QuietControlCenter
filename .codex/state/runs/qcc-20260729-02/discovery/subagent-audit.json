@@ -1,0 +1,84 @@
+{
+  "audit_id": "qcc-20260729-02-discovery",
+  "run_id": "qcc-20260729-02",
+  "phase_id": "discovery",
+  "expected": [
+    {
+      "role": "project_explorer",
+      "agent_name": "project_explorer",
+      "task_id": "qcc-20260729-02-discovery-explorer",
+      "mode": "read-only",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib",
+        "v2rayN\\ServiceLib.Tests",
+        "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\codex-clipboard-b51a56d2-1f5b-4dec-9020-8fa47bb6d75f.png"
+      ]
+    },
+    {
+      "role": "project_qa",
+      "agent_name": "project_qa",
+      "task_id": "qcc-20260729-02-discovery-qa",
+      "mode": "read-only",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib",
+        "v2rayN\\ServiceLib.Tests",
+        "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\codex-clipboard-b51a56d2-1f5b-4dec-9020-8fa47bb6d75f.png"
+      ]
+    }
+  ],
+  "observed": [
+    {
+      "role": "project_explorer",
+      "agent_name": "project_explorer",
+      "agent_thread_id": "/root/project_explorer",
+      "permission_mode": "read-only",
+      "state": "done"
+    },
+    {
+      "role": "project_qa",
+      "agent_name": "project_qa",
+      "agent_thread_id": "/root/project_qa",
+      "permission_mode": "read-only",
+      "state": "done"
+    }
+  ],
+  "runtime_policy": {
+    "parent_permission_mode": "danger-full-access",
+    "evidence_source": "Codex collaboration spawn/followup runtime and agent result messages"
+  },
+  "workspace_snapshot": {
+    "method": "git-status-porcelain",
+    "before": "",
+    "after": "",
+    "changed": false
+  },
+  "results": [
+    {
+      "task_id": "qcc-20260729-02-discovery-explorer",
+      "agent_thread_id": "/root/project_explorer",
+      "status": "done",
+      "summary": "完成 WPF 视图、ViewModel、资源和测试缺口的范围内只读审计。",
+      "evidence": [
+        {"kind": "command", "value": "rg 静态审计 MainWindow/ProfilesView/StatusBarView 及 ViewModels", "exit_code": 0},
+        {"kind": "path", "value": "v2rayN/v2rayN/Views/ProfilesView.xaml"},
+        {"kind": "finding", "value": "cmbMoveToGroup 位于 DataTemplate namescope，DelayColorConverter 未在 ProfilesView 可见作用域注册。"}
+      ],
+      "blockers": "只读阶段未执行构建或启动。"
+    },
+    {
+      "task_id": "qcc-20260729-02-discovery-qa",
+      "agent_thread_id": "/root/project_qa",
+      "status": "done",
+      "summary": "完成 XML、命名控件、资源、测试覆盖与参考图尺寸的范围内只读 QA 审计。",
+      "evidence": [
+        {"kind": "command", "value": "XmlDocument.Load 五个关键 XAML 文件", "exit_code": 0},
+        {"kind": "command", "value": "x:Name、事件与 Qcc 资源交叉检查", "exit_code": 0},
+        {"kind": "path", "value": "C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-b51a56d2-1f5b-4dec-9020-8fa47bb6d75f.png"},
+        {"kind": "finding", "value": "参考图为 1487x1058@96DPI；详情按钮与动态状态是首要功能缺口。"}
+      ],
+      "blockers": "缺 .NET 10 SDK；只读阶段未执行构建、启动或截图。"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "run_id": "qcc-20260729-01",
+  "phase": "discovery",
+  "project": {
+    "name": "Quiet Control Center v7.24.3",
+    "risk": "standard",
+    "risk_reasons": [
+      "跨 MainWindow、ProfilesView、StatusBarView、主题和构建链，且需要原生运行验证"
+    ],
+    "scope": [
+      "v2rayN\\v2rayN",
+      "v2rayN\\ServiceLib"
+    ],
+    "acceptance_criteria": [
+      "WPF 项目成功编译；主窗口主要区域匹配参考图；节点、订阅、系统代理、TUN、路由与托盘绑定保留；设计 QA 有截图证据"
+    ]
+  },
+  "prior_audit_report": null,
+  "roles": [
+    {
+      "name": "project_explorer",
+      "task_id": "qcc-20260729-01-discovery-explorer",
+      "stage": "discovery",
+      "mode": "read-only",
+      "task": "只读定位与目标相关的模块、测试、依赖和风险；项目目标：将用户选定的第一张视觉稿实现为可运行的 v2rayN 7.24.3 Windows WPF UI，并保留现有代理功能。",
+      "expected_output": "模块地图、证据路径和风险清单。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib"
+      ]
+    },
+    {
+      "name": "project_qa",
+      "task_id": "qcc-20260729-01-discovery-qa",
+      "stage": "discovery",
+      "mode": "read-only",
+      "task": "只读检查测试覆盖、回归风险和验证路径；项目目标：将用户选定的第一张视觉稿实现为可运行的 v2rayN 7.24.3 Windows WPF UI，并保留现有代理功能。",
+      "expected_output": "测试矩阵、回归风险和验证命令。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib"
+      ]
+    }
+  ]
+}
