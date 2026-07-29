@@ -1,0 +1,11 @@
+{
+  "audit_id": "qcc-20260729-02-planning",
+  "run_id": "qcc-20260729-02",
+  "phase_id": "planning",
+  "verdict": "PASS",
+  "checked_roles": [
+    "project_planner"
+  ],
+  "reasons": [],
+  "generated_at": "2026-07-29T02:30:37.157642+00:00"
+}

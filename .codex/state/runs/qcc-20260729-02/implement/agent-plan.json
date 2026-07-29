@@ -1,0 +1,41 @@
+{
+  "run_id": "qcc-20260729-02",
+  "phase": "implement",
+  "project": {
+    "name": "Quiet Control Center v7.24.3",
+    "risk": "standard",
+    "risk_reasons": [
+      "跨六个 WPF UI 文件且需原生构建运行验证"
+    ],
+    "scope": [
+      "v2rayN\\v2rayN\\Resources\\QuietControlTheme.xaml",
+      "v2rayN\\v2rayN\\Views\\MainWindow.xaml",
+      "v2rayN\\v2rayN\\Views\\MainWindow.xaml.cs",
+      "v2rayN\\v2rayN\\Views\\ProfilesView.xaml",
+      "v2rayN\\v2rayN\\Views\\ProfilesView.xaml.cs",
+      "v2rayN\\v2rayN\\Views\\StatusBarView.xaml"
+    ],
+    "acceptance_criteria": [
+      "两个 P0 修复；详情命令和底部四区可用；动态版本和状态语义正确；build/test/publish 退出0；生成1487x1058原生截图"
+    ]
+  },
+  "prior_audit_report": ".codex\\state\\runs\\qcc-20260729-02\\planning\\audit-report.json",
+  "roles": [
+    {
+      "name": "project_worker",
+      "task_id": "qcc-20260729-02-implement-worker",
+      "stage": "implement",
+      "mode": "write",
+      "task": "仅在允许路径内实施已审查的计划；项目目标：由唯一 worker 修复并完成第一张参考图对应的 WPF UI，编译测试发布并截取原生证据。",
+      "expected_output": "实际差异、验证结果、限制和回滚提示。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN\\Resources\\QuietControlTheme.xaml",
+        "v2rayN\\v2rayN\\Views\\MainWindow.xaml",
+        "v2rayN\\v2rayN\\Views\\MainWindow.xaml.cs",
+        "v2rayN\\v2rayN\\Views\\ProfilesView.xaml",
+        "v2rayN\\v2rayN\\Views\\ProfilesView.xaml.cs",
+        "v2rayN\\v2rayN\\Views\\StatusBarView.xaml"
+      ]
+    }
+  ]
+}
