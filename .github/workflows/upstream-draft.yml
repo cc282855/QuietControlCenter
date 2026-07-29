@@ -117,8 +117,18 @@ jobs:
             provenanceUrl = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           }
           $canonical = "1`nQuietControlCenter`n$($manifest.appVersion)`nwin-x64`n$($manifest.assetUrl)`n$sha`n$($manifest.provenanceUrl)`n"
+          $signingKey = $env:QCC_SIGNING_PRIVATE_KEY_PEM.Trim()
+          if ($signingKey -notmatch '^-----BEGIN ') {
+            try {
+              $signingKey = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($signingKey))
+            }
+            catch {
+              throw 'QCC_SIGNING_PRIVATE_KEY_PEM is neither PEM nor base64-encoded PEM.'
+            }
+          }
+          $signingKey = $signingKey.Replace('\r\n', "`n").Replace('\n', "`n")
           $key = [Security.Cryptography.ECDsa]::Create()
-          $key.ImportFromPem($env:QCC_SIGNING_PRIVATE_KEY_PEM)
+          $key.ImportFromPem($signingKey)
           $sig = $key.SignData([Text.Encoding]::UTF8.GetBytes($canonical), [Security.Cryptography.HashAlgorithmName]::SHA256)
           $manifest.signature = [Convert]::ToBase64String($sig)
           $key.Dispose()

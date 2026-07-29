@@ -102,8 +102,8 @@ internal static class QuietUpdateDefaults
         ExpectedRepository = "v2rayN",
         PublicKeyPem = """
             -----BEGIN PUBLIC KEY-----
-            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFZrXWIHpr3Dh6u8xyrrdk8czaaSp
-            ucuSeSDDWHSFdbntVUV0eq1WGnQvMNxBWgN18BCZjjGJ+W2A51yxoZ20sQ==
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/OpybzxwVVABpIeDTDZsiGPw54IS
+            k37qebQxgsfEhQ+f+smVwDPp5jgr+kp7WLkUbOks21X9d/0P4bBAQHwLiQ==
             -----END PUBLIC KEY-----
             """
     };
