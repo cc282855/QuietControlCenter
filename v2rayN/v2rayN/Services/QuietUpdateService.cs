@@ -187,6 +187,8 @@ public sealed partial class QuietUpdateService
         Directory.CreateDirectory(work);
         var handedOff = false;
         Process? helperProcess = null;
+        string? cleanupInstallDirectory = null;
+        string? cleanupToken = null;
         try
         {
             var package = Path.Combine(work, "package.zip");
@@ -206,11 +208,15 @@ public sealed partial class QuietUpdateService
             if (!File.Exists(helperSource) || !File.Exists(originExecutable)) throw new InvalidDataException("Updater helper or origin executable is unavailable.");
             var helper = Path.Combine(work, "AmazTool.exe"); File.Copy(helperSource, helper);
             var tokenValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+            var installDirectory = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
+            _ = GetCanonicalStagePath(installDirectory, tokenValue);
+            cleanupInstallDirectory = installDirectory;
+            cleanupToken = tokenValue;
             var ack = Path.Combine(work, "startup.ack");
             using var current = Process.GetCurrentProcess();
             var instruction = new
             {
-                schema = 1, product = "QuietControlCenter", packagePath = package, installDirectory = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory),
+                schema = 1, product = "QuietControlCenter", packagePath = package, installDirectory,
                 mainExecutable = "v2rayN.exe", expectedPackageSha256 = manifest.Sha256, expectedVersion = manifest.AppVersion,
                 originExecutablePath = originExecutable, originExecutableSha256 = HashFile(originExecutable),
                 processId = current.Id, processStartTimeUtc = new DateTimeOffset(current.StartTime.ToUniversalTime(), TimeSpan.Zero), token = tokenValue, ackPath = ack
@@ -232,8 +238,7 @@ public sealed partial class QuietUpdateService
         {
             if (!handedOff)
             {
-                TryKillExact(helperProcess);
-                TryDeleteDirectory(work);
+                CleanupFailedHandoff(helperProcess, cleanupInstallDirectory, cleanupToken, work);
             }
             helperProcess?.Dispose();
         }
@@ -305,7 +310,74 @@ public sealed partial class QuietUpdateService
     { await using var stream = await _http.GetAsync(uri, token).ConfigureAwait(false); return await JsonSerializer.DeserializeAsync<T>(stream, WebJson, token).ConfigureAwait(false); }
     private static string HashFile(string path) { using var s = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(s)); }
     private static void TryDeleteDirectory(string path) { try { if (Directory.Exists(path)) Directory.Delete(path, true); } catch { } }
-    private static void TryKillExact(Process? process) { try { if (process is { HasExited: false }) { process.Kill(true); process.WaitForExit(5000); } } catch { } }
+    private static bool TryKillExact(Process process)
+    {
+        try
+        {
+            if (!process.HasExited) process.Kill(true);
+            return process.WaitForExit(5000) && process.HasExited;
+        }
+        catch { return false; }
+    }
+
+    internal static string GetCanonicalStagePath(string installDirectory, string token)
+    {
+        if (token.Length != 48 || !token.All(Uri.IsHexDigit)) throw new InvalidDataException("Invalid update nonce.");
+        var install = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installDirectory));
+        var parent = Directory.GetParent(install)?.FullName ?? throw new InvalidDataException("Install directory has no parent.");
+        var leaf = ".qcc-stage-" + token.ToUpperInvariant();
+        var stage = Path.GetFullPath(Path.Combine(parent, leaf));
+        if (!string.Equals(Directory.GetParent(stage)?.FullName, parent, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(Path.GetFileName(stage), leaf, StringComparison.Ordinal))
+            throw new InvalidDataException("Stage path is not canonical.");
+        return stage;
+    }
+
+    internal static bool CleanupCanonicalStage(string installDirectory, string token)
+        => TryDeleteCanonicalStage(GetCanonicalStagePath(installDirectory, token));
+
+    internal static bool CleanupFailedHandoff(Process? helperProcess, string? installDirectory, string? token, string workRoot)
+    {
+        var helperTerminated = helperProcess is null || TryKillExact(helperProcess);
+        if (!helperTerminated) return false;
+        var stageRemoved = installDirectory is null || token is null || CleanupCanonicalStage(installDirectory, token);
+        for (var attempt = 0; attempt < 20 && Directory.Exists(workRoot); attempt++)
+        {
+            TryDeleteDirectory(workRoot);
+            if (Directory.Exists(workRoot)) Thread.Sleep(50);
+        }
+        return stageRemoved && !Directory.Exists(workRoot);
+    }
+
+    private static bool TryDeleteCanonicalStage(string stage)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try { DeleteTreeWithoutFollowingLinks(stage); } catch { }
+            if (!Directory.Exists(stage)) return true;
+            Thread.Sleep(50);
+        }
+        return false;
+    }
+
+    private static void DeleteTreeWithoutFollowingLinks(string path)
+    {
+        if (!Directory.Exists(path)) return;
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            Directory.Delete(path, false);
+            return;
+        }
+        foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.TopDirectoryOnly))
+        {
+            try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+            File.Delete(file);
+        }
+        foreach (var directory in Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly))
+            DeleteTreeWithoutFollowingLinks(directory);
+        Directory.Delete(path, false);
+    }
     private static void ValidatePackageMarker(string package, QuietUpdateManifest manifest)
     {
         using var zip = ZipFile.OpenRead(package); var entry = zip.GetEntry("qcc-package.json") ?? throw new InvalidDataException("Package marker missing.");

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.IO.Compression;
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using v2rayN.Services;
 using Xunit;
 
@@ -174,6 +175,29 @@ public sealed class QuietUpdateTests
         Assert.False(result.UpgradeStarted);
         Assert.Single(launcher.WorkRoots);
         Assert.False(Directory.Exists(launcher.WorkRoots[0]));
+        Assert.All(launcher.StagePaths, stage => Assert.False(Directory.Exists(stage)));
+        Assert.False(IsProcessAlive(launcher.ProcessId));
+    }
+
+    [Fact]
+    public async Task CancellationDuringReadyWaitTerminatesHelperAndCleansStageAndWork()
+    {
+        var launcher = new ProtocolLauncher(ReadyMode.Timeout);
+        using var cancellation = new CancellationTokenSource();
+        var check = RunSignedUpdateAsync(launcher, TimeSpan.FromSeconds(5), cancellation.Token);
+        Assert.True(SpinWait.SpinUntil(() => launcher.StagePaths.Count == 1, TimeSpan.FromSeconds(5)));
+        cancellation.Cancel();
+
+        try
+        {
+            var result = await check;
+            Assert.False(result.UpgradeStarted);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+
+        Assert.Single(launcher.WorkRoots);
+        Assert.False(Directory.Exists(launcher.WorkRoots[0]));
+        Assert.All(launcher.StagePaths, stage => Assert.False(Directory.Exists(stage)));
         Assert.False(IsProcessAlive(launcher.ProcessId));
     }
 
@@ -194,7 +218,7 @@ public sealed class QuietUpdateTests
         catch (ArgumentException) { return false; }
     }
 
-    private static async Task<QuietUpdateResult> RunSignedUpdateAsync(IQuietProcessLauncher launcher, TimeSpan readyTimeout)
+    private static async Task<QuietUpdateResult> RunSignedUpdateAsync(IQuietProcessLauncher launcher, TimeSpan readyTimeout, CancellationToken cancellationToken = default)
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var payload = Encoding.UTF8.GetBytes("fixture executable");
@@ -220,7 +244,7 @@ public sealed class QuietUpdateTests
         var origin = Path.Combine(AppContext.BaseDirectory, "v2rayN.exe");
         File.Copy(SystemExe("where.exe"), helper, true);
         File.Copy(SystemExe("where.exe"), origin, true);
-        try { return await new QuietUpdateService(new FakeClock(), http, store, launcher, readyTimeout).CheckAsync("7.24.3"); }
+        try { return await new QuietUpdateService(new FakeClock(), http, store, launcher, readyTimeout).CheckAsync("7.24.3", cancellationToken); }
         finally { File.Delete(helper); File.Delete(origin); }
     }
 
@@ -255,6 +279,7 @@ public sealed class QuietUpdateTests
     private sealed class ProtocolLauncher(ReadyMode mode) : IQuietProcessLauncher
     {
         public List<string> WorkRoots { get; } = [];
+        public List<string> StagePaths { get; } = [];
         public Process? Process { get; private set; }
         public int ProcessId { get; private set; }
 
@@ -269,11 +294,20 @@ public sealed class QuietUpdateTests
                 return Process;
             }
 
-            Process = System.Diagnostics.Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 5 127.0.0.1 > nul") { UseShellExecute = false, CreateNoWindow = true })!;
+            Process = System.Diagnostics.Process.Start(new ProcessStartInfo(SystemExe("ping.exe"), "-n 5 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true })!;
             ProcessId = Process.Id;
-            var pipe = new AnonymousPipeClientStream(PipeDirection.Out, pipeHandle);
+            var pipe = new AnonymousPipeClientStream(PipeDirection.Out,
+                mode == ReadyMode.Timeout ? DuplicatePipeHandle(pipeHandle) : pipeHandle);
             if (mode == ReadyMode.Timeout)
             {
+                using var document = JsonDocument.Parse(File.ReadAllText(instructionPath));
+                var instruction = document.RootElement;
+                var stage = QuietUpdateService.GetCanonicalStagePath(
+                    instruction.GetProperty("installDirectory").GetString()!,
+                    instruction.GetProperty("token").GetString()!);
+                Directory.CreateDirectory(stage);
+                File.WriteAllText(Path.Combine(stage, "partial-payload.bin"), "partial");
+                StagePaths.Add(stage);
                 _ = Task.Run(async () => { using (pipe) await Task.Delay(1000); });
                 return Process;
             }
@@ -321,12 +355,28 @@ public sealed class QuietUpdateTests
     private static Process LaunchTimeoutProcess(string arguments)
     {
         var (_, pipeHandle) = ParseUpgradeArguments(arguments);
-        var process = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 5 127.0.0.1 > nul")
+        var process = Process.Start(new ProcessStartInfo(SystemExe("ping.exe"), "-n 5 127.0.0.1")
         { UseShellExecute = false, CreateNoWindow = true })!;
-        var pipe = new AnonymousPipeClientStream(PipeDirection.Out, pipeHandle);
+        var pipe = new AnonymousPipeClientStream(PipeDirection.Out, DuplicatePipeHandle(pipeHandle));
         _ = Task.Run(async () => { using (pipe) await Task.Delay(1000); });
         return process;
     }
+
+    private static string DuplicatePipeHandle(string handle)
+    {
+        var current = GetCurrentProcess();
+        if (!DuplicateHandle(current, new IntPtr(long.Parse(handle)), current, out var duplicate, 0, false, 2))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        return duplicate.ToInt64().ToString();
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DuplicateHandle(IntPtr sourceProcess, IntPtr sourceHandle, IntPtr targetProcess,
+        out IntPtr targetHandle, uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint options);
 
     private static (string InstructionPath, string PipeHandle) ParseUpgradeArguments(string arguments)
     {

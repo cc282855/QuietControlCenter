@@ -45,7 +45,7 @@ internal static class UpgradeApp
         // the GUI exits immediately after receiving the ready handshake.
         using var originProcess = AcquireExactProcess(instruction, install);
 
-        var nonce = instruction.Token[..12];
+        var nonce = instruction.Token;
         var stage = Path.Combine(parent, $".qcc-stage-{nonce}");
         var backup = Path.Combine(parent, $".qcc-backup-{nonce}");
         var failed = Path.Combine(parent, $".qcc-failed-{nonce}");
@@ -120,7 +120,7 @@ internal static class UpgradeApp
     private static void ValidateInstruction(UpgradeInstruction i, string workRoot)
     {
         if (i.Schema != 1 || i.Product != "QuietControlCenter" ||
-            string.IsNullOrWhiteSpace(i.Token) || i.Token.Length < 24 ||
+            string.IsNullOrWhiteSpace(i.Token) || i.Token.Length != 48 || !i.Token.All(Uri.IsHexDigit) ||
             Path.GetFullPath(i.PackagePath) != Path.Combine(workRoot, "package.zip") ||
             Path.GetFullPath(i.AckPath) != Path.Combine(workRoot, "startup.ack") ||
             !Path.IsPathFullyQualified(i.InstallDirectory) || !IsSha(i.ExpectedPackageSha256) ||

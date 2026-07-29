@@ -14,5 +14,6 @@
   <ItemGroup>
     <Compile Include="..\v2rayN\Services\QuietUpdateService.cs" Link="QuietUpdateService.cs" />
     <Compile Include="..\AmazTool\UpgradeApp.cs" Link="UpgradeApp.cs" />
+    <ProjectReference Include="..\AmazTool\AmazTool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
