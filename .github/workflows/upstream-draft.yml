@@ -218,19 +218,24 @@ jobs:
               }
             } while ([DateTime]::UtcNow -lt $deadline)
 
+            Start-Sleep -Seconds 2
+            $logFiles = @(Get-ChildItem -LiteralPath (Join-Path $smokeRoot 'guiLogs') -Filter '*.txt' -File -Recurse -ErrorAction SilentlyContinue)
+            foreach ($logFile in $logFiles) {
+              Write-Host "----- smoke log: $($logFile.FullName) -----"
+              Get-Content -LiteralPath $logFile.FullName -ErrorAction SilentlyContinue | Write-Host
+            }
+            $logFailures = @($logFiles |
+              Where-Object LastWriteTimeUtc -ge $startedAt |
+              Select-String -Pattern 'App_DispatcherUnhandledException|XamlParseException|StaticResourceExtension')
+            if ($logFailures.Count -gt 0) {
+              throw "Final ZIP startup log contains a fatal UI/XAML error: $($logFailures[0].Line)"
+            }
+
             $process.Refresh()
             if ($process.HasExited) { throw 'Final ZIP startup smoke test process did not remain alive.' }
             if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Final ZIP did not create a main window within 30 seconds.' }
             if ($process.MainWindowTitle -ne 'Quiet Control Center') {
               throw "Unexpected final ZIP main window title: '$($process.MainWindowTitle)'"
-            }
-
-            Start-Sleep -Seconds 2
-            $logFailures = @(Get-ChildItem -LiteralPath $smokeRoot -Filter '*.txt' -File -Recurse -ErrorAction SilentlyContinue |
-              Where-Object LastWriteTimeUtc -ge $startedAt |
-              Select-String -Pattern 'App_DispatcherUnhandledException|XamlParseException|StaticResourceExtension')
-            if ($logFailures.Count -gt 0) {
-              throw "Final ZIP startup log contains a fatal UI/XAML error: $($logFailures[0].Line)"
             }
             Write-Host "Final ZIP startup smoke test passed for PID $($process.Id)."
           }
