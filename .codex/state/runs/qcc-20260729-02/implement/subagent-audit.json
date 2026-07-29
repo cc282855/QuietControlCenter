@@ -28,7 +28,7 @@
       "role": "project_worker",
       "agent_name": "project_worker",
       "agent_thread_id": "/root/project_worker",
-      "permission_mode": "write",
+      "permission_mode": "workspace-write",
       "state": "done"
     }
   ],

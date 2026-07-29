@@ -1,0 +1,17 @@
+{
+  "audit_id": "qcc-20260729-02-implement",
+  "run_id": "qcc-20260729-02",
+  "phase_id": "implement",
+  "verdict": "FAIL",
+  "checked_roles": [
+    "project_worker"
+  ],
+  "reasons": [
+    {
+      "level": "fail",
+      "code": "PERMISSION_MISMATCH",
+      "message": "project_worker 的有效权限不是 workspace-write。"
+    }
+  ],
+  "generated_at": "2026-07-29T03:00:10.215912+00:00"
+}
