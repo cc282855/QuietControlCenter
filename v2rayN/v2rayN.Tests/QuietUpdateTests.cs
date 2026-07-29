@@ -107,15 +107,20 @@ public sealed class QuietUpdateTests
         var origin = Path.Combine(AppContext.BaseDirectory, "v2rayN.exe");
         File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "where.exe"), helper, true);
         File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "where.exe"), origin, true);
+        var launcher = new FakeLauncher();
         try
         {
-            var result = await new QuietUpdateService(new FakeClock(), http, store, new FakeLauncher()).CheckAsync("7.24.3");
+            var result = await new QuietUpdateService(new FakeClock(), http, store, launcher).CheckAsync("7.24.3");
             Assert.True(result.UpgradeStarted);
         }
-        finally { File.Delete(helper); File.Delete(origin); }
+        finally
+        {
+            File.Delete(helper); File.Delete(origin);
+            foreach (var root in launcher.WorkRoots) if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 
-    [Fact] public async Task HelperLaunchFailureIsCleanedAndSchedulerRetriesNextDay()
+    [Fact] public async Task ReadyTimeoutIsCleanedAndSchedulerRetriesNextDay()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var payload = Encoding.UTF8.GetBytes("fixture"); var payloadHash = Convert.ToHexString(SHA256.HashData(payload)); byte[] zipBytes;
@@ -136,7 +141,7 @@ public sealed class QuietUpdateTests
         File.Copy(SystemExe("where.exe"), helper, true); File.Copy(SystemExe("where.exe"), origin, true);
         try
         {
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new QuietUpdateScheduler(new QuietUpdateService(clock, new RouteHttp(responses), store, launcher), delay).RunAsync("7.24.3", _ => Task.CompletedTask, cts.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new QuietUpdateScheduler(new QuietUpdateService(clock, new RouteHttp(responses), store, launcher, TimeSpan.FromMilliseconds(150)), delay).RunAsync("7.24.3", _ => Task.CompletedTask, cts.Token));
             Assert.Equal(2, launcher.Calls); Assert.False(Directory.Exists(launcher.WorkRoots[0]));
         }
         finally { File.Delete(helper); File.Delete(origin); foreach (var root in launcher.WorkRoots) if (Directory.Exists(root)) Directory.Delete(root, true); }
@@ -156,6 +161,9 @@ public sealed class QuietUpdateTests
     [InlineData(ReadyMode.WrongToken)]
     [InlineData(ReadyMode.WrongHelperPid)]
     [InlineData(ReadyMode.WrongParent)]
+    [InlineData(ReadyMode.WrongParentStart)]
+    [InlineData(ReadyMode.WrongParentPath)]
+    [InlineData(ReadyMode.WrongParentHash)]
     [InlineData(ReadyMode.ExitEarly)]
     public async Task InvalidOrMissingReadyKeepsGuiRunningAndCleansWork(ReadyMode mode)
     {
@@ -228,7 +236,8 @@ public sealed class QuietUpdateTests
     private sealed class ThrowHttp : IQuietHttp { public Task<Stream> GetAsync(Uri u, CancellationToken t) => throw new HttpRequestException(); }
     private sealed class FakeLauncher : IQuietProcessLauncher
     {
-        public Process Launch(string f, string a, string w) => LaunchReadyProcess(a);
+        public List<string> WorkRoots { get; } = [];
+        public Process Launch(string f, string a, string w) { WorkRoots.Add(w); return LaunchReadyProcess(a); }
     }
     private sealed class FlakyLauncher : IQuietProcessLauncher
     {
@@ -236,12 +245,12 @@ public sealed class QuietUpdateTests
         public Process Launch(string f, string a, string w)
         {
             Calls++; WorkRoots.Add(w);
-            if (Calls == 1) throw new System.ComponentModel.Win32Exception("simulated");
+            if (Calls == 1) return LaunchTimeoutProcess(a);
             return LaunchReadyProcess(a);
         }
     }
 
-    public enum ReadyMode { Timeout, WrongToken, WrongHelperPid, WrongParent, ExitEarly }
+    public enum ReadyMode { Timeout, WrongToken, WrongHelperPid, WrongParent, WrongParentStart, WrongParentPath, WrongParentHash, ExitEarly }
 
     private sealed class ProtocolLauncher(ReadyMode mode) : IQuietProcessLauncher
     {
@@ -279,9 +288,9 @@ public sealed class QuietUpdateTests
                     Token = mode == ReadyMode.WrongToken ? "forged-token" : instruction.GetProperty("token").GetString()!,
                     HelperProcessId = mode == ReadyMode.WrongHelperPid ? Process.Id + 1 : Process.Id,
                     ParentProcessId = mode == ReadyMode.WrongParent ? instruction.GetProperty("processId").GetInt32() + 1 : instruction.GetProperty("processId").GetInt32(),
-                    ParentStartTimeUtc = instruction.GetProperty("processStartTimeUtc").GetDateTimeOffset(),
-                    ParentExecutablePath = instruction.GetProperty("originExecutablePath").GetString()!,
-                    ParentExecutableSha256 = instruction.GetProperty("originExecutableSha256").GetString()!
+                    ParentStartTimeUtc = mode == ReadyMode.WrongParentStart ? instruction.GetProperty("processStartTimeUtc").GetDateTimeOffset().AddMinutes(1) : instruction.GetProperty("processStartTimeUtc").GetDateTimeOffset(),
+                    ParentExecutablePath = mode == ReadyMode.WrongParentPath ? SystemExe("cmd.exe") : instruction.GetProperty("originExecutablePath").GetString()!,
+                    ParentExecutableSha256 = mode == ReadyMode.WrongParentHash ? new string('0', 64) : instruction.GetProperty("originExecutableSha256").GetString()!
                 }));
             }
             return Process;
@@ -306,6 +315,16 @@ public sealed class QuietUpdateTests
             ParentExecutablePath = instruction.GetProperty("originExecutablePath").GetString()!,
             ParentExecutableSha256 = instruction.GetProperty("originExecutableSha256").GetString()!
         }));
+        return process;
+    }
+
+    private static Process LaunchTimeoutProcess(string arguments)
+    {
+        var (_, pipeHandle) = ParseUpgradeArguments(arguments);
+        var process = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 5 127.0.0.1 > nul")
+        { UseShellExecute = false, CreateNoWindow = true })!;
+        var pipe = new AnonymousPipeClientStream(PipeDirection.Out, pipeHandle);
+        _ = Task.Run(async () => { using (pipe) await Task.Delay(1000); });
         return process;
     }
 
