@@ -144,7 +144,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $releaseTag = "quiet-${{ steps.prepare.outputs.tag }}"
-          if (gh release view $releaseTag 2>$null) {
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release view $releaseTag *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($releaseExists) {
             gh release upload $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --clobber
             gh release edit $releaseTag --draft=false --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed."
           } else {
