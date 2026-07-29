@@ -4,6 +4,7 @@ using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
 using v2rayN.Base;
 using v2rayN.Manager;
+using v2rayN.Services;
 
 namespace v2rayN.Views;
 
@@ -17,6 +18,8 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
+
+        txtAppVersion.Text = Utils.GetVersion();
 
         _config = AppManager.Instance.Config;
         ThreadPool.RegisterWaitForSingleObject(App.ProgramStarted, OnProgramStarted, null, -1, false);
@@ -35,6 +38,27 @@ public partial class MainWindow
 
         this.WhenActivated(disposables =>
         {
+            // ReactiveWindow command bindings target ViewModel directly, while
+            // the dashboard's XAML status bindings resolve through DataContext.
+            // Keep both surfaces on the same live view model.
+            DataContext = ViewModel;
+            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedProxyDisplay)
+                .Select(value => value.IsNullOrEmpty() ? "↑ 0 B/s" : value)
+                .BindTo(this, v => v.txtHeroProxySpeed.Text)
+                .DisposeWith(disposables);
+            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedDirectDisplay)
+                .Select(value => value.IsNullOrEmpty() ? "↓ 0 B/s" : value)
+                .BindTo(this, v => v.txtHeroDirectSpeed.Text)
+                .DisposeWith(disposables);
+            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.RunningInfoDisplay)
+                .Select(value => value.IsNullOrEmpty() ? "未连接" : value)
+                .BindTo(this, v => v.txtHeroRunningStatus.Text)
+                .DisposeWith(disposables);
+            var connectionStateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            connectionStateTimer.Tick += (_, _) => UpdateConnectionStateBadge();
+            connectionStateTimer.Start();
+            UpdateConnectionStateBadge();
+            Disposable.Create(connectionStateTimer.Stop).DisposeWith(disposables);
             //servers
             this.BindCommand(ViewModel, vm => vm.AddVmessServerCmd, v => v.menuAddVmessServer).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddVlessServerCmd, v => v.menuAddVlessServer).DisposeWith(disposables);
@@ -286,6 +310,7 @@ public partial class MainWindow
     {
         tabMain.Visibility = Visibility.Collapsed;
         tabProfiles.Visibility = Visibility.Visible;
+        SetActiveNavigation(sender as Button ?? btnNavHome);
     }
 
     private void ShowLogs_Click(object sender, RoutedEventArgs e)
@@ -293,6 +318,7 @@ public partial class MainWindow
         tabProfiles.Visibility = Visibility.Collapsed;
         tabMain.Visibility = Visibility.Visible;
         tabMain.SelectedIndex = 0;
+        SetActiveNavigation(btnNavLogs);
     }
 
     private void ShowConnections_Click(object sender, RoutedEventArgs e)
@@ -300,6 +326,23 @@ public partial class MainWindow
         tabProfiles.Visibility = Visibility.Collapsed;
         tabMain.Visibility = Visibility.Visible;
         tabMain.SelectedIndex = 2;
+        SetActiveNavigation(btnNavConnections);
+    }
+
+    private void ShowSubscription_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavSubscription);
+
+    private void ShowRouting_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavRouting);
+
+    private void ShowSettings_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavSettings);
+
+    private void SetActiveNavigation(Button activeButton)
+    {
+        var normalStyle = (Style)FindResource("QccNavButton");
+        var activeStyle = (Style)FindResource("QccNavButtonActive");
+        foreach (var button in new[] { btnNavHome, btnNavNodes, btnNavSubscription, btnNavRouting, btnNavConnections, btnNavLogs, btnNavSettings })
+        {
+            button.Style = ReferenceEquals(button, activeButton) ? activeStyle : normalStyle;
+        }
     }
 
     private void MenuPromotion_Click(object sender, RoutedEventArgs e)
@@ -338,9 +381,29 @@ public partial class MainWindow
     {
         _checkUpdateView ??= new CheckUpdateView();
         _checkUpdateView.ViewModel = ViewModel?.CheckUpdateViewModel;
+        CheckUpdateView.RemoveOfficialGuiUpdate(_checkUpdateView.ViewModel);
         DialogHost.Show(_checkUpdateView, "RootDialog");
 
         AppEvents.HasUpdateNotified.Publish(false);
+    }
+
+    private async void Disconnect_Click(object sender, RoutedEventArgs e)
+    {
+        btnDisconnect.IsEnabled = false;
+        try
+        {
+            await CoreManager.Instance.CoreStop();
+            MainSnackbar.MessageQueue?.Enqueue("代理核心已停止；重新载入配置可再次连接");
+        }
+        catch (Exception ex)
+        {
+            Logging.SaveLog("DisconnectCore", ex);
+            MainSnackbar.MessageQueue?.Enqueue("断开连接失败，请查看日志");
+        }
+        finally
+        {
+            btnDisconnect.IsEnabled = true;
+        }
     }
 
     private void MenuBackupAndRestore_Click(object sender, RoutedEventArgs e)
@@ -382,6 +445,30 @@ public partial class MainWindow
             ShowHideWindow(false);
         }
         RestoreUI();
+        _ = CheckQuietUpdatesAsync();
+    }
+
+    private async Task CheckQuietUpdatesAsync()
+    {
+        var notices = await new QuietUpdateService().CheckAsync(Utils.GetVersion());
+        foreach (var notice in notices)
+        {
+            MainSnackbar.MessageQueue?.Enqueue(notice, null, null, null, false, true, TimeSpan.FromSeconds(12));
+        }
+    }
+
+    private void UpdateConnectionStateBadge()
+    {
+        var connected = Enum.GetValues<ECoreType>()
+            .Where(coreType => coreType != ECoreType.v2rayN)
+            .Any(AppManager.Instance.IsRunningCore);
+        txtHeroConnectionState.Text = connected ? "已连接" : "未连接";
+        txtHeroConnectionState.Foreground = connected
+            ? (Brush)FindResource("QccSuccess")
+            : (Brush)FindResource("QccMuted");
+        borderHeroConnectionState.Background = new SolidColorBrush(
+            connected ? Color.FromRgb(234, 248, 239) : Color.FromRgb(242, 244, 247));
+        borderHeroConnectionState.ToolTip = ViewModel?.StatusBarViewModel?.RunningInfoDisplay;
     }
 
     private void RestoreUI()

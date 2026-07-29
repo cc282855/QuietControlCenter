@@ -1,0 +1,9 @@
+{
+  "appVersion": "7.24.4",
+  "platform": "win-x64",
+  "assetUrl": "https://github.com/OWNER/REPOSITORY/releases/download/quiet-7.24.4/QuietControlCenter-7.24.4-win-x64.zip",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "signature": null,
+  "provenanceUrl": "https://github.com/OWNER/REPOSITORY/actions/runs/RUN_ID"
+}
+

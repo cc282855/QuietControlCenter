@@ -17,6 +17,11 @@ public partial class StatusBarView
 
         this.WhenActivated(disposables =>
         {
+            DataContext = ViewModel;
+            this.WhenAnyValue(v => v.ViewModel.RunningInfoDisplay)
+                .Select(value => value.IsNullOrEmpty() ? "未连接" : value)
+                .BindTo(this, v => v.txtBottomRunningStatus.Text)
+                .DisposeWith(disposables);
             //system proxy
             this.OneWayBind(ViewModel, vm => vm.BlSystemProxyClear, v => v.menuSystemProxyClear2.Visibility, conversionHint: BooleanToVisibilityHint.UseHidden, vmToViewConverterOverride: new BooleanToVisibilityTypeConverter()).DisposeWith(disposables);
             this.OneWayBind(ViewModel, vm => vm.BlSystemProxySet, v => v.menuSystemProxySet2.Visibility, conversionHint: BooleanToVisibilityHint.UseHidden, vmToViewConverterOverride: new BooleanToVisibilityTypeConverter()).DisposeWith(disposables);
@@ -81,8 +86,31 @@ public partial class StatusBarView
 
     private async Task RefreshIcon()
     {
-        tbNotify.Icon = await WindowsManager.Instance.GetNotifyIcon(_config);
-        Application.Current.MainWindow?.Icon = WindowsManager.Instance.GetAppIcon(_config);
+        try
+        {
+            tbNotify.Icon = await WindowsManager.Instance.GetNotifyIcon(_config);
+            Application.Current.MainWindow?.Icon = WindowsManager.Instance.GetAppIcon(_config);
+        }
+        catch (Exception ex)
+        {
+            // A brand-new profile can temporarily have no default routing.  Icon
+            // decoration is optional, so retain the packaged icon and keep the UI alive.
+            Logging.SaveLog("StatusBarView.RefreshIcon", ex);
+        }
+    }
+
+    private async void AdvancedSettings_Click(object sender, RoutedEventArgs e)
+    {
+        btnAdvancedSettings.IsEnabled = false;
+        try
+        {
+            var settingViewModel = new OptionSettingViewModel();
+            await AppManager.Instance.WindowDialog.ShowDialogAsync(settingViewModel);
+        }
+        finally
+        {
+            btnAdvancedSettings.IsEnabled = true;
+        }
     }
 
     private async void menuExit_Click(object sender, RoutedEventArgs e)

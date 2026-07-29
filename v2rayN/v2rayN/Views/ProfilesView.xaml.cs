@@ -1,11 +1,51 @@
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Globalization;
+using System.Windows.Data;
 using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
 using v2rayN.Base;
 using Point = System.Windows.Point;
 
 namespace v2rayN.Views;
+
+public sealed class DelayDisplayConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is int delay && delay > 0 ? $"{delay} ms" : "未测试";
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
+
+public sealed class SpeedDisplayConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        double speed;
+        try
+        {
+            speed = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
+        }
+        catch (Exception) when (value is null or string)
+        {
+            return "未测试";
+        }
+        if (speed <= 0)
+        {
+            return "未测试";
+        }
+
+        return speed >= 1024 * 1024
+            ? $"{speed / 1024 / 1024:0.##} MB/s"
+            : speed >= 1024
+                ? $"{speed / 1024:0.##} KB/s"
+                : $"{speed:0.##} B/s";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
 
 public partial class ProfilesView
 {
@@ -25,6 +65,7 @@ public partial class ProfilesView
         lstProfiles.SelectionChanged += LstProfiles_SelectionChanged;
         lstProfiles.LoadingRow += LstProfiles_LoadingRow;
         menuSelectAll.Click += menuSelectAll_Click;
+        SizeChanged += ProfilesView_SizeChanged;
 
         if (_config.UiItem.EnableDragDropSort)
         {
@@ -37,6 +78,9 @@ public partial class ProfilesView
 
         this.WhenActivated(disposables =>
         {
+            // Reactive bindings below drive controls directly; XAML inspector
+            // bindings also need the same view model as their DataContext.
+            DataContext = ViewModel;
             this.OneWayBind(ViewModel, vm => vm.ProfileItems, v => v.lstProfiles.ItemsSource).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedProfile, v => v.lstProfiles.SelectedItem).DisposeWith(disposables);
 
@@ -44,6 +88,7 @@ public partial class ProfilesView
             this.Bind(ViewModel, vm => vm.SelectedSub, v => v.lstGroup.SelectedItem).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.ServerFilter, v => v.txtServerFilter.Text).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnAddSub).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnEmptyAddSub).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.EditSubCmd, v => v.btnEditSub).DisposeWith(disposables);
 
             //servers delete
@@ -74,6 +119,14 @@ public partial class ProfilesView
             this.BindCommand(ViewModel, vm => vm.SortServerResultCmd, v => v.menuSortServerResult).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.RemoveInvalidServerResultCmd, v => v.menuRemoveInvalidServerResult).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.FastRealPingCmd, v => v.btnFastRealPing).DisposeWith(disposables);
+
+            //selected node inspector
+            this.BindCommand(ViewModel, vm => vm.RealPingServerCmd, v => v.btnDetailPing).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SpeedServerCmd, v => v.btnDetailSpeed).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.CopyServerCmd, v => v.btnDetailCopy).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.EditServerCmd, v => v.btnDetailEdit).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.RemoveServerCmd, v => v.btnDetailDelete).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SetDefaultServerCmd, v => v.btnDetailActivate).DisposeWith(disposables);
 
             //servers export
             this.BindCommand(ViewModel, vm => vm.Export2ClientConfigCmd, v => v.menuExport2ClientConfig).DisposeWith(disposables);
@@ -150,6 +203,38 @@ public partial class ProfilesView
               .Subscribe(_ => StorageUI())
               .DisposeWith(disposables);
         });
+
+        RestoreUI();
+        ApplyResponsiveColumns(ActualWidth);
+    }
+
+    private void ProfilesView_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyResponsiveColumns(e.NewSize.Width);
+    }
+
+    private void ApplyResponsiveColumns(double width)
+    {
+        if (width <= 0)
+        {
+            return;
+        }
+
+        if (width < 1050)
+        {
+            // Keep every visible header comfortably readable at the documented
+            // 1120px window minimum; secondary details remain in the inspector.
+            colNetwork.Visibility = Visibility.Collapsed;
+            colAddress.Visibility = Visibility.Collapsed;
+            colPort.Visibility = Visibility.Collapsed;
+            colSecurity.Visibility = Visibility.Collapsed;
+            colRemarks.Width = new DataGridLength(1.6, DataGridLengthUnitType.Star);
+            colConfigType.Width = new DataGridLength(0.85, DataGridLengthUnitType.Star);
+            colSubRemarks.Width = new DataGridLength(1.05, DataGridLengthUnitType.Star);
+            colDelay.Width = new DataGridLength(0.8, DataGridLengthUnitType.Star);
+            colSpeed.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            return;
+        }
 
         RestoreUI();
     }

@@ -55,14 +55,14 @@
                             <materialDesign:PackIcon Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" Kind="ShieldCheck" />
                         </Border>
                         <TextBlock Margin="11,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="17" FontWeight="SemiBold" Text="Quiet Control Center" />
-                        <TextBlock Margin="14,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="13" Text="v2rayN 7.24.3" />
+                        <TextBlock x:Name="txtAppVersion" Margin="14,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="13" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="menuCheckUpdate" Width="104" Style="{StaticResource QccIconButton}">
+                        <Button x:Name="menuCheckUpdate" Width="128" Style="{StaticResource QccIconButton}" ToolTip="仅更新核心与 Geo 数据，不替换定制界面">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,7,0" Kind="Update" />
-                                <TextBlock VerticalAlignment="Center" FontSize="13" Text="检查更新" />
+                                <TextBlock VerticalAlignment="Center" FontSize="13" Text="检查内核更新" />
                             </StackPanel>
                         </Button>
                         <materialDesign:PopupBox Width="78" HorizontalAlignment="Center" PlacementMode="BottomAndAlignRightEdges">
@@ -116,13 +116,13 @@
                                     <TextBlock VerticalAlignment="Center" Text="节点" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavSubscription" Style="{StaticResource QccNavButton}">
+                            <Button x:Name="btnNavSubscription" Style="{StaticResource QccNavButton}" Click="ShowSubscription_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="21" Height="21" Margin="2,0,16,0" Kind="FileDocumentOutline" />
                                     <TextBlock VerticalAlignment="Center" Text="订阅" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavRouting" Style="{StaticResource QccNavButton}">
+                            <Button x:Name="btnNavRouting" Style="{StaticResource QccNavButton}" Click="ShowRouting_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="21" Height="21" Margin="2,0,16,0" Kind="SourceBranch" />
                                     <TextBlock VerticalAlignment="Center" Text="路由" />
@@ -140,7 +140,7 @@
                                     <TextBlock VerticalAlignment="Center" Text="日志" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavSettings" Style="{StaticResource QccNavButton}">
+                            <Button x:Name="btnNavSettings" Style="{StaticResource QccNavButton}" Click="ShowSettings_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="21" Height="21" Margin="2,0,16,0" Kind="CogOutline" />
                                     <TextBlock VerticalAlignment="Center" Text="设置" />
@@ -151,7 +151,7 @@
                         <StackPanel Grid.Row="2" Margin="22,0,18,18">
                             <TextBlock Style="{StaticResource QccMutedText}" Text="核心与组件" />
                             <TextBlock Margin="0,5,0,0" Foreground="{StaticResource QccMuted}" FontSize="12" Text="Xray / sing-box / mihomo" />
-                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="发现新版本" Cursor="Hand" />
+                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="更新核心组件" Cursor="Hand" ToolTip="定制客户端仅通过 Quiet Control Center 完整包更新" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -161,7 +161,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="190" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="146" />
+                        <RowDefinition Height="160" />
                     </Grid.RowDefinitions>
 
                     <!-- Connection summary -->
@@ -175,9 +175,9 @@
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock FontSize="13" Foreground="{StaticResource QccMuted}" Text="当前节点" />
                                 <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource QccHeading}" FontSize="27" Text="{Binding StatusBarViewModel.RunningServerDisplay, FallbackValue=尚未连接}" TextTrimming="CharacterEllipsis" MaxWidth="380" />
-                                    <Border Margin="12,4,0,0" Padding="9,3" VerticalAlignment="Top" Background="#FFE7F7EC" CornerRadius="9">
-                                        <TextBlock Foreground="{StaticResource QccSuccess}" FontSize="12" FontWeight="SemiBold" Text="运行中" />
+                                    <TextBlock Style="{StaticResource QccHeading}" FontSize="27" Text="{Binding ProfilesViewModel.SelectedProfile.Remarks, FallbackValue=尚未连接}" TextTrimming="CharacterEllipsis" MaxWidth="280" />
+                                    <Border x:Name="borderHeroConnectionState" Margin="12,4,0,0" Padding="9,3" VerticalAlignment="Top" Background="#FFF2F4F7" CornerRadius="9">
+                                        <TextBlock x:Name="txtHeroConnectionState" Foreground="{StaticResource QccMuted}" FontSize="12" FontWeight="SemiBold" Text="未连接" />
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Margin="0,12,0,0" Foreground="{StaticResource QccMuted}" FontSize="13" Text="连接状态由当前活动配置实时同步" />
@@ -196,11 +196,11 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
                                         <StackPanel Margin="18,10" VerticalAlignment="Center">
-                                            <TextBlock FontSize="18" Text="{Binding StatusBarViewModel.SpeedProxyDisplay, FallbackValue=↑ 0 B/s}" />
+                                            <TextBlock x:Name="txtHeroProxySpeed" FontSize="18" Text="↑ 0 B/s" />
                                             <TextBlock Margin="0,5,0,0" Style="{StaticResource QccMutedText}" Text="代理流量" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="18,10" VerticalAlignment="Center">
-                                            <TextBlock FontSize="18" Text="{Binding StatusBarViewModel.SpeedDirectDisplay, FallbackValue=↓ 0 B/s}" />
+                                            <TextBlock x:Name="txtHeroDirectSpeed" FontSize="18" Text="↓ 0 B/s" />
                                             <TextBlock Margin="0,5,0,0" Style="{StaticResource QccMutedText}" Text="直连流量" />
                                         </StackPanel>
                                     </Grid>
@@ -208,9 +208,9 @@
                                 <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0" Style="{StaticResource QccCard}">
                                     <Grid Margin="18,0">
                                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                                        <StackPanel VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="核心状态" /><TextBlock Margin="0,3,0,0" Foreground="{StaticResource QccSuccess}" Text="运行正常" /></StackPanel>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="入口端口" /><TextBlock Margin="0,3,0,0" Text="{Binding StatusBarViewModel.InboundDisplay, FallbackValue=10808}" /></StackPanel>
-                                        <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="运行信息" /><TextBlock Margin="0,3,0,0" Text="{Binding StatusBarViewModel.RunningInfoDisplay, FallbackValue=就绪}" TextTrimming="CharacterEllipsis" /></StackPanel>
+                                        <StackPanel VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="延迟" /><TextBlock Margin="0,3,0,0" Text="{Binding ProfilesViewModel.SelectedProfile.DelayVal, FallbackValue=—}" TextTrimming="CharacterEllipsis" /></StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="抖动 / 丢包" /><TextBlock Margin="0,3,0,0" Text="— / —" /></StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Style="{StaticResource QccMutedText}" Text="运行状态" /><TextBlock x:Name="txtHeroRunningStatus" Margin="0,3,0,0" Text="未连接" TextTrimming="CharacterEllipsis" /></StackPanel>
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -219,8 +219,8 @@
                                 <Button x:Name="btnHeroSwitch" Style="{StaticResource QccPrimaryButton}" Click="ShowProfiles_Click">
                                     <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="19" Height="19" Margin="0,0,9,0" Kind="SwapHorizontal" /><TextBlock VerticalAlignment="Center" Text="切换节点" /></StackPanel>
                                 </Button>
-                                <Button Margin="0,12,0,0" Style="{StaticResource QccSecondaryButton}" Click="ShowProfiles_Click">
-                                    <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="18" Height="18" Margin="0,0,9,0" Foreground="{StaticResource QccDanger}" Kind="Power" /><TextBlock VerticalAlignment="Center" Text="管理连接" /></StackPanel>
+                                <Button x:Name="btnDisconnect" Margin="0,12,0,0" Style="{StaticResource QccSecondaryButton}" Click="Disconnect_Click" ToolTip="停止当前代理核心；重新载入配置可再次连接">
+                                    <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="18" Height="18" Margin="0,0,9,0" Foreground="{StaticResource QccDanger}" Kind="Power" /><TextBlock VerticalAlignment="Center" Text="断开连接" /></StackPanel>
                                 </Button>
                             </StackPanel>
                         </Grid>

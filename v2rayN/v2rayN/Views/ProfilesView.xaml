@@ -3,8 +3,10 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:base="clr-namespace:v2rayN.Base"
+    xmlns:converters="clr-namespace:v2rayN.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:local="clr-namespace:v2rayN.Views"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:reactiveui="http://reactiveui.net"
     xmlns:vms="clr-namespace:ServiceLib.ViewModels;assembly=ServiceLib"
@@ -14,6 +16,12 @@
     Background="White"
     FontFamily="{StaticResource QccFont}"
     mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <converters:DelayColorConverter x:Key="DelayColorConverter" />
+        <local:DelayDisplayConverter x:Key="DelayDisplayConverter" />
+        <local:SpeedDisplayConverter x:Key="SpeedDisplayConverter" />
+    </UserControl.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -136,12 +144,12 @@
                         <MenuItem x:Name="menuSpeedServer" Header="测试速度" />
                         <MenuItem x:Name="menuSortServerResult" Header="按测试结果排序" />
                         <Separator />
-                        <MenuItem x:Name="menuMoveToGroup" Header="移动到分组">
-                            <MenuItem.HeaderTemplate>
-                                <DataTemplate>
-                                    <ComboBox x:Name="cmbMoveToGroup" MinWidth="180" DisplayMemberPath="Remarks" />
-                                </DataTemplate>
-                            </MenuItem.HeaderTemplate>
+                        <MenuItem x:Name="menuMoveToGroup">
+                            <MenuItem.Header>
+                                <DockPanel>
+                                    <ComboBox x:Name="cmbMoveToGroup" MinWidth="180" DisplayMemberPath="Remarks" materialDesign:HintAssist.Hint="移动到分组" />
+                                </DockPanel>
+                            </MenuItem.Header>
                         </MenuItem>
                         <MenuItem Header="调整顺序">
                             <MenuItem x:Name="menuMoveTop" Header="移到顶部" />
@@ -169,19 +177,19 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <base:MyDGTextColumn Width="1.55*" Binding="{Binding Remarks}" ExName="Remarks" Header="节点名称" />
-                    <base:MyDGTextColumn Width="0.8*" Binding="{Binding ConfigType}" ExName="ConfigType" Header="协议" />
-                    <base:MyDGTextColumn Width="1.1*" Binding="{Binding SubRemarks}" ExName="SubRemarks" Header="分组" />
-                    <base:MyDGTextColumn Width="0.9*" Binding="{Binding Network}" ExName="Network" Header="传输" />
-                    <base:MyDGTextColumn Width="0.9*" Binding="{Binding DelayVal}" ExName="DelayVal" Header="延迟" SortMemberPath="Delay">
+                    <base:MyDGTextColumn x:Name="colRemarks" Width="1.55*" Binding="{Binding Remarks}" ExName="Remarks" Header="节点名称" />
+                    <base:MyDGTextColumn x:Name="colConfigType" Width="0.8*" Binding="{Binding ConfigType}" ExName="ConfigType" Header="协议" />
+                    <base:MyDGTextColumn x:Name="colSubRemarks" Width="1.1*" Binding="{Binding SubRemarks}" ExName="SubRemarks" Header="分组" />
+                    <base:MyDGTextColumn x:Name="colNetwork" Width="0.9*" Binding="{Binding Network}" ExName="Network" Header="传输" />
+                    <base:MyDGTextColumn x:Name="colDelay" Width="0.9*" Binding="{Binding Delay, Converter={StaticResource DelayDisplayConverter}}" ExName="DelayVal" Header="延迟" SortMemberPath="Delay">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{Binding Delay, Converter={StaticResource DelayColorConverter}}" /></Style>
                         </DataGridTextColumn.ElementStyle>
                     </base:MyDGTextColumn>
-                    <base:MyDGTextColumn Width="1*" Binding="{Binding SpeedVal}" ExName="SpeedVal" Header="速度" />
-                    <base:MyDGTextColumn Width="1.25*" Binding="{Binding Address}" ExName="Address" Header="地址" />
-                    <base:MyDGTextColumn Width="70" Binding="{Binding Port}" ExName="Port" Header="端口" />
-                    <base:MyDGTextColumn Width="90" Binding="{Binding StreamSecurity}" ExName="StreamSecurity" Header="安全" />
+                    <base:MyDGTextColumn x:Name="colSpeed" Width="1*" Binding="{Binding Speed, Converter={StaticResource SpeedDisplayConverter}}" ExName="SpeedVal" Header="速度" />
+                    <base:MyDGTextColumn x:Name="colAddress" Width="1.25*" Binding="{Binding Address}" ExName="Address" Header="地址" />
+                    <base:MyDGTextColumn x:Name="colPort" Width="70" Binding="{Binding Port}" ExName="Port" Header="端口" />
+                    <base:MyDGTextColumn x:Name="colSecurity" Width="90" Binding="{Binding StreamSecurity}" ExName="StreamSecurity" Header="安全" />
                     <base:MyDGTextColumn x:Name="colTodayUp" Visibility="Collapsed" Binding="{Binding TodayUp}" ExName="TodayUp" Header="今日上传" />
                     <base:MyDGTextColumn x:Name="colTodayDown" Visibility="Collapsed" Binding="{Binding TodayDown}" ExName="TodayDown" Header="今日下载" />
                     <base:MyDGTextColumn x:Name="colTotalUp" Visibility="Collapsed" Binding="{Binding TotalUp}" ExName="TotalUp" Header="累计上传" />
@@ -189,6 +197,27 @@
                     <base:MyDGTextColumn x:Name="colIpInfo" Visibility="Collapsed" Binding="{Binding IpInfo}" ExName="IpInfo" Header="IP 信息" />
                 </DataGrid.Columns>
             </DataGrid>
+
+            <Border Grid.Row="1" Panel.ZIndex="2" Background="White">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=lstProfiles, Path=HasItems}" Value="False">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel Width="360" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Width="54" Height="54" HorizontalAlignment="Center" Background="{StaticResource QccPrimarySoft}" CornerRadius="18">
+                        <materialDesign:PackIcon Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource QccPrimary}" Kind="ServerNetworkOff" />
+                    </Border>
+                    <TextBlock Margin="0,16,0,0" HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="还没有可用节点" />
+                    <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="{StaticResource QccMuted}" Text="添加订阅后同步节点，或右键列表导入本地配置。" TextAlignment="Center" TextWrapping="Wrap" />
+                    <Button x:Name="btnEmptyAddSub" Margin="0,18,0,0" HorizontalAlignment="Center" Style="{StaticResource QccPrimaryButton}" Content="添加订阅" />
+                </StackPanel>
+            </Border>
 
             <Border Grid.Row="2" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,1,0">
                 <Grid Margin="18,0">
@@ -222,8 +251,8 @@
                     <StackPanel Margin="18,18,18,14">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource QccHeading}" FontSize="20" Text="{Binding SelectedProfile.Remarks, FallbackValue=请选择节点}" TextTrimming="CharacterEllipsis" MaxWidth="205" />
-                            <Border Margin="8,1,0,0" Padding="8,3" VerticalAlignment="Top" Background="#FFE7F7EC" CornerRadius="8">
-                                <TextBlock Foreground="{StaticResource QccSuccess}" FontSize="11" Text="可用" />
+                            <Border Margin="8,1,0,0" Padding="8,3" VerticalAlignment="Top" Background="{StaticResource QccPrimarySoft}" CornerRadius="8">
+                                <TextBlock Foreground="{StaticResource QccPrimary}" FontSize="11" Text="节点详情" />
                             </Border>
                         </StackPanel>
 
@@ -238,26 +267,26 @@
                             <TextBlock Grid.Row="2" Style="{StaticResource QccMutedText}" Text="安全" /><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedProfile.StreamSecurity, FallbackValue=—}" />
                             <TextBlock Grid.Row="3" Style="{StaticResource QccMutedText}" Text="地址" /><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedProfile.Address, FallbackValue=—}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Row="4" Style="{StaticResource QccMutedText}" Text="端口" /><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProfile.Port, FallbackValue=—}" />
-                            <TextBlock Grid.Row="5" Style="{StaticResource QccMutedText}" Text="延迟" /><TextBlock Grid.Row="5" Grid.Column="1" Foreground="{StaticResource QccSuccess}" Text="{Binding SelectedProfile.DelayVal, FallbackValue=未测试}" />
-                            <TextBlock Grid.Row="6" Style="{StaticResource QccMutedText}" Text="速度" /><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedProfile.SpeedVal, FallbackValue=未测试}" />
+                            <TextBlock Grid.Row="5" Style="{StaticResource QccMutedText}" Text="延迟" /><TextBlock Grid.Row="5" Grid.Column="1" Foreground="{Binding SelectedProfile.Delay, Converter={StaticResource DelayColorConverter}}" Text="{Binding SelectedProfile.Delay, Converter={StaticResource DelayDisplayConverter}}" />
+                            <TextBlock Grid.Row="6" Style="{StaticResource QccMutedText}" Text="速度" /><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedProfile.Speed, Converter={StaticResource SpeedDisplayConverter}}" />
                             <TextBlock Grid.Row="7" Style="{StaticResource QccMutedText}" Text="订阅" /><TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedProfile.SubRemarks, FallbackValue=本地节点}" TextTrimming="CharacterEllipsis" />
                         </Grid>
 
-                        <Separator Margin="0,12" Style="{StaticResource QccDivider}" />
-                        <TextBlock FontSize="13" FontWeight="SemiBold" Text="节点操作" />
-                        <UniformGrid Margin="0,12,0,0" Columns="2" Rows="3">
-                            <Button x:Name="btnDetailPing" Margin="0,0,6,8" Style="{StaticResource QccSecondaryButton}" Content="测试延迟" />
-                            <Button x:Name="btnDetailSpeed" Margin="6,0,0,8" Style="{StaticResource QccSecondaryButton}" Content="测试速度" />
-                            <Button x:Name="btnDetailCopy" Margin="0,0,6,8" Style="{StaticResource QccSecondaryButton}" Content="复制节点" />
-                            <Button x:Name="btnDetailEdit" Margin="6,0,0,8" Style="{StaticResource QccSecondaryButton}" Content="编辑节点" />
-                            <Button x:Name="btnDetailDelete" Margin="0,0,6,0" Foreground="{StaticResource QccDanger}" Style="{StaticResource QccSecondaryButton}" Content="删除节点" />
-                            <Button x:Name="btnDetailActivate" Margin="6,0,0,0" Style="{StaticResource QccPrimaryButton}" Content="设为活动" />
-                        </UniformGrid>
                     </StackPanel>
                 </ScrollViewer>
 
-                <Border Grid.Row="2" Padding="18,12" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
-                    <TextBlock Foreground="{StaticResource QccMuted}" FontSize="12" Text="右键节点可访问移动、导出和批量操作" TextWrapping="Wrap" />
+                <Border Grid.Row="2" Padding="18,12" Background="#FFFCFDFE" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
+                    <StackPanel>
+                        <TextBlock FontSize="13" FontWeight="SemiBold" Text="节点操作" />
+                        <UniformGrid Margin="0,10,0,0" Columns="2" Rows="3">
+                            <Button x:Name="btnDetailPing" Margin="0,0,5,7" Style="{StaticResource QccSecondaryButton}" Content="测试延迟" />
+                            <Button x:Name="btnDetailSpeed" Margin="5,0,0,7" Style="{StaticResource QccSecondaryButton}" Content="测试速度" />
+                            <Button x:Name="btnDetailCopy" Margin="0,0,5,7" Style="{StaticResource QccSecondaryButton}" Content="复制节点" />
+                            <Button x:Name="btnDetailEdit" Margin="5,0,0,7" Style="{StaticResource QccSecondaryButton}" Content="编辑节点" />
+                            <Button x:Name="btnDetailDelete" Margin="0,0,5,0" Foreground="{StaticResource QccDanger}" Style="{StaticResource QccSecondaryButton}" Content="删除节点" />
+                            <Button x:Name="btnDetailActivate" Margin="5,0,0,0" Style="{StaticResource QccPrimaryButton}" Content="设为活动" />
+                        </UniformGrid>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Border>

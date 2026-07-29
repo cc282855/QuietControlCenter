@@ -43,12 +43,15 @@
                 x:Name="btnCheckUpdate"
                 Width="100"
                 Margin="{StaticResource Margin8}"
-                Content="{x:Static resx:ResUI.menuCheckUpdate}"
+                Content="更新所选核心"
                 IsDefault="True"
                 Style="{StaticResource DefButton}" />
         </StackPanel>
 
         <StackPanel>
+            <Border Margin="8,0,8,10" Padding="12,9" Background="#FFF0F6FF" CornerRadius="6">
+                <TextBlock Foreground="#FF315C9B" Text="此处仅更新代理核心与 Geo 数据；Quiet Control Center 界面仅通过定制完整包更新。" TextWrapping="Wrap" />
+            </Border>
             <ListView
                 x:Name="lstCheckUpdates"
                 BorderThickness="1"

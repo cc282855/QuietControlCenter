@@ -1,0 +1,97 @@
+name: Build Quiet UI for upstream release
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Upstream v2rayN tag (for example 7.24.4)
+        required: true
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  detect-build-draft:
+    runs-on: windows-latest
+    steps:
+      - name: Check out customized branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve upstream tag and build patch layer
+        id: prepare
+        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.upstream_tag }}
+          BASE_TAG: ${{ vars.QUIET_UI_BASE_TAG }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git remote add upstream https://github.com/2dust/v2rayN.git 2>$null
+          git fetch upstream --tags --force
+          $tag = $env:REQUESTED_TAG
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $release = Invoke-RestMethod -Headers @{ 'User-Agent' = 'Quiet-Control-Center-CI' } https://api.github.com/repos/2dust/v2rayN/releases/latest
+            $tag = $release.tag_name
+          }
+          $base = if ($env:BASE_TAG) { $env:BASE_TAG } else { '7.24.3' }
+          git rev-parse "refs/tags/$tag" | Out-Null
+          git rev-parse "refs/tags/$base" | Out-Null
+          $patch = Join-Path $env:RUNNER_TEMP quiet-ui.patch
+          git diff --binary "refs/tags/$base" HEAD -- v2rayN/v2rayN/Views v2rayN/v2rayN/Resources v2rayN/v2rayN/Services .gitignore .gitmodules BUILDING.md tools | Set-Content -Encoding utf8 $patch
+          if ((Get-Item $patch).Length -eq 0) { throw 'Quiet UI patch layer is empty.' }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "patch=$patch" >> $env:GITHUB_OUTPUT
+
+      - name: Reapply Quiet UI onto exact upstream tag
+        shell: pwsh
+        run: |
+          git checkout --detach "refs/tags/${{ steps.prepare.outputs.tag }}"
+          git submodule update --init --recursive
+          git apply --check "${{ steps.prepare.outputs.patch }}"
+          git apply "${{ steps.prepare.outputs.patch }}"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore, test, and publish
+        shell: pwsh
+        run: |
+          dotnet restore v2rayN/v2rayN.slnx
+          dotnet build v2rayN/v2rayN/v2rayN.csproj -c Release --no-restore
+          dotnet test v2rayN/ServiceLib.Tests/ServiceLib.Tests.csproj -c Release --no-restore --logger trx
+          dotnet publish v2rayN/v2rayN/v2rayN.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/qcc-win-x64
+
+      - name: Package and generate manifest
+        id: package
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.prepare.outputs.tag }}'
+          $zip = "QuietControlCenter-$tag-win-x64.zip"
+          Compress-Archive artifacts/qcc-win-x64/* $zip
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            appVersion = $tag.TrimStart('v','V')
+            platform = 'win-x64'
+            assetUrl = "https://github.com/${{ github.repository }}/releases/download/quiet-$tag/$zip"
+            sha256 = $sha
+            signature = $null
+            provenanceUrl = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          $manifest | ConvertTo-Json | Set-Content -Encoding utf8 quiet-update-manifest.json
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Create draft custom release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releaseTag = "quiet-${{ steps.prepare.outputs.tag }}"
+          if (gh release view $releaseTag 2>$null) { exit 0 }
+          gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --draft --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automated compatibility draft. Review UI and provenance before publishing."
+
