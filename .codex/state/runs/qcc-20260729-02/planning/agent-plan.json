@@ -1,0 +1,35 @@
+{
+  "run_id": "qcc-20260729-02",
+  "phase": "planning",
+  "project": {
+    "name": "Quiet Control Center v7.24.3",
+    "risk": "standard",
+    "risk_reasons": [
+      "跨多个 WPF 视图与原生构建验证"
+    ],
+    "scope": [
+      "v2rayN\\v2rayN",
+      "v2rayN\\ServiceLib",
+      "v2rayN\\ServiceLib.Tests"
+    ],
+    "acceptance_criteria": [
+      "计划修复两个 P0、接通可见操作、重写底部状态区、动态化版本并定义编译/运行/截图验收"
+    ]
+  },
+  "prior_audit_report": ".codex\\state\\runs\\qcc-20260729-02\\discovery\\audit-report.json",
+  "roles": [
+    {
+      "name": "project_planner",
+      "task_id": "qcc-20260729-02-planning-planner",
+      "stage": "planning",
+      "mode": "read-only",
+      "task": "基于已审查发现制定实施顺序、边界和验收条件；项目目标：把已通过发现审计的风险转为单写入者实施计划与验收顺序。",
+      "expected_output": "有序计划、唯一写入边界和验收条件。",
+      "allowed_paths": [
+        "v2rayN\\v2rayN",
+        "v2rayN\\ServiceLib",
+        "v2rayN\\ServiceLib.Tests"
+      ]
+    }
+  ]
+}
