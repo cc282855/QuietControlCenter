@@ -24,6 +24,7 @@ Assert-True ($helper -notmatch 'new\[\] \{ "guiConfigs", "logs", "bin" \}') 'Imm
 Assert-True ($helper -match 'instruction\.sha256' -and $helper -match 'OriginExecutableSha256' -and $helper -match 'Guid\.TryParseExact') 'Instruction/work-root/origin binding is incomplete.'
 Assert-True ($helper -match 'deferred backup cleanup' -and $helper -match 'Reparse point in mutable data') 'Commit cleanup or reparse rejection is missing.'
 Assert-True ($workflow -match 'QCC_SIGNING_PRIVATE_KEY_PEM' -and $workflow -match '\-\-draft' -and $workflow -match '\-\-clobber') 'Draft/signing/rerun workflow contract is missing.'
+Assert-True ($workflow -match 'releases\?per_page=100' -and $workflow -match '\[Version\]\$Matches\.version') 'Highest semantic upstream release selection is missing.'
 Assert-True ($workflow -match 'actions/checkout@[0-9a-f]{40}' -and $workflow -match 'actions/setup-dotnet@[0-9a-f]{40}') 'Third-party actions are not pinned to full SHAs.'
 
 $manifest = Get-Content -Raw (Join-Path $root 'tools/quiet-update-manifest.example.json') | ConvertFrom-Json

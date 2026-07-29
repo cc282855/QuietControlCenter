@@ -36,8 +36,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $LASTEXITCODE" }
           $tag = $env:REQUESTED_TAG
           if ([string]::IsNullOrWhiteSpace($tag)) {
-            $release = Invoke-RestMethod -Headers @{ 'User-Agent' = 'Quiet-Control-Center-CI' } https://api.github.com/repos/2dust/v2rayN/releases/latest
-            $tag = $release.tag_name
+            $releases = Invoke-RestMethod -Headers @{ 'User-Agent' = 'Quiet-Control-Center-CI' } 'https://api.github.com/repos/2dust/v2rayN/releases?per_page=100'
+            $candidates = @($releases | Where-Object { -not $_.draft } | ForEach-Object {
+              if ($_.tag_name -match '^v?(?<version>\d+\.\d+\.\d+)(?:[-+].*)?$') {
+                [pscustomobject]@{
+                  Tag = $_.tag_name
+                  Version = [Version]$Matches.version
+                  PublishedAt = [DateTimeOffset]$_.published_at
+                }
+              }
+            })
+            if ($candidates.Count -eq 0) { throw 'No semantic upstream release was found.' }
+            $tag = ($candidates | Sort-Object Version, PublishedAt -Descending | Select-Object -First 1).Tag
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
           $releaseTag = "quiet-$tag"
