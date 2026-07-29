@@ -145,12 +145,12 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $releaseTag = "quiet-${{ steps.prepare.outputs.tag }}"
           $PSNativeCommandUseErrorActionPreference = $false
-          gh release view $releaseTag *> $null
+          gh release view $releaseTag --repo "${{ github.repository }}" *> $null
           $releaseExists = $LASTEXITCODE -eq 0
           $PSNativeCommandUseErrorActionPreference = $true
           if ($releaseExists) {
-            gh release upload $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --clobber
-            gh release edit $releaseTag --draft=false --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed."
+            gh release upload $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --clobber --repo "${{ github.repository }}"
+            gh release edit $releaseTag --draft=false --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed." --repo "${{ github.repository }}"
           } else {
-            gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed."
+            gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed." --repo "${{ github.repository }}"
           }
