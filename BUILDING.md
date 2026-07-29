@@ -8,20 +8,21 @@ The single scheduler starts when the main window loads, checks immediately if th
 
 The official API `https://api.github.com/repos/2dust/v2rayN/releases/latest` only produces a notice. Official archives are never downloaded or passed to the updater.
 
-## Enable the custom signed channel
+## Production signed channel
 
-The channel is dormant unless every field below exists in `%LOCALAPPDATA%\QuietControlCenter\update-channel.json`:
+The shipped client is pinned to the production channel below, so no manual setup is required:
 
 ```json
 {
-  "manifestUrl": "https://github.com/OWNER/REPOSITORY/releases/latest/download/quiet-update-manifest.json",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n...P-256 PUBLIC KEY ONLY...\n-----END PUBLIC KEY-----",
-  "expectedOwner": "OWNER",
-  "expectedRepository": "REPOSITORY"
+  "manifestUrl": "https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json",
+  "expectedOwner": "cc282855",
+  "expectedRepository": "v2rayN"
 }
 ```
 
-Never place a private key in the client or repository. Configure the matching P-256 private PEM only as the GitHub Actions secret `QCC_SIGNING_PRIVATE_KEY_PEM`. The workflow remains draft-only. Without that secret it emits an unsigned draft manifest, which every client rejects. A human must review the UI screenshots, provenance URL, hashes, and draft before publishing.
+The matching P-256 public key is embedded in the client. `%LOCALAPPDATA%\QuietControlCenter\update-channel.json` remains an optional explicit override; a complete override can redirect or disable the channel for testing.
+
+The private key exists only as the GitHub Actions secret `QCC_SIGNING_PRIVATE_KEY_PEM` in `cc282855/v2rayN`. Never place it in the client or repository. The scheduled workflow checks upstream daily, skips versions that already have a Quiet release, reapplies the UI layer, runs both test suites, publishes both binaries, cleans the artifact, signs the manifest, and publishes a latest non-draft release. A missing signing secret, patch conflict, test failure, build failure, marker failure, or packaging failure prevents publication, so existing clients stay on the last verified version.
 
 The signed canonical bytes are UTF-8 lines in this exact order, ending with a newline: `schema`, `product`, `appVersion`, `platform`, `assetUrl`, lowercase `sha256`, `provenanceUrl`. URLs must be HTTPS, contain no credentials, and belong to the pinned owner/repository. The client streams the archive with a 512 MiB cap, checks the actual SHA-256, validates `qcc-package.json`, and rehashes every marked payload file before invoking the external helper.
 

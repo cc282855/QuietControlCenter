@@ -1,11 +1,11 @@
-name: Build Quiet UI for upstream release
+name: Publish signed Quiet UI for upstream release
 
 on:
   workflow_dispatch:
     inputs:
       upstream_tag:
         description: Upstream v2rayN tag (for example 7.24.4)
-        required: true
+        required: false
   schedule:
     - cron: "17 2 * * *"
 
@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 jobs:
-  detect-build-draft:
+  detect-build-release:
     runs-on: windows-latest
     steps:
       - name: Check out customized branch
@@ -30,38 +30,57 @@ jobs:
           BASE_TAG: ${{ vars.QUIET_UI_BASE_TAG }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
           git remote add upstream https://github.com/2dust/v2rayN.git 2>$null
           git fetch upstream --tags --force
+          if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $LASTEXITCODE" }
           $tag = $env:REQUESTED_TAG
           if ([string]::IsNullOrWhiteSpace($tag)) {
             $release = Invoke-RestMethod -Headers @{ 'User-Agent' = 'Quiet-Control-Center-CI' } https://api.github.com/repos/2dust/v2rayN/releases/latest
             $tag = $release.tag_name
           }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          $releaseTag = "quiet-$tag"
+          if (gh release view $releaseTag --repo "${{ github.repository }}" 2>$null) {
+            "skip=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Quiet release $releaseTag already exists; nothing to publish."
+            exit 0
+          }
+          "skip=false" >> $env:GITHUB_OUTPUT
           $base = if ($env:BASE_TAG) { $env:BASE_TAG } else { '7.24.3' }
           git rev-parse "refs/tags/$tag" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Missing upstream tag: $tag" }
           git rev-parse "refs/tags/$base" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Missing Quiet UI base tag: $base" }
           $patch = Join-Path $env:RUNNER_TEMP quiet-ui.patch
-          git diff --binary "refs/tags/$base" HEAD -- .github/workflows/upstream-draft.yml v2rayN/v2rayN/Views v2rayN/v2rayN/Resources v2rayN/v2rayN/Services v2rayN/v2rayN/v2rayN.csproj v2rayN/AmazTool v2rayN/v2rayN.Tests v2rayN/v2rayN.slnx .gitignore .gitmodules BUILDING.md design-qa.md tools | Set-Content -Encoding utf8 $patch
+          git diff --binary "--output=$patch" "refs/tags/$base" HEAD -- .github/workflows/upstream-draft.yml v2rayN/v2rayN/Views v2rayN/v2rayN/Resources v2rayN/v2rayN/Services v2rayN/v2rayN/v2rayN.csproj v2rayN/AmazTool v2rayN/v2rayN.Tests v2rayN/v2rayN.slnx .gitignore .gitmodules BUILDING.md design-qa.md tools
+          if ($LASTEXITCODE -ne 0) { throw "Quiet UI patch generation failed: $LASTEXITCODE" }
           if ((Get-Item $patch).Length -eq 0) { throw 'Quiet UI patch layer is empty.' }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
           "patch=$patch" >> $env:GITHUB_OUTPUT
 
       - name: Reapply Quiet UI onto exact upstream tag
+        if: steps.prepare.outputs.skip != 'true'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           git checkout --detach "refs/tags/${{ steps.prepare.outputs.tag }}"
           git submodule update --init --recursive
           git apply --check "${{ steps.prepare.outputs.patch }}"
           git apply "${{ steps.prepare.outputs.patch }}"
 
       - name: Setup .NET 10
+        if: steps.prepare.outputs.skip != 'true'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore, test, and publish
+        if: steps.prepare.outputs.skip != 'true'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           dotnet restore v2rayN/v2rayN.slnx
           dotnet build v2rayN/v2rayN/v2rayN.csproj -c Release --no-restore
           dotnet test v2rayN/ServiceLib.Tests/ServiceLib.Tests.csproj -c Release --no-restore --logger trx
@@ -71,20 +90,19 @@ jobs:
           Copy-Item artifacts/qcc-helper/AmazTool.exe artifacts/qcc-win-x64/AmazTool.exe -Force
 
       - name: Package and generate manifest
+        if: steps.prepare.outputs.skip != 'true'
         id: package
         shell: pwsh
         env:
           QCC_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.QCC_SIGNING_PRIVATE_KEY_PEM }}
         run: |
+          $ErrorActionPreference = 'Stop'
           $tag = '${{ steps.prepare.outputs.tag }}'
           $version = $tag.TrimStart('v','V')
-          $files = [ordered]@{}
-          Get-ChildItem artifacts/qcc-win-x64 -File -Recurse | Sort-Object FullName | ForEach-Object {
-            $relative = [IO.Path]::GetRelativePath((Resolve-Path artifacts/qcc-win-x64), $_.FullName).Replace('\','/')
-            $files[$relative] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ([string]::IsNullOrWhiteSpace($env:QCC_SIGNING_PRIVATE_KEY_PEM)) {
+            throw 'QCC_SIGNING_PRIVATE_KEY_PEM is required; unsigned releases are forbidden.'
           }
-          [ordered]@{ product='QuietControlCenter'; platform='win-x64'; version=$version; files=$files } |
-            ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts/qcc-win-x64/qcc-package.json
+          & ./tools/package-qcc.ps1 -Artifact artifacts/qcc-win-x64 -Helper artifacts/qcc-helper/AmazTool.exe -Version $version
           $zip = "QuietControlCenter-$tag-win-x64.zip"
           Compress-Archive artifacts/qcc-win-x64/* $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -98,26 +116,27 @@ jobs:
             signature = $null
             provenanceUrl = "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           }
-          if ($env:QCC_SIGNING_PRIVATE_KEY_PEM) {
-            $canonical = "1`nQuietControlCenter`n$($manifest.appVersion)`nwin-x64`n$($manifest.assetUrl)`n$sha`n$($manifest.provenanceUrl)`n"
-            $key = [Security.Cryptography.ECDsa]::Create()
-            $key.ImportFromPem($env:QCC_SIGNING_PRIVATE_KEY_PEM)
-            $sig = $key.SignData([Text.Encoding]::UTF8.GetBytes($canonical), [Security.Cryptography.HashAlgorithmName]::SHA256)
-            $manifest.signature = [Convert]::ToBase64String($sig)
-            $key.Dispose()
-          }
+          $canonical = "1`nQuietControlCenter`n$($manifest.appVersion)`nwin-x64`n$($manifest.assetUrl)`n$sha`n$($manifest.provenanceUrl)`n"
+          $key = [Security.Cryptography.ECDsa]::Create()
+          $key.ImportFromPem($env:QCC_SIGNING_PRIVATE_KEY_PEM)
+          $sig = $key.SignData([Text.Encoding]::UTF8.GetBytes($canonical), [Security.Cryptography.HashAlgorithmName]::SHA256)
+          $manifest.signature = [Convert]::ToBase64String($sig)
+          $key.Dispose()
           $manifest | ConvertTo-Json | Set-Content -Encoding utf8 quiet-update-manifest.json
           "zip=$zip" >> $env:GITHUB_OUTPUT
 
-      - name: Create draft custom release
+      - name: Publish signed custom release
+        if: steps.prepare.outputs.skip != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           $releaseTag = "quiet-${{ steps.prepare.outputs.tag }}"
           if (gh release view $releaseTag 2>$null) {
-            gh release edit $releaseTag --draft=true --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automated compatibility draft. It must remain draft until visual/provenance review and a valid signature are confirmed."
             gh release upload $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --clobber
+            gh release edit $releaseTag --draft=false --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed."
           } else {
-            gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --draft --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automated compatibility draft. It must remain draft until visual/provenance review and a valid signature are confirmed."
+            gh release create $releaseTag "${{ steps.package.outputs.zip }}" quiet-update-manifest.json --latest --title "Quiet Control Center ${{ steps.prepare.outputs.tag }}" --notes "Automatically rebuilt from upstream ${{ steps.prepare.outputs.tag }}. All build, ServiceLib, update-security, marker and signing gates passed."
           }

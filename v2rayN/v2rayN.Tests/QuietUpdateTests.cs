@@ -31,6 +31,16 @@ public sealed class QuietUpdateTests
         Assert.Null(await new FileQuietStateStore(dir).ReadStateAsync(default));
     }
 
+    [Fact] public async Task MissingChannelUsesPinnedProductionChannel()
+    {
+        var channel = await new FileQuietStateStore(Temp()).ReadChannelAsync(default);
+        Assert.NotNull(channel);
+        Assert.Equal("cc282855", channel.ExpectedOwner);
+        Assert.Equal("v2rayN", channel.ExpectedRepository);
+        Assert.Equal("https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json", channel.ManifestUrl);
+        Assert.True(QuietUpdateService.IsConfigured(channel, out _));
+    }
+
     [Fact] public void ChannelIsDormantWithoutPinnedKey()
     {
         var c = new QuietChannelConfig { ManifestUrl = "https://github.com/a/b/releases/x", ExpectedOwner = "a", ExpectedRepository = "b" };

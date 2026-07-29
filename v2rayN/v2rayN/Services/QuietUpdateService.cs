@@ -68,7 +68,9 @@ public sealed class FileQuietStateStore : IQuietStateStore
     private readonly string _directory;
     public FileQuietStateStore(string? directory = null) => _directory = directory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuietControlCenter");
     public Task<QuietUpdateState?> ReadStateAsync(CancellationToken token) => ReadAsync<QuietUpdateState>("update-state.json", token);
-    public Task<QuietChannelConfig?> ReadChannelAsync(CancellationToken token) => ReadAsync<QuietChannelConfig>("update-channel.json", token);
+    public async Task<QuietChannelConfig?> ReadChannelAsync(CancellationToken token)
+        => await ReadAsync<QuietChannelConfig>("update-channel.json", token).ConfigureAwait(false)
+           ?? QuietUpdateDefaults.CreateChannel();
     public async Task WriteStateAsync(QuietUpdateState state, CancellationToken token)
     {
         Directory.CreateDirectory(_directory);
@@ -89,6 +91,22 @@ public sealed class FileQuietStateStore : IQuietStateStore
         }
         catch (JsonException) { return default; }
     }
+}
+
+internal static class QuietUpdateDefaults
+{
+    public static QuietChannelConfig CreateChannel() => new()
+    {
+        ManifestUrl = "https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json",
+        ExpectedOwner = "cc282855",
+        ExpectedRepository = "v2rayN",
+        PublicKeyPem = """
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEFZrXWIHpr3Dh6u8xyrrdk8czaaSp
+            ucuSeSDDWHSFdbntVUV0eq1WGnQvMNxBWgN18BCZjjGJ+W2A51yxoZ20sQ==
+            -----END PUBLIC KEY-----
+            """
+    };
 }
 
 public sealed class QuietUpdateScheduler
