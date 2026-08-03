@@ -58,8 +58,8 @@ public sealed class QuietUpdateTests
         var channel = await new FileQuietStateStore(Temp()).ReadChannelAsync(default);
         Assert.NotNull(channel);
         Assert.Equal("cc282855", channel.ExpectedOwner);
-        Assert.Equal("v2rayN", channel.ExpectedRepository);
-        Assert.Equal("https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json", channel.ManifestUrl);
+        Assert.Equal("QuietControlCenter", channel.ExpectedRepository);
+        Assert.Equal("https://github.com/cc282855/QuietControlCenter/releases/latest/download/quiet-update-manifest.json", channel.ManifestUrl);
         Assert.True(QuietUpdateService.IsConfigured(channel, out _));
     }
 

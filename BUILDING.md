@@ -14,15 +14,15 @@ The shipped client is pinned to the production channel below, so no manual setup
 
 ```json
 {
-  "manifestUrl": "https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json",
+  "manifestUrl": "https://github.com/cc282855/QuietControlCenter/releases/latest/download/quiet-update-manifest.json",
   "expectedOwner": "cc282855",
-  "expectedRepository": "v2rayN"
+  "expectedRepository": "QuietControlCenter"
 }
 ```
 
 The matching P-256 public key is embedded in the client. `%LOCALAPPDATA%\QuietControlCenter\update-channel.json` remains an optional explicit override; a complete override can redirect or disable the channel for testing.
 
-The private key exists only as the GitHub Actions secret `QCC_SIGNING_PRIVATE_KEY_PEM` in `cc282855/v2rayN`. Never place it in the client or repository. The scheduled workflow checks upstream daily, selects the highest semantic non-draft release (including prereleases, so it never downgrades from `7.24.3` to the older stable `7.23.4`), and skips only a complete published Quiet release. For a new or incomplete release it reapplies the complete UI and supporting `ServiceLib` patch layer with Git's three-way merge, runs both test suites, verifies and imports only the upstream Windows `bin/` runtime payload, publishes both custom binaries, signs every immutable file in the complete package marker, creates or repairs a draft Release, verifies both uploaded asset digests, and only then publishes it as latest. A missing signing secret, upstream asset mismatch, unresolved patch conflict, test failure, build failure, marker failure, upload failure, or packaging failure leaves no newly published update, so existing clients stay on the last verified version and the next run can repair the draft.
+The private key exists only as the GitHub Actions secret `QCC_SIGNING_PRIVATE_KEY_PEM` in `cc282855/QuietControlCenter`. Never place it in the client or repository. The scheduled workflow checks upstream daily, selects the highest semantic non-draft release (including prereleases, so it never downgrades from `7.24.3` to the older stable `7.23.4`), and skips only a complete published Quiet release. For a new or incomplete release it reapplies the complete UI and supporting `ServiceLib` patch layer with Git's three-way merge, runs both test suites, verifies and imports only the upstream Windows `bin/` runtime payload, publishes both custom binaries, signs every immutable file in the complete package marker, creates or repairs a draft Release, verifies both uploaded asset digests, and only then publishes it as latest. A missing signing secret, upstream asset mismatch, unresolved patch conflict, test failure, build failure, marker failure, upload failure, or packaging failure leaves no newly published update, so existing clients stay on the last verified version and the next run can repair the draft.
 
 The signed canonical bytes are UTF-8 lines in this exact order, ending with a newline: `schema`, `product`, `appVersion`, `platform`, `assetUrl`, lowercase `sha256`, `provenanceUrl`. URLs must be HTTPS, contain no credentials, and belong to the pinned owner/repository. The client streams the archive with a 512 MiB cap, checks the actual SHA-256, validates `qcc-package.json`, and rehashes every marked payload file before invoking the external helper.
 

@@ -97,13 +97,13 @@ internal static class QuietUpdateDefaults
 {
     public static QuietChannelConfig CreateChannel() => new()
     {
-        ManifestUrl = "https://github.com/cc282855/v2rayN/releases/latest/download/quiet-update-manifest.json",
+        ManifestUrl = "https://github.com/cc282855/QuietControlCenter/releases/latest/download/quiet-update-manifest.json",
         ExpectedOwner = "cc282855",
-        ExpectedRepository = "v2rayN",
+        ExpectedRepository = "QuietControlCenter",
         PublicKeyPem = """
             -----BEGIN PUBLIC KEY-----
-            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/OpybzxwVVABpIeDTDZsiGPw54IS
-            k37qebQxgsfEhQ+f+smVwDPp5jgr+kp7WLkUbOks21X9d/0P4bBAQHwLiQ==
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEk0thdRGNx8dtjaNIkRJIZ4KZXoUU
+            5PtQU4owTBSjjyzk+SXpFGlrmbJg6gVjs2jpazvM104bmWKXwNJk+6gMSw==
             -----END PUBLIC KEY-----
             """
     };
