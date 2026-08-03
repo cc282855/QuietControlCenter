@@ -118,7 +118,7 @@ jobs:
           $namespaces.AddNamespace('base', 'clr-namespace:v2rayN.Base')
           $namespaces.AddNamespace('p', 'http://schemas.microsoft.com/winfx/2006/xaml/presentation')
           $root = $xaml.DocumentElement
-          if ($root.GetAttribute('Title') -ne 'Quiet Control Center' -or
+          if ($root.GetAttribute('Title') -ne '米卡' -or
               $root.GetAttribute('Style') -ne '{StaticResource QccWindow}') {
             throw 'Customized main window guard failed; title or QccWindow style is missing.'
           }
@@ -230,7 +230,7 @@ jobs:
               if ($process.HasExited) {
                 throw "Final ZIP startup smoke test process exited early with code $($process.ExitCode)."
               }
-              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle.StartsWith('Quiet Control Center')) {
+              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle.StartsWith('米卡')) {
                 break
               }
             } while ([DateTime]::UtcNow -lt $deadline)
@@ -251,7 +251,7 @@ jobs:
             $process.Refresh()
             if ($process.HasExited) { throw 'Final ZIP startup smoke test process did not remain alive.' }
             if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Final ZIP did not create a main window within 30 seconds.' }
-            if (-not $process.MainWindowTitle.StartsWith('Quiet Control Center')) {
+            if (-not $process.MainWindowTitle.StartsWith('米卡')) {
               throw "Unexpected final ZIP main window title: '$($process.MainWindowTitle)'"
             }
             Write-Host "Final ZIP startup smoke test passed for PID $($process.Id)."

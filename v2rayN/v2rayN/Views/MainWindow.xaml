@@ -9,7 +9,7 @@
     xmlns:resx="clr-namespace:ServiceLib.Resx;assembly=ServiceLib"
     xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
     xmlns:vms="clr-namespace:ServiceLib.ViewModels;assembly=ServiceLib"
-    Title="Quiet Control Center"
+    Title="米卡"
     Width="1440"
     Height="960"
     MinWidth="1120"
@@ -59,10 +59,10 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Margin="18,0,0,0" VerticalAlignment="Center" Orientation="Horizontal">
-                        <Border Width="30" Height="30" CornerRadius="9" Background="{StaticResource QccPrimary}">
-                            <materialDesign:PackIcon Width="19" Height="19" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" Kind="ShieldCheck" />
+                        <Border Width="30" Height="30" Background="Transparent" ClipToBounds="True" CornerRadius="7">
+                            <Image Source="/Resources/MikaLogo.png" Stretch="Uniform" />
                         </Border>
-                        <TextBlock Margin="11,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="17" FontWeight="SemiBold" Text="Quiet Control Center" />
+                        <TextBlock Margin="11,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="17" FontWeight="SemiBold" Text="米卡" />
                         <TextBlock x:Name="txtAppVersion" Margin="14,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="13" />
                     </StackPanel>
 

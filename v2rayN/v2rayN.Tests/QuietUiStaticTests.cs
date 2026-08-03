@@ -217,6 +217,26 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void MainWindow_UsesMikaBrandAndLogoAssets()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+        var project = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "v2rayN.csproj"));
+        var resources = Path.Combine(root, "v2rayN", "v2rayN", "Resources");
+
+        Assert.Contains("Title=\"米卡\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"米卡\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Source=\"/Resources/MikaLogo.png\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Kind=\"ShieldCheck\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title = $\"米卡 -", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("<ApplicationIcon>Resources\\v2rayN.ico</ApplicationIcon>", project, StringComparison.Ordinal);
+        Assert.Contains("<Resource Include=\"Resources\\MikaLogo.png\" />", project, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(resources, "MikaLogo.png")));
+        Assert.True(File.Exists(Path.Combine(resources, "v2rayN.ico")));
+    }
+
+    [Fact]
     public void QaCapture_CanOpenSoftwareUpdatePopupWithoutRuntimeReload()
     {
         var root = FindProjectRoot();
