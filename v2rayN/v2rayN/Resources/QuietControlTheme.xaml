@@ -107,7 +107,12 @@
         <Setter Property="Background" Value="{StaticResource QccSurface}" />
         <Setter Property="BorderBrush" Value="{StaticResource QccBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="8" Color="#FF0F172A" Direction="270" Opacity="0.10" ShadowDepth="1" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="QccDivider" TargetType="Separator">

@@ -592,6 +592,7 @@ public partial class MainWindow
             if (args.Contains("--qcc-qa-reload", StringComparer.Ordinal)) await ViewModel.Reload();
             await Task.Delay(8000);
             UpdateConnectionStateBadge();
+            ApplyQaQualitySampleIfRequested(args);
             if (args.Contains("--qcc-qa-open-update", StringComparer.Ordinal))
             {
                 await RefreshQuietUpdateStatusAsync();
@@ -613,6 +614,29 @@ public partial class MainWindow
         }
     }
 
+    private void ApplyQaQualitySampleIfRequested(string[] args)
+    {
+        var index = Array.IndexOf(args, "--qcc-qa-quality-sample");
+        if (index < 0 || index + 3 >= args.Length
+            || !int.TryParse(args[index + 1], out var delayMs)
+            || !int.TryParse(args[index + 2], out var jitterMs)
+            || !int.TryParse(args[index + 3], out var lossPercent)
+            || delayMs < 0 || jitterMs < 0 || lossPercent is < 0 or > 100)
+        {
+            return;
+        }
+
+        txtHeroConnectionState.Text = "已连接";
+        txtHeroConnectionState.Foreground = (Brush)FindResource("QccSuccess");
+        borderHeroConnectionState.Background = new SolidColorBrush(Color.FromRgb(234, 248, 239));
+        txtHeroRunningStatus.Text = "sing-box 运行中";
+        txtHeroDelay.Text = $"{delayMs} ms";
+        txtHeroJitterLoss.Text = $"{jitterMs} ms / {lossPercent}%";
+        txtHeroDelay.Foreground = GetMetricBrush(ConnectionQualitySeverityCalculator.GetDelaySeverity(delayMs));
+        txtHeroJitterLoss.Foreground = GetMetricBrush(
+            ConnectionQualitySeverityCalculator.GetJitterLossSeverity(jitterMs, lossPercent));
+    }
+
     private async void LiveMetricsTimer_Tick(object? sender, EventArgs e)
     {
         var connected = UpdateConnectionStateBadge();
@@ -620,8 +644,7 @@ public partial class MainWindow
         if (!connected)
         {
             _connectionQualityMonitor.Reset();
-            txtHeroDelay.Text = "—";
-            txtHeroJitterLoss.Text = "— / —";
+            ResetHeroQualityMetrics();
             return;
         }
 
@@ -635,18 +658,40 @@ public partial class MainWindow
             if (!CoreManager.Instance.IsRunning)
             {
                 _connectionQualityMonitor.Reset();
-                txtHeroDelay.Text = "—";
-                txtHeroJitterLoss.Text = "— / —";
+                ResetHeroQualityMetrics();
                 return;
             }
             txtHeroDelay.Text = snapshot.DelayMs is { } currentDelay ? $"{currentDelay} ms" : "超时";
             txtHeroJitterLoss.Text = snapshot.JitterMs is { } jitter
                 ? $"{jitter} ms / {snapshot.LossPercent}%"
                 : $"— / {snapshot.LossPercent}%";
+            txtHeroDelay.Foreground = GetMetricBrush(ConnectionQualitySeverityCalculator.GetDelaySeverity(snapshot.DelayMs));
+            txtHeroJitterLoss.Foreground = GetMetricBrush(
+                ConnectionQualitySeverityCalculator.GetJitterLossSeverity(snapshot.JitterMs, snapshot.LossPercent));
         }
         catch (OperationCanceledException) when (_liveMetricsCancellation.IsCancellationRequested)
         {
         }
+    }
+
+    private void ResetHeroQualityMetrics()
+    {
+        txtHeroDelay.Text = "—";
+        txtHeroJitterLoss.Text = "— / —";
+        txtHeroDelay.Foreground = GetMetricBrush(ConnectionQualitySeverity.None);
+        txtHeroJitterLoss.Foreground = GetMetricBrush(ConnectionQualitySeverity.None);
+    }
+
+    private Brush GetMetricBrush(ConnectionQualitySeverity severity)
+    {
+        var resourceKey = severity switch
+        {
+            ConnectionQualitySeverity.Good => "QccSuccess",
+            ConnectionQualitySeverity.Warning => "QccWarning",
+            ConnectionQualitySeverity.Danger => "QccDanger",
+            _ => "QccMuted"
+        };
+        return (Brush)FindResource(resourceKey);
     }
 
     private void StopLiveMetrics()

@@ -121,6 +121,11 @@ public sealed class QuietUiStaticTests
         Assert.Contains("ProxyPingClient", codeBehind, StringComparison.Ordinal);
         Assert.Contains("Interval = TimeSpan.FromSeconds(1)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("CoreManager.Instance.IsRunning", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("ConnectionQualitySeverityCalculator.GetDelaySeverity", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("ConnectionQualitySeverityCalculator.GetJitterLossSeverity", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("txtHeroDelay.Foreground", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("txtHeroJitterLoss.Foreground", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("--qcc-qa-quality-sample", codeBehind, StringComparison.Ordinal);
         Assert.DoesNotContain("StatusBarViewModel.RunningInfoDisplay)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("FormatLiveTraffic(update.ProxyUp, update.ProxyDown)", statusViewModel, StringComparison.Ordinal);
         Assert.Contains("FormatLiveTraffic(update.DirectUp, update.DirectDown)", statusViewModel, StringComparison.Ordinal);
@@ -161,13 +166,17 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
-    public void MainWindow_UsesOriginalFlatOuterFrame()
+    public void MainWindow_UsesRoundedLayeredOuterFrame()
     {
         var root = FindProjectRoot();
         var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var theme = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Resources", "QuietControlTheme.xaml"));
         Assert.Contains("x:Name=\"windowOutline\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderBrush=\"#FFD8DCE2\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderThickness=\"1\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"12\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"10\" />", theme, StringComparison.Ordinal);
+        Assert.Contains("DropShadowEffect", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("txtQuietUpdateEvidence", xaml, StringComparison.Ordinal);
     }
 

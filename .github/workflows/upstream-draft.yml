@@ -263,6 +263,47 @@ jobs:
             }
           }
 
+      - name: Capture isolated visual QA frames
+        if: steps.prepare.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = '${{ steps.package.outputs.zip }}'
+          $qaRoot = Join-Path $env:RUNNER_TEMP "qcc-visual-qa-$([Guid]::NewGuid().ToString('N'))"
+          New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null
+          New-Item -ItemType Directory -Path artifacts/visual-qa -Force | Out-Null
+          Expand-Archive -LiteralPath $zip -DestinationPath $qaRoot -Force
+          $exe = Join-Path $qaRoot 'v2rayN.exe'
+          $captures = @(
+            @{ Name = 'qcc-1120x720-good.png'; Width = 1120; Height = 720; Delay = 78; Jitter = 12; Loss = 0 },
+            @{ Name = 'qcc-1120x720-warning.png'; Width = 1120; Height = 720; Delay = 145; Jitter = 35; Loss = 2 },
+            @{ Name = 'qcc-1487x1058-danger.png'; Width = 1487; Height = 1058; Delay = 260; Jitter = 70; Loss = 8 }
+          )
+          foreach ($capture in $captures) {
+            $output = (Resolve-Path artifacts/visual-qa).Path + '\' + $capture.Name
+            $arguments = @(
+              '--qcc-qa-capture', $output, $capture.Width, $capture.Height,
+              '--qcc-qa-quality-sample', $capture.Delay, $capture.Jitter, $capture.Loss
+            )
+            $process = Start-Process -FilePath $exe -WorkingDirectory $qaRoot -ArgumentList $arguments -PassThru
+            if (-not $process.WaitForExit(45_000)) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              throw "Visual QA capture timed out: $($capture.Name)"
+            }
+            if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $output -PathType Leaf)) {
+              throw "Visual QA capture failed: $($capture.Name)"
+            }
+          }
+
+      - name: Upload visual QA frames
+        if: steps.prepare.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-qa-${{ steps.prepare.outputs.version }}
+          path: artifacts/visual-qa/*.png
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Sign verified update manifest
         if: steps.prepare.outputs.skip != 'true'
         shell: pwsh

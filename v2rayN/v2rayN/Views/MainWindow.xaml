@@ -32,7 +32,7 @@
     </Window.Resources>
 
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="58" CornerRadius="0" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" />
+        <shell:WindowChrome CaptionHeight="58" CornerRadius="12" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
     <materialDesign:DialogHost
@@ -40,7 +40,7 @@
         Identifier="RootDialog"
         SnackbarMessageQueue="{Binding ElementName=MainSnackbar, Path=MessageQueue}"
         Style="{StaticResource MaterialDesignEmbeddedDialogHost}">
-        <Grid Background="{StaticResource QccCanvas}">
+        <Grid Background="{StaticResource QccCanvas}" ClipToBounds="True">
             <Grid.RowDefinitions>
                 <RowDefinition Height="58" />
                 <RowDefinition Height="*" />
@@ -226,7 +226,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Connection summary -->
-                    <Border Grid.Row="0" Background="White" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
+                    <Border Grid.Row="0" Background="{StaticResource QccCanvas}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
                         <Grid Margin="18,10,16,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1.35*" />
@@ -338,6 +338,7 @@
                 Panel.ZIndex="1000"
                 BorderBrush="#FFD8DCE2"
                 BorderThickness="1"
+                CornerRadius="12"
                 IsHitTestVisible="False"
                 SnapsToDevicePixels="True" />
         </Grid>
