@@ -70,6 +70,51 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Rounded frame and quality-color inspection — 2026-08-03
+
+### Source visual truth
+
+- Current full-window reference supplied by the user: `C:\Users\Administrator\AppData\Local\Temp\codex-clipboard-01c889f8-bdcc-4d11-a1b3-8162dc9cf657.png`, 2048x1156 pixels.
+- Current quality-card reference supplied by the user: `C:\Users\Administrator\AppData\Local\Temp\codex-clipboard-57709fd2-e03d-49f0-92dc-a22739b92a20.png`, 553x173 pixels.
+- Exact 1120x720 structural baseline: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.3\final-responsive-1120x720.png`.
+
+### Rendered implementation
+
+The signed `quiet-7.24.4.6` release was rendered on an isolated GitHub Windows runner at 96 DPI; no local v2rayN or proxy process was started or stopped.
+
+- Good state, 1120x720: `.codex/state/runs/qcc-20260803-01/implement/qcc-1120x720-good.png` — SHA-256 `C9EF7C40A3F3B6A6BDC7EFBB2C4C2BB4894779215421CA110AB073DB8D8178A6`.
+- Warning state, 1120x720: `.codex/state/runs/qcc-20260803-01/implement/qcc-1120x720-warning.png` — SHA-256 `4602B33F30A60F4FFA993EBE5237103F7C0F4F096FD3AA90AFA9119CA0099E89`.
+- Danger-state capture request, 1487x1058: `.codex/state/runs/qcc-20260803-01/implement/qcc-1487x1058-danger.png` — SHA-256 `70E6894741521B7AB0A821838EEC77122F04EF8BF73249158DAABD0E587CD3D2`. The runner work area constrained the native window to 1120 pixels, so only its top-left 1120-pixel region is valid visual evidence; the remaining black area is capture-environment padding, not application output.
+
+### Density normalization and comparison evidence
+
+- Full-view comparison: `.codex/state/runs/qcc-20260803-01/implement/comparison-baseline-vs-rounded-1120x720.png`, 2240x720, exact 1:1 96-DPI frames placed left-to-right (baseline, final), SHA-256 `C4B5264661F72B51FB3E3AB1A845A8223F0403E005B7DCEA1CC47FAD965EE0AC`.
+- Focused quality-card comparison: `.codex/state/runs/qcc-20260803-01/implement/comparison-metrics-source-vs-warning.png`, 1106x173, user source on the left and the final warning state normalized to the same 553x173 region on the right, SHA-256 `2E39609D4D0CF96279491F8B4E7F46C3880A4E697ADF91BFA42BF7464555B53A`.
+
+### Findings
+
+- Fonts and typography: existing font family, 11–18px hierarchy, wrapping and truncation behavior remain unchanged. Metric values retain readable 12px text and semantic color does not reduce legibility.
+- Spacing and layout rhythm: the outer 12px frame radius and 10px status-card radii are visibly consistent. Subtle 1px borders and low-opacity elevation add depth without changing control dimensions, columns, navigation, or table layout.
+- Colors and visual tokens: 78ms / 12ms / 0% renders green; 145ms / 35ms / 2% renders yellow; 260ms / 70ms / 8% renders red. The combined jitter/loss color follows the more severe value. Disconnected/no-data values remain muted gray.
+- Image and icon fidelity: the supplied Mika logo and Material Design icons remain sharp and unchanged; no raster placeholder, custom SVG, emoji, or substitute asset was introduced.
+- Copy and content: application labels and feature structure are unchanged. The QA-only sample switch is command-line gated and does not appear in normal use.
+- Responsiveness and polish: at 1120x720, all persistent navigation, status, search/filter controls, inspector actions and bottom controls remain visible with no overlap or clipping. Rounded corners and the outer outline remain visible against the white comparison canvas.
+- Functional evidence: Release build completed with 0 warnings and 0 errors; ServiceLib tests passed 141/141 and UI tests passed 64/64. Threshold edges are covered at delay 100/101/200/201ms, jitter 20/21/50/51ms, and loss 0/1/5/6%.
+
+### Comparison history
+
+- Pass 1: the 1120x720 full-view comparison and focused metric comparison found no actionable P0, P1, or P2 visual mismatch. No remediation loop was required after the final capture.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: the hosted runner cannot produce a true 1487x1058 native-window frame because its work area is smaller; this affects only the large screenshot artifact, not the application layout or the signed package.
+
+final result: passed
+
 ## Profile fields and combined testing inspection — 2026-07-31
 
 References:
