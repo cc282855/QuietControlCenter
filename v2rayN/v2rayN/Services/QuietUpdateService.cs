@@ -102,8 +102,8 @@ internal static class QuietUpdateDefaults
         ExpectedRepository = "QuietControlCenter",
         PublicKeyPem = """
             -----BEGIN PUBLIC KEY-----
-            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEk0thdRGNx8dtjaNIkRJIZ4KZXoUU
-            5PtQU4owTBSjjyzk+SXpFGlrmbJg6gVjs2jpazvM104bmWKXwNJk+6gMSw==
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETRKu8774McE0Te3WQ62uEs0eoJNl
+            jkT3Sar3i5KlX/isAZtmCk5TSm+IWkdax77y4c5zur7AbPOzU+FWnimVzw==
             -----END PUBLIC KEY-----
             """
     };
