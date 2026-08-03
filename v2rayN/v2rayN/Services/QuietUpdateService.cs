@@ -450,11 +450,7 @@ public sealed partial class QuietUpdateService
             return $"检测到定制版 {status.LatestCustom}，正在准备更新";
         if (TryParseVersion(status.LatestOfficial, out var official) && official > installed)
             return $"官方已有新版本 {status.LatestOfficial}，定制版正在适配";
-        if (!TryParseVersion(status.LatestCustom, out custom))
-            return "检查完成，但尚未取得米卡最新版的签名证据";
-        if (custom == installed)
-            return $"已核验：当前 {installed} = 米卡最新 {custom}";
-        return $"当前 {installed} 高于 GitHub 已发布的米卡版本 {custom}";
+        return "当前已是最新版";
     }
     public static bool IsConfigured(QuietChannelConfig? c, out Uri? manifest)
     {

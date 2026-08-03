@@ -185,7 +185,6 @@ public partial class MainWindow
         });
 
         Title = $"米卡 - {Utils.GetVersion()} - {(Utils.IsAdministrator() ? ResUI.RunAsAdmin : ResUI.NotRunAsAdmin)}";
-        WindowsUtils.SetSquareCorners(this);
         if (_config.UiItem.AutoHideStartup)
         {
             WindowState = WindowState.Minimized;
@@ -551,33 +550,7 @@ public partial class MainWindow
             txtQuietUpdateLastAttempt.Text = DisplayUpdateTime(status.LastAttemptUtc);
             txtQuietUpdateLastSuccess.Text = DisplayUpdateTime(status.LastSuccessUtc);
             txtQuietUpdateStatus.Text = QuietUpdateService.GetStatusMessage(status, Utils.GetVersion());
-            txtQuietUpdateEvidence.Text = GetQuietUpdateEvidence(status);
         });
-    }
-
-    private static string GetQuietUpdateEvidence(QuietUpdateStatus status)
-    {
-        if (status.IsChecking) return "正在从 GitHub 获取并验证版本信息…";
-        if (!string.IsNullOrWhiteSpace(status.LastError)) return $"本次核验失败：{status.LastError}";
-        if (status.LastSuccessUtc is null || status.LastCompletedUtc != status.LastSuccessUtc || string.IsNullOrWhiteSpace(status.LatestCustom))
-            return "尚未取得完整证据；请点击“立即检查”。";
-        return $"已验证 cc282855/QuietControlCenter 的 P-256 签名清单：米卡 {status.LatestCustom} · {DisplayUpdateTime(status.LastSuccessUtc)}";
-    }
-
-    private void QuietUpdateOpenCustomRelease_Click(object sender, RoutedEventArgs e)
-        => OpenReleasePage("https://github.com/cc282855/QuietControlCenter/releases/latest");
-
-    private void QuietUpdateOpenOfficialRelease_Click(object sender, RoutedEventArgs e)
-        => OpenReleasePage("https://github.com/2dust/v2rayN/releases/latest");
-
-    private static void OpenReleasePage(string url)
-    {
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch (Exception ex)
-        {
-            Logging.SaveLog(ex.Message);
-            NoticeManager.Instance.Enqueue("无法打开 GitHub Release 页面");
-        }
     }
 
     private static string DisplayVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "尚未发现" : version;
