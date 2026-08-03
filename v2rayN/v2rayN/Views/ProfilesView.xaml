@@ -242,7 +242,7 @@
                             <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{Binding Delay, Converter={StaticResource DelayColorConverter}}" /></Style>
                         </DataGridTextColumn.ElementStyle>
                     </base:MyDGTextColumn>
-                    <base:MyDGTextColumn x:Name="colSpeed" Width="1*" MinWidth="96" Binding="{Binding Speed, Converter={StaticResource SpeedDisplayConverter}}" ExName="SpeedVal" Header="速度" />
+                    <base:MyDGTextColumn x:Name="colSpeed" Width="1*" MinWidth="96" Binding="{Binding SpeedVal, Converter={StaticResource SpeedDisplayConverter}}" ExName="SpeedVal" Header="速度" SortMemberPath="Speed" />
                     <base:MyDGTextColumn x:Name="colAddress" Width="1.25*" MinWidth="168" Binding="{Binding Address}" ExName="Address" Header="地址" />
                     <base:MyDGTextColumn x:Name="colPort" Width="70" MinWidth="68" Binding="{Binding Port}" ExName="Port" Header="端口" />
                     <base:MyDGTextColumn x:Name="colSecurity" Width="90" MinWidth="86" Binding="{Binding StreamSecurity}" ExName="StreamSecurity" Header="安全" />
@@ -335,7 +335,7 @@
                             <TextBlock Grid.Row="3" Style="{StaticResource QccInspectorLabel}" Text="地址" /><TextBlock x:Name="txtInspectorAddress" Grid.Row="3" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Address, FallbackValue=—}" TextWrapping="Wrap" ToolTip="{Binding SelectedProfile.Address}" />
                             <TextBlock Grid.Row="4" Style="{StaticResource QccInspectorLabel}" Text="端口" /><TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Port, FallbackValue=—}" />
                             <TextBlock Grid.Row="5" Style="{StaticResource QccInspectorLabel}" Text="延迟" /><TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Foreground="{Binding SelectedProfile.Delay, Converter={StaticResource DelayColorConverter}}" Text="{Binding SelectedProfile.Delay, Converter={StaticResource DelayDisplayConverter}}" />
-                            <TextBlock Grid.Row="6" Style="{StaticResource QccInspectorLabel}" Text="速度" /><TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Speed, Converter={StaticResource SpeedDisplayConverter}}" />
+                            <TextBlock Grid.Row="6" Style="{StaticResource QccInspectorLabel}" Text="速度" /><TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.SpeedVal, Converter={StaticResource SpeedDisplayConverter}}" />
                             <TextBlock Grid.Row="7" Style="{StaticResource QccInspectorLabel}" Text="订阅" /><TextBlock Grid.Row="7" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.SubRemarks, FallbackValue=本地节点}" TextWrapping="Wrap" ToolTip="{Binding SelectedProfile.SubRemarks}" />
                         </Grid>
 

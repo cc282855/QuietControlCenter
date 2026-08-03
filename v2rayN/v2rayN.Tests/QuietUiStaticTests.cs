@@ -161,6 +161,25 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void MixedSpeedTest_DisplaysLiveStatusAndMeasuredSpeed()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml.cs"));
+        var viewModel = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "ViewModels", "ProfilesViewModel.cs"));
+        var speedtest = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "Services", "SpeedtestService.cs"));
+
+        Assert.Contains("Binding=\"{Binding SpeedVal, Converter={StaticResource SpeedDisplayConverter}}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedProfile.SpeedVal, Converter={StaticResource SpeedDisplayConverter}", xaml, StringComparison.Ordinal);
+        Assert.Contains("return text;", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("MB/s", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("item.SpeedVal = result.Speed", viewModel, StringComparison.Ordinal);
+        Assert.Contains("item.Speed = speed;", viewModel, StringComparison.Ordinal);
+        Assert.Contains("concurrencyCount = Math.Max(1, concurrencyCount);", speedtest, StringComparison.Ordinal);
+        Assert.Contains("Global.SpeedTestUrls.First()", speedtest, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SignedUpdateWorkflow_SupportsAHotfixVersionAboveTheUpstreamTag()
     {
         var root = FindProjectRoot();

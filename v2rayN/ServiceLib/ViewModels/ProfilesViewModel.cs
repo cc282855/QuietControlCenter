@@ -322,6 +322,10 @@ public class ProfilesViewModel : MyReactiveObject
         if (result.Speed.IsNotEmpty())
         {
             item.SpeedVal = result.Speed ?? string.Empty;
+            if (decimal.TryParse(result.Speed, out var speed) && speed > 0)
+            {
+                item.Speed = speed;
+            }
         }
         if (result.IpInfo.IsNotEmpty())
         {

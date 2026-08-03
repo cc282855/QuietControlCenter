@@ -22,25 +22,24 @@ public sealed class SpeedDisplayConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        double speed;
-        try
-        {
-            speed = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
-        }
-        catch (Exception) when (value is null or string)
-        {
-            return "未测试";
-        }
-        if (speed <= 0)
+        if (value is null)
         {
             return "未测试";
         }
 
-        return speed >= 1024 * 1024
-            ? $"{speed / 1024 / 1024:0.##} MB/s"
-            : speed >= 1024
-                ? $"{speed / 1024:0.##} KB/s"
-                : $"{speed:0.##} B/s";
+        var text = value.ToString()?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return "未测试";
+        }
+
+        if (!decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed)
+            && !decimal.TryParse(text, NumberStyles.Float, culture, out speed))
+        {
+            return text;
+        }
+
+        return speed > 0 ? $"{speed:0.0#} MB/s" : "未测试";
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>

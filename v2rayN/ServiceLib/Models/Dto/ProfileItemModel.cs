@@ -19,6 +19,7 @@ public class ProfileItemModel : ReactiveObject
     [Reactive]
     public int Delay { get; set; }
 
+    [Reactive]
     public decimal Speed { get; set; }
 
     [Reactive]

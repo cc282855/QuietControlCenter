@@ -15,9 +15,17 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
     {
         Task.Run(async () =>
         {
-            await RunAsync(actionType, selecteds);
-            await ProfileExManager.Instance.SaveTo();
-            await UpdateFunc("", ResUI.SpeedtestingCompleted);
+            try
+            {
+                await RunAsync(actionType, selecteds);
+                await ProfileExManager.Instance.SaveTo();
+                await UpdateFunc("", ResUI.SpeedtestingCompleted);
+            }
+            catch (Exception ex)
+            {
+                Logging.SaveLog(_tag, ex);
+                await UpdateFunc("", ex.Message);
+            }
         });
     }
 
@@ -355,6 +363,7 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
 
     private async Task RunMixedTestAsync(List<ServerTestItem> selecteds, int concurrencyCount, bool blSpeedTest, string exitLoopKey)
     {
+        concurrencyCount = Math.Max(1, concurrencyCount);
         using var concurrencySemaphore = new SemaphoreSlim(concurrencyCount);
         var downloadHandle = new DownloadService();
         List<Task> tasks = [];
@@ -445,7 +454,9 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
         await UpdateFunc(it.IndexId, "", ResUI.Speedtesting);
 
         var webProxy = new WebProxy($"socks5://{Global.Loopback}:{it.Port}");
-        var url = _config.SpeedTestItem.SpeedTestUrl;
+        var url = _config.SpeedTestItem.SpeedTestUrl.IsNullOrEmpty()
+            ? Global.SpeedTestUrls.First()
+            : _config.SpeedTestItem.SpeedTestUrl;
         var timeout = _config.SpeedTestItem.SpeedTestTimeout;
         await downloadHandle.DownloadDataAsync(url, webProxy, timeout, async (success, msg) =>
         {
