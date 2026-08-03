@@ -436,6 +436,22 @@ public sealed partial class QuietUpdateService
         version = new(); if (string.IsNullOrWhiteSpace(value)) return false;
         var match = VersionPattern().Match(value); return match.Success && Version.TryParse(match.Value, out version);
     }
+    public static string GetStatusMessage(QuietUpdateStatus status, string currentVersion)
+    {
+        if (status.IsChecking) return "正在检查…";
+        if (!string.IsNullOrWhiteSpace(status.LastError)) return status.LastError;
+        if (status.LastAttemptUtc is null) return "尚未检查";
+        if (status.LastCompletedUtc != status.LastAttemptUtc || status.LastSuccessUtc != status.LastCompletedUtc)
+            return "上次检查未完成";
+
+        if (!TryParseVersion(currentVersion, out var installed))
+            return "检查完成，未检测到可用的新版本";
+        if (TryParseVersion(status.LatestCustom, out var custom) && custom > installed)
+            return $"检测到定制版 {status.LatestCustom}，正在准备更新";
+        if (TryParseVersion(status.LatestOfficial, out var official) && official > installed)
+            return $"官方已有新版本 {status.LatestOfficial}，定制版正在适配";
+        return "当前已是最新版";
+    }
     public static bool IsConfigured(QuietChannelConfig? c, out Uri? manifest)
     {
         manifest = null;

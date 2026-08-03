@@ -25,6 +25,20 @@ public sealed class QuietUpdateTests
         Assert.True(QuietUpdateService.ShouldCheck(now.AddHours(1), now));
     }
 
+    [Fact] public void StatusMessageClearlyExplainsManualCheckResult()
+    {
+        var now = DateTimeOffset.Parse("2026-08-03T06:00:00Z");
+        var latest = new QuietUpdateStatus(now, now, null, "7.24.4", "7.24.4", now, false);
+        var waiting = latest with { LatestOfficial = "7.24.5" };
+        var available = latest with { LatestOfficial = "7.24.5", LatestCustom = "7.24.4.1" };
+
+        Assert.Equal("当前已是最新版", QuietUpdateService.GetStatusMessage(latest, "v2rayN - V7.24.4 - X64"));
+        Assert.Equal("官方已有新版本 7.24.5，定制版正在适配", QuietUpdateService.GetStatusMessage(waiting, "7.24.4"));
+        Assert.Equal("检测到定制版 7.24.4.1，正在准备更新", QuietUpdateService.GetStatusMessage(available, "7.24.4"));
+        Assert.Equal("正在检查…", QuietUpdateService.GetStatusMessage(latest with { IsChecking = true }, "7.24.4"));
+        Assert.Equal("网络不可用", QuietUpdateService.GetStatusMessage(latest with { LastError = "网络不可用" }, "7.24.4"));
+    }
+
     [Fact] public async Task CorruptStateRecoversAsMissing()
     {
         var dir = Temp(); await File.WriteAllTextAsync(Path.Combine(dir, "update-state.json"), "{");

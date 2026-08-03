@@ -72,7 +72,8 @@
                             Width="104"
                             HorizontalAlignment="Center"
                             Opened="QuietUpdatePopup_Opened"
-                            PlacementMode="BottomAndAlignRightEdges">
+                            PlacementMode="BottomAndAlignRightEdges"
+                            StaysOpen="True">
                             <materialDesign:PopupBox.ToggleContent>
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,7,0" Kind="CloudSyncOutline" />

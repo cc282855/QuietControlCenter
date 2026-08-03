@@ -487,8 +487,10 @@ public partial class MainWindow
 
     private async void QuietUpdateCheckNow_Click(object sender, RoutedEventArgs e)
     {
+        pbQuietUpdate.IsPopupOpen = true;
         btnQuietUpdateCheckNow.IsEnabled = false;
         txtQuietUpdateStatus.Text = "正在检查…";
+        string? fallbackMessage = null;
         try
         {
             var result = await _quietUpdateService.CheckNowAsync(Utils.GetVersion(), _quietUpdateCancellation.Token);
@@ -497,7 +499,7 @@ public partial class MainWindow
         catch (OperationCanceledException) when (_quietUpdateCancellation.IsCancellationRequested) { }
         catch
         {
-            txtQuietUpdateStatus.Text = "更新检查失败";
+            fallbackMessage = "更新检查失败，请稍后重试";
         }
         finally
         {
@@ -505,6 +507,11 @@ public partial class MainWindow
             {
                 btnQuietUpdateCheckNow.IsEnabled = true;
                 await RefreshQuietUpdateStatusAsync();
+                if (!string.IsNullOrWhiteSpace(fallbackMessage))
+                {
+                    txtQuietUpdateStatus.Text = fallbackMessage;
+                }
+                pbQuietUpdate.IsPopupOpen = true;
             }
         }
     }
@@ -542,17 +549,8 @@ public partial class MainWindow
             txtQuietUpdateCustomVersion.Text = DisplayVersion(status.LatestCustom);
             txtQuietUpdateLastAttempt.Text = DisplayUpdateTime(status.LastAttemptUtc);
             txtQuietUpdateLastSuccess.Text = DisplayUpdateTime(status.LastSuccessUtc);
-            txtQuietUpdateStatus.Text = FormatQuietUpdateStatus(status);
+            txtQuietUpdateStatus.Text = QuietUpdateService.GetStatusMessage(status, Utils.GetVersion());
         });
-    }
-
-    private static string FormatQuietUpdateStatus(QuietUpdateStatus status)
-    {
-        if (status.IsChecking) return "正在检查…";
-        if (!string.IsNullOrWhiteSpace(status.LastError)) return status.LastError;
-        if (status.LastAttemptUtc is null) return "尚未检查";
-        if (status.LastCompletedUtc != status.LastAttemptUtc) return "上次检查未完成";
-        return status.LastSuccessUtc == status.LastCompletedUtc ? "检查成功" : "上次检查未完成";
     }
 
     private static string DisplayVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "尚未发现" : version;

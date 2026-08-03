@@ -147,19 +147,30 @@ public sealed class QuietUiStaticTests
             Assert.Contains($"x:Name=\"{name}\"", xaml, StringComparison.Ordinal);
         }
         Assert.Contains("Content=\"立即检查\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("StaysOpen=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("private readonly QuietUpdateService _quietUpdateService = new();", codeBehind, StringComparison.Ordinal);
         Assert.DoesNotContain("new QuietUpdateScheduler(new QuietUpdateService()", codeBehind, StringComparison.Ordinal);
         Assert.Contains("_quietUpdateService.CheckNowAsync", codeBehind, StringComparison.Ordinal);
         Assert.Contains("new QuietUpdateScheduler(_quietUpdateService", codeBehind, StringComparison.Ordinal);
         Assert.Contains("HandleQuietUpdateResultAsync", codeBehind, StringComparison.Ordinal);
         Assert.Contains("QuietUpdatePopup_Opened", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("FormatQuietUpdateStatus", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("status.IsChecking", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("status.LastCompletedUtc != status.LastAttemptUtc", codeBehind, StringComparison.Ordinal);
-        var statusFormatter = codeBehind[codeBehind.IndexOf("private static string FormatQuietUpdateStatus", StringComparison.Ordinal)..];
-        Assert.True(
-            statusFormatter.IndexOf("!string.IsNullOrWhiteSpace(status.LastError)", StringComparison.Ordinal)
-            < statusFormatter.IndexOf("status.LastAttemptUtc is null", StringComparison.Ordinal));
+        Assert.Contains("QuietUpdateService.GetStatusMessage", codeBehind, StringComparison.Ordinal);
+        var clickHandler = codeBehind[codeBehind.IndexOf("private async void QuietUpdateCheckNow_Click", StringComparison.Ordinal)..];
+        Assert.True(clickHandler.Split("pbQuietUpdate.IsPopupOpen = true;", StringSplitOptions.None).Length >= 3);
+        Assert.Contains("更新检查失败，请稍后重试", clickHandler, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SignedUpdateWorkflow_SupportsAHotfixVersionAboveTheUpstreamTag()
+    {
+        var root = FindProjectRoot();
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "upstream-draft.yml"));
+
+        Assert.Contains("release_version:", workflow, StringComparison.Ordinal);
+        Assert.Contains("version=$version", workflow, StringComparison.Ordinal);
+        Assert.Contains("-p:Version=$version", workflow, StringComparison.Ordinal);
+        Assert.Contains("quiet-${{ steps.prepare.outputs.version }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("QuietControlCenter-$version-win-x64.zip", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
