@@ -286,7 +286,7 @@ jobs:
               '--qcc-qa-quality-sample', $capture.Delay, $capture.Jitter, $capture.Loss
             )
             $process = Start-Process -FilePath $exe -WorkingDirectory $qaRoot -ArgumentList $arguments -PassThru
-            if (-not $process.WaitForExit(45_000)) {
+            if (-not $process.WaitForExit(45000)) {
               Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
               throw "Visual QA capture timed out: $($capture.Name)"
             }
