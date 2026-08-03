@@ -32,7 +32,7 @@ public sealed class QuietUpdateTests
         var waiting = latest with { LatestOfficial = "7.24.5" };
         var available = latest with { LatestOfficial = "7.24.5", LatestCustom = "7.24.4.1" };
 
-        Assert.Equal("当前已是最新版", QuietUpdateService.GetStatusMessage(latest, "v2rayN - V7.24.4 - X64"));
+        Assert.Equal("当前已是最新版（当前 7.24.4 / 米卡最新 7.24.4）", QuietUpdateService.GetStatusMessage(latest, "v2rayN - V7.24.4 - X64"));
         Assert.Equal("官方已有新版本 7.24.5，定制版正在适配", QuietUpdateService.GetStatusMessage(waiting, "7.24.4"));
         Assert.Equal("检测到定制版 7.24.4.1，正在准备更新", QuietUpdateService.GetStatusMessage(available, "7.24.4"));
         Assert.Equal("正在检查…", QuietUpdateService.GetStatusMessage(latest with { IsChecking = true }, "7.24.4"));

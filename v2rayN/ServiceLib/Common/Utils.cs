@@ -848,13 +848,23 @@ public class Utils
     {
         try
         {
-            return Assembly.GetExecutingAssembly()?.GetName()?.Version?.ToString(3) ?? "0.0";
+            return FormatVersion(Assembly.GetExecutingAssembly()?.GetName()?.Version);
         }
         catch (Exception ex)
         {
             Logging.SaveLog(_tag, ex);
             return "0.0";
         }
+    }
+
+    public static string FormatVersion(Version? version)
+    {
+        if (version is null)
+        {
+            return "0.0";
+        }
+
+        return version.Revision > 0 ? version.ToString(4) : version.ToString(3);
     }
 
     public static string GetRuntimeInfo()
