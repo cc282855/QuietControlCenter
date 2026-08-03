@@ -62,6 +62,14 @@ internal static partial class WindowsUtils
         SetDarkBorder(window, isDark);
     }
 
+    public static void SetSquareCorners(Window window)
+    {
+        var hWnd = new WindowInteropHelper(window).EnsureHandle();
+        var preference = 1; // DWMWCP_DONOTROUND
+        var attributeSize = (uint)Marshal.SizeOf(preference);
+        DwmSetWindowAttribute(hWnd, DWMWINDOWATTRIBUTE.DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, attributeSize);
+    }
+
     private static void SetDarkBorder(Window window, bool dark)
     {
         // Make sure the handle is created before the window is shown
@@ -87,6 +95,7 @@ internal static partial class WindowsUtils
     {
         DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19,
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+        DWMWA_WINDOW_CORNER_PREFERENCE = 33,
     }
 
     #endregion Windows API

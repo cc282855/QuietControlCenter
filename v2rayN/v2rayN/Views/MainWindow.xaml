@@ -63,7 +63,7 @@
                             <Image Source="/Resources/MikaLogo.png" Stretch="Uniform" />
                         </Border>
                         <TextBlock Margin="11,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="17" FontWeight="SemiBold" Text="米卡" />
-                        <TextBlock x:Name="txtAppVersion" Margin="14,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="13" />
+                        <TextBlock x:Name="txtAppVersion" Margin="14,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="13" ToolTip="这里显示当前安装版本；请通过右侧“软件更新”核验 GitHub 最新版" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
@@ -80,7 +80,7 @@
                                     <TextBlock VerticalAlignment="Center" FontSize="13" Text="软件更新" />
                                 </StackPanel>
                             </materialDesign:PopupBox.ToggleContent>
-                            <Border Width="380" Padding="18" Background="White" CornerRadius="10">
+                            <Border Width="420" Padding="18" Background="White" BorderBrush="{StaticResource QccBorder}" BorderThickness="1" CornerRadius="8">
                                 <StackPanel>
                                     <TextBlock FontFamily="{StaticResource QccDisplayFont}" FontSize="16" FontWeight="SemiBold" Text="软件更新" />
                                     <TextBlock Margin="0,4,0,14" Foreground="{StaticResource QccMuted}" FontSize="12" Text="官方 GUI 只用于发现版本，不会覆盖定制界面。" TextWrapping="Wrap" />
@@ -110,6 +110,19 @@
                                         <TextBlock x:Name="txtQuietUpdateLastSuccess" Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" />
                                         <TextBlock x:Name="txtQuietUpdateStatus" Grid.Row="5" Grid.Column="1" Margin="0,5,0,0" TextWrapping="Wrap" />
                                     </Grid>
+                                    <Border Margin="0,14,0,0" Padding="12,10" Background="{StaticResource QccPrimarySoft}" BorderBrush="#FFC9DEFF" BorderThickness="1" CornerRadius="7">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,7,0" VerticalAlignment="Center" Foreground="{StaticResource QccPrimary}" Kind="ShieldCheckOutline" />
+                                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="GitHub 版本核验证据" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="txtQuietUpdateEvidence" Margin="24,5,0,0" Foreground="{StaticResource QccMuted}" FontSize="12" TextWrapping="Wrap" />
+                                            <StackPanel Margin="18,7,0,0" Orientation="Horizontal">
+                                                <Button x:Name="btnQuietUpdateOpenCustomRelease" Padding="6,2" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Click="QuietUpdateOpenCustomRelease_Click" Content="查看米卡 Release" Cursor="Hand" />
+                                                <Button x:Name="btnQuietUpdateOpenOfficialRelease" Margin="8,0,0,0" Padding="6,2" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Click="QuietUpdateOpenOfficialRelease_Click" Content="查看官方 Release" Cursor="Hand" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
                                     <Button
                                         x:Name="btnQuietUpdateCheckNow"
                                         Margin="0,16,0,0"
@@ -330,6 +343,17 @@
                     <MenuItem x:Name="menuHelp" />
                 </Menu>
             </Grid>
+
+            <!-- Flat one-pixel frame matching the original Quiet UI reference. -->
+            <Border
+                x:Name="windowOutline"
+                Grid.RowSpan="2"
+                Panel.ZIndex="1000"
+                BorderBrush="#FFD7DDE5"
+                BorderThickness="1"
+                CornerRadius="0"
+                IsHitTestVisible="False"
+                SnapsToDevicePixels="True" />
         </Grid>
     </materialDesign:DialogHost>
 </base:WindowBase>

@@ -141,6 +141,7 @@ public sealed class QuietUiStaticTests
                  {
                      "txtQuietUpdateCurrentVersion", "txtQuietUpdateOfficialVersion", "txtQuietUpdateCustomVersion",
                      "txtQuietUpdateLastAttempt", "txtQuietUpdateLastSuccess", "txtQuietUpdateStatus",
+                     "txtQuietUpdateEvidence", "btnQuietUpdateOpenCustomRelease", "btnQuietUpdateOpenOfficialRelease",
                      "btnQuietUpdateCheckNow"
                  })
         {
@@ -155,9 +156,28 @@ public sealed class QuietUiStaticTests
         Assert.Contains("HandleQuietUpdateResultAsync", codeBehind, StringComparison.Ordinal);
         Assert.Contains("QuietUpdatePopup_Opened", codeBehind, StringComparison.Ordinal);
         Assert.Contains("QuietUpdateService.GetStatusMessage", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("P-256 签名清单", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("https://github.com/cc282855/QuietControlCenter/releases/latest", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("https://github.com/2dust/v2rayN/releases/latest", codeBehind, StringComparison.Ordinal);
         var clickHandler = codeBehind[codeBehind.IndexOf("private async void QuietUpdateCheckNow_Click", StringComparison.Ordinal)..];
         Assert.True(clickHandler.Split("pbQuietUpdate.IsPopupOpen = true;", StringSplitOptions.None).Length >= 3);
         Assert.Contains("更新检查失败，请稍后重试", clickHandler, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_UsesOriginalFlatOuterFrame()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var windowsUtils = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Common", "WindowsUtils.cs"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+
+        Assert.Contains("x:Name=\"windowOutline\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("BorderBrush=\"#FFD7DDE5\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("BorderThickness=\"1\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DWMWA_WINDOW_CORNER_PREFERENCE = 33", windowsUtils, StringComparison.Ordinal);
+        Assert.Contains("WindowsUtils.SetSquareCorners(this);", codeBehind, StringComparison.Ordinal);
     }
 
     [Fact]
