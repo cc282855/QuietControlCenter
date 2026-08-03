@@ -51,21 +51,40 @@ public partial class ProfilesView
 {
     private static Config _config;
     private static readonly string _tag = "ProfilesView";
+    private readonly Dictionary<string, MenuItem> _profileColumnMenuItems;
+    private readonly SemaphoreSlim _profileColumnSaveLock = new(1, 1);
 
     public ProfilesView()
     {
         InitializeComponent();
         lstGroup.MaxHeight = Math.Floor(SystemParameters.WorkArea.Height * 0.20 / 40) * 40;
+        lstCountry.MaxHeight = lstGroup.MaxHeight;
 
         _config = AppManager.Instance.Config;
 
+        _profileColumnMenuItems = new(StringComparer.Ordinal)
+        {
+            [ProfileColumnVisibility.ConfigType] = menuColumnConfigType,
+            [ProfileColumnVisibility.Remarks] = menuColumnRemarks,
+            [ProfileColumnVisibility.Address] = menuColumnAddress,
+            [ProfileColumnVisibility.Port] = menuColumnPort,
+            [ProfileColumnVisibility.Network] = menuColumnNetwork,
+            [ProfileColumnVisibility.StreamSecurity] = menuColumnStreamSecurity,
+            [ProfileColumnVisibility.Delay] = menuColumnDelay,
+            [ProfileColumnVisibility.SpeedVal] = menuColumnSpeed
+        };
+
         btnAutofitColumnWidth.Click += BtnAutofitColumnWidth_Click;
+        btnProfileColumns.Click += BtnProfileColumns_Click;
+        foreach (var menuItem in _profileColumnMenuItems.Values)
+        {
+            menuItem.Click += ProfileColumnMenuItem_Click;
+        }
         txtServerFilter.PreviewKeyDown += TxtServerFilter_PreviewKeyDown;
         lstProfiles.PreviewKeyDown += LstProfiles_PreviewKeyDown;
         lstProfiles.SelectionChanged += LstProfiles_SelectionChanged;
         lstProfiles.LoadingRow += LstProfiles_LoadingRow;
         menuSelectAll.Click += menuSelectAll_Click;
-        SizeChanged += ProfilesView_SizeChanged;
 
         if (_config.UiItem.EnableDragDropSort)
         {
@@ -86,6 +105,8 @@ public partial class ProfilesView
 
             this.OneWayBind(ViewModel, vm => vm.SubItems, v => v.lstGroup.ItemsSource).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSub, v => v.lstGroup.SelectedItem).DisposeWith(disposables);
+            this.OneWayBind(ViewModel, vm => vm.CountryItems, v => v.lstCountry.ItemsSource).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedCountryCode, v => v.lstCountry.SelectedValue).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.ServerFilter, v => v.txtServerFilter.Text).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnAddSub).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnEmptyAddSub).DisposeWith(disposables);
@@ -119,6 +140,7 @@ public partial class ProfilesView
             this.BindCommand(ViewModel, vm => vm.SortServerResultCmd, v => v.menuSortServerResult).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.RemoveInvalidServerResultCmd, v => v.menuRemoveInvalidServerResult).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.FastRealPingCmd, v => v.btnFastRealPing).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.MixedTestServerCmd, v => v.btnMixedTest).DisposeWith(disposables);
 
             //selected node inspector
             this.BindCommand(ViewModel, vm => vm.RealPingServerCmd, v => v.btnDetailPing).DisposeWith(disposables);
@@ -202,44 +224,64 @@ public partial class ProfilesView
               .ObserveOn(RxSchedulers.MainThreadScheduler)
               .Subscribe(_ => StorageUI())
               .DisposeWith(disposables);
+            AppEvents.ProfileColumnsChanged
+              .AsObservable()
+              .ObserveOn(RxSchedulers.MainThreadScheduler)
+              .Subscribe(_ => RefreshProfileColumnControls())
+              .DisposeWith(disposables);
         });
 
         RestoreUI();
-        ApplyResponsiveColumns(ActualWidth);
-    }
-
-    private void ProfilesView_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        ApplyResponsiveColumns(e.NewSize.Width);
-    }
-
-    private void ApplyResponsiveColumns(double width)
-    {
-        if (width <= 0)
-        {
-            return;
-        }
-
-        if (width < 1050)
-        {
-            // Keep every visible header comfortably readable at the documented
-            // 1120px window minimum; secondary details remain in the inspector.
-            colNetwork.Visibility = Visibility.Collapsed;
-            colAddress.Visibility = Visibility.Collapsed;
-            colPort.Visibility = Visibility.Collapsed;
-            colSecurity.Visibility = Visibility.Collapsed;
-            colRemarks.Width = new DataGridLength(1.6, DataGridLengthUnitType.Star);
-            colConfigType.Width = new DataGridLength(0.85, DataGridLengthUnitType.Star);
-            colSubRemarks.Width = new DataGridLength(1.05, DataGridLengthUnitType.Star);
-            colDelay.Width = new DataGridLength(0.8, DataGridLengthUnitType.Star);
-            colSpeed.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
-            return;
-        }
-
-        RestoreUI();
+        SyncProfileColumnMenuItems();
     }
 
     #region Event
+
+    private void BtnProfileColumns_Click(object sender, RoutedEventArgs e)
+    {
+        SyncProfileColumnMenuItems();
+        menuProfileColumns.PlacementTarget = btnProfileColumns;
+        menuProfileColumns.Placement = PlacementMode.Bottom;
+        menuProfileColumns.IsOpen = true;
+    }
+
+    private async void ProfileColumnMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await _profileColumnSaveLock.WaitAsync();
+        var previousHiddenColumns = _config.UiItem.HiddenProfileColumns?.ToList();
+        menuProfileColumns.IsEnabled = false;
+
+        try
+        {
+            _config.UiItem.HiddenProfileColumns = ProfileColumnVisibility.GetHiddenColumns(
+                _profileColumnMenuItems.Select(item =>
+                    new KeyValuePair<string, bool>(item.Key, item.Value.IsChecked)));
+            ApplyProfileColumnVisibility();
+
+            if (await ConfigHandler.SaveConfig(_config) == 0)
+            {
+                AppEvents.ProfileColumnsChanged.Publish();
+            }
+            else
+            {
+                _config.UiItem.HiddenProfileColumns = previousHiddenColumns;
+                RefreshProfileColumnControls();
+                NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            }
+        }
+        catch (Exception ex)
+        {
+            _config.UiItem.HiddenProfileColumns = previousHiddenColumns;
+            RefreshProfileColumnControls();
+            Logging.SaveLog(_tag, ex);
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+        }
+        finally
+        {
+            menuProfileColumns.IsEnabled = true;
+            _profileColumnSaveLock.Release();
+        }
+    }
 
     public async Task ShareServer(string url)
     {
@@ -414,7 +456,7 @@ public partial class ProfilesView
     {
         try
         {
-            var lvColumnItem = _config.UiItem.MainColumnItem.OrderBy(t => t.Index).ToList();
+            var lvColumnItem = (_config.UiItem.MainColumnItem ?? []).OrderBy(t => t.Index).ToList();
             var displayIndex = 0;
             foreach (var item in lvColumnItem)
             {
@@ -422,15 +464,16 @@ public partial class ProfilesView
                 {
                     if (item2.ExName == item.Name)
                     {
-                        if (item.Width < 0)
+                        var configurable = ProfileColumnVisibility.IsSupported(item2.ExName);
+                        if (item.Width > 0)
+                        {
+                            item2.Width = item.Width;
+                        }
+                        else if (!configurable)
                         {
                             item2.Visibility = Visibility.Hidden;
                         }
-                        else
-                        {
-                            item2.Width = item.Width;
-                            item2.DisplayIndex = displayIndex++;
-                        }
+                        item2.DisplayIndex = displayIndex++;
                         if (item.Name.StartsWith("to", StringComparison.CurrentCultureIgnoreCase))
                         {
                             item2.Visibility = _config.GuiItem.EnableStatistics ? Visibility.Visible : Visibility.Hidden;
@@ -442,6 +485,8 @@ public partial class ProfilesView
                     }
                 }
             }
+
+            ApplyProfileColumnVisibility();
         }
         catch (Exception ex)
         {
@@ -449,17 +494,48 @@ public partial class ProfilesView
         }
     }
 
+    private void ApplyProfileColumnVisibility()
+    {
+        foreach (var column in lstProfiles.Columns.Cast<MyDGTextColumn>().Where(column => ProfileColumnVisibility.IsSupported(column.ExName)))
+        {
+            column.Visibility = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, column.ExName)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+    }
+
+    private void SyncProfileColumnMenuItems()
+    {
+        foreach (var item in _profileColumnMenuItems)
+        {
+            item.Value.IsChecked = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, item.Key);
+        }
+    }
+
+    private void RefreshProfileColumnControls()
+    {
+        ApplyProfileColumnVisibility();
+        SyncProfileColumnMenuItems();
+    }
+
     private void StorageUI()
     {
         try
         {
             List<ColumnItem> lvColumnItem = [];
+            var storedWidths = (_config.UiItem.MainColumnItem ?? [])
+                .Where(item => item.Width > 0)
+                .GroupBy(item => item.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().Width, StringComparer.Ordinal);
             foreach (var item2 in lstProfiles.Columns.Cast<MyDGTextColumn>())
             {
+                var width = item2.ActualWidth >= item2.MinWidth && item2.ActualWidth > 0
+                    ? (int)item2.ActualWidth
+                    : storedWidths.GetValueOrDefault(item2.ExName, (int)Math.Max(item2.MinWidth, 70));
                 lvColumnItem.Add(new()
                 {
                     Name = item2.ExName,
-                    Width = (int)(item2.Visibility == Visibility.Visible ? item2.ActualWidth : -1),
+                    Width = width,
                     Index = item2.DisplayIndex
                 });
             }

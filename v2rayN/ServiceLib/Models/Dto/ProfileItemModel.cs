@@ -13,6 +13,7 @@ public class ProfileItemModel : ReactiveObject
     public string StreamSecurity { get; set; }
     public string Subid { get; set; }
     public string SubRemarks { get; set; }
+    public string CountryCode { get; set; } = CountryClassifier.UnknownCode;
     public int Sort { get; set; }
 
     [Reactive]
@@ -52,3 +53,5 @@ public class ProfileItemModel : ReactiveObject
         return summary;
     }
 }
+
+public sealed record CountryFilterItem(string Code, string DisplayName);

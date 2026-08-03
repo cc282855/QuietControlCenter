@@ -2,6 +2,7 @@ namespace ServiceLib.ViewModels;
 
 public class StatusBarViewModel : MyReactiveObject
 {
+    private DateTime _lastStatisticsAtUtc = DateTime.MinValue;
     public Interaction<string, Unit> SetClipboardDataInteraction { get; } = new();
     public Interaction<Unit, string?> PasswordInputInteraction { get; } = new();
     public Interaction<Unit, Unit> DispatcherRefreshIconInteraction { get; } = new();
@@ -109,6 +110,7 @@ public class StatusBarViewModel : MyReactiveObject
         SelectedRouting = new();
         SelectedServer = new();
         RunningServerToolTipText = GetRunningServerToolTipText("-");
+        ResetLiveTrafficDisplay();
         BlSystemProxyPacVisible = Utils.IsWindows();
         BlIsNonWindows = Utils.IsNonWindows();
 
@@ -531,29 +533,46 @@ public class StatusBarViewModel : MyReactiveObject
 
     public async Task UpdateStatistics(ServerSpeedItem update)
     {
-        if (!_config.GuiItem.DisplayRealTimeSpeed)
-        {
-            return;
-        }
-
         try
         {
-            if (AppManager.Instance.IsRunningCore(ECoreType.sing_box))
+            if (!CoreManager.Instance.IsRunning)
             {
-                SpeedProxyDisplay = string.Format(ResUI.SpeedDisplayText, EInboundProtocol.mixed, Utils.HumanFy(update.ProxyUp), Utils.HumanFy(update.ProxyDown));
-                SpeedDirectDisplay = string.Empty;
+                _lastStatisticsAtUtc = DateTime.MinValue;
+                ResetLiveTrafficDisplay();
+                return;
             }
-            else
-            {
-                SpeedProxyDisplay = string.Format(ResUI.SpeedDisplayText, Global.ProxyTag, Utils.HumanFy(update.ProxyUp), Utils.HumanFy(update.ProxyDown));
-                SpeedDirectDisplay = string.Format(ResUI.SpeedDisplayText, Global.DirectTag, Utils.HumanFy(update.DirectUp), Utils.HumanFy(update.DirectDown));
-            }
+            SpeedProxyDisplay = FormatLiveTraffic(update.ProxyUp, update.ProxyDown);
+            SpeedDirectDisplay = FormatLiveTraffic(update.DirectUp, update.DirectDown);
+            _lastStatisticsAtUtc = DateTime.UtcNow;
         }
         catch
         {
         }
         await Task.CompletedTask;
     }
+
+    public void RefreshLiveTrafficState(bool connected)
+    {
+        if (!connected)
+        {
+            _lastStatisticsAtUtc = DateTime.MinValue;
+            ResetLiveTrafficDisplay();
+        }
+        else if (DateTime.UtcNow - _lastStatisticsAtUtc > TimeSpan.FromSeconds(2.5))
+        {
+            SpeedProxyDisplay = "统计不可用";
+            SpeedDirectDisplay = "统计不可用";
+        }
+    }
+
+    private void ResetLiveTrafficDisplay()
+    {
+        SpeedProxyDisplay = FormatLiveTraffic(0, 0);
+        SpeedDirectDisplay = FormatLiveTraffic(0, 0);
+    }
+
+    private static string FormatLiveTraffic(long up, long down) =>
+        $"↑ {Utils.HumanFy(Math.Max(0, up))}/s  ↓ {Utils.HumanFy(Math.Max(0, down))}/s";
 
     #endregion UI
 }

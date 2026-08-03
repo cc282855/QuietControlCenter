@@ -121,7 +121,7 @@ public sealed class QuietUpdateScheduler
             try { result = await _service.CheckAsync(currentVersion, token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch { result = new QuietUpdateResult([], false); }
-            if (result.Notices.Count > 0 || result.UpgradeStarted) await publish(result).ConfigureAwait(false);
+            if (result.CheckPerformed || result.Notices.Count > 0 || result.UpgradeStarted) await publish(result).ConfigureAwait(false);
             var untilDue = await _service.GetDelayUntilDueAsync(token).ConfigureAwait(false);
             await _delay.Delay(untilDue < TimeSpan.FromMinutes(1) ? TimeSpan.FromMinutes(1) : untilDue, token).ConfigureAwait(false);
         }
@@ -130,6 +130,11 @@ public sealed class QuietUpdateScheduler
 
 public sealed partial class QuietUpdateService
 {
+    private const string OfficialQueryError = "官方版本查询失败";
+    private const string CustomQueryError = "定制版查询失败";
+    private const string CustomValidationError = "定制版验证失败";
+    private const string CustomInstallError = "定制版安装失败";
+    private const string StateAccessError = "更新状态读写失败";
     private const long MaxPackageBytes = 512L * 1024 * 1024;
     private static readonly Uri LatestReleaseApi = new("https://api.github.com/repos/2dust/v2rayN/releases/latest");
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
@@ -138,29 +143,74 @@ public sealed partial class QuietUpdateService
     private readonly IQuietProcessLauncher _processLauncher;
     private readonly TimeSpan _readyTimeout;
     private readonly object _sync = new(); private Task<QuietUpdateResult>? _inflight;
+    private bool _forceRequested;
+    private bool _stateWriteFailed;
+    private QuietUpdateStatus _snapshot = QuietUpdateStatus.Empty;
 
     public QuietUpdateService(IQuietClock? clock = null, IQuietHttp? http = null, IQuietStateStore? state = null, IQuietProcessLauncher? processLauncher = null, TimeSpan? readyTimeout = null)
     { _clock = clock ?? new SystemQuietClock(); _http = http ?? new QuietHttp(); _state = state ?? new FileQuietStateStore(); _processLauncher = processLauncher ?? new QuietProcessLauncher(); _readyTimeout = readyTimeout ?? TimeSpan.FromMinutes(2); }
 
     public Task<QuietUpdateResult> CheckAsync(string currentVersion, CancellationToken token = default)
     {
-        lock (_sync) return _inflight ??= CompleteAsync(CheckCoreAsync(currentVersion, token));
+        return StartCheck(currentVersion, false, token);
+    }
+    public Task<QuietUpdateResult> CheckNowAsync(string currentVersion, CancellationToken token = default)
+        => StartCheck(currentVersion, true, token);
+    public QuietUpdateStatus Snapshot { get { lock (_sync) return _snapshot; } }
+    public async Task<QuietUpdateStatus> GetStatusAsync(CancellationToken token = default)
+    {
+        try
+        {
+            var persisted = ToStatus(await _state.ReadStateAsync(token).ConfigureAwait(false), IsChecking);
+            QuietUpdateStatus status;
+            lock (_sync) status = _stateWriteFailed ? _snapshot with { IsChecking = _inflight is not null } : persisted;
+            SetSnapshot(status);
+            return status;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            var status = Snapshot with { LastError = StateAccessError };
+            SetSnapshot(status);
+            return status;
+        }
     }
     public async Task<TimeSpan> GetDelayUntilDueAsync(CancellationToken token = default)
     {
         try
         {
-            var last = (await _state.ReadStateAsync(token).ConfigureAwait(false))?.LastCheckedUtc;
+            var state = await _state.ReadStateAsync(token).ConfigureAwait(false);
+            var last = state?.LastAttemptUtc ?? state?.LastCheckedUtc;
             if (last is null || last > _clock.UtcNow.AddMinutes(5)) return TimeSpan.Zero;
             var remaining = CheckInterval - (_clock.UtcNow - last.Value);
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException) { return TimeSpan.Zero; }
     }
+    private Task<QuietUpdateResult> StartCheck(string currentVersion, bool force, CancellationToken token)
+    {
+        lock (_sync)
+        {
+            if (_inflight is not null)
+            {
+                if (!force) return _inflight;
+                _forceRequested = true;
+                return EnsureForcedAfterAsync(_inflight, currentVersion, token);
+            }
+            _forceRequested = force;
+            return _inflight = CompleteAsync(CheckCoreAsync(currentVersion, token));
+        }
+    }
+    private async Task<QuietUpdateResult> EnsureForcedAfterAsync(Task<QuietUpdateResult> joined, string currentVersion, CancellationToken token)
+    {
+        var result = await joined.ConfigureAwait(false);
+        if (result.CheckPerformed) return result;
+        return await StartCheck(currentVersion, true, token).ConfigureAwait(false);
+    }
     private async Task<QuietUpdateResult> CompleteAsync(Task<QuietUpdateResult> task)
     {
         try { return await task.ConfigureAwait(false); }
-        finally { lock (_sync) _inflight = null; }
+        finally { lock (_sync) { _inflight = null; _forceRequested = false; } }
     }
 
     private async Task<QuietUpdateResult> CheckCoreAsync(string currentVersion, CancellationToken token)
@@ -168,36 +218,124 @@ public sealed partial class QuietUpdateService
         // Ensure the coalesced task is published before even fully synchronous test doubles complete.
         await Task.Yield();
         var notices = new List<string>();
+        QuietUpdateState state;
+        try { state = await _state.ReadStateAsync(token).ConfigureAwait(false) ?? new(); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch
+        {
+            SetSnapshot(Snapshot with { LastError = StateAccessError, IsChecking = false });
+            return new(notices, false, true);
+        }
+
+        var now = _clock.UtcNow;
+        var lastAttempt = state.LastAttemptUtc ?? state.LastCheckedUtc;
+        bool force;
+        lock (_sync) force = _forceRequested;
+        var due = ShouldCheck(lastAttempt, now);
+        if (!force && !due)
+        {
+            // Re-evaluate the time boundary immediately before returning. A manual request
+            // that joins after the force decision awaits this no-op and then starts one
+            // serialized forced check in EnsureForcedAfterAsync.
+            if (!ShouldCheck(lastAttempt, _clock.UtcNow))
+            {
+                SetSnapshot(ToStatus(state, false));
+                return new(notices, false, false);
+            }
+        }
+
+        state.LastAttemptUtc = now;
+        state.LastCheckedUtc = now;
+        await PersistStateAsync(state, true, token).ConfigureAwait(false);
+
+        var errors = new List<string>();
+        var upgradeStarted = false;
+
         try
         {
-            var state = await _state.ReadStateAsync(token).ConfigureAwait(false) ?? new();
-            var now = _clock.UtcNow;
-            if (!ShouldCheck(state.LastCheckedUtc, now)) return new(notices, false);
-            state.LastCheckedUtc = now;
-            await _state.WriteStateAsync(state, token).ConfigureAwait(false);
-
+            var previousOfficial = state.LatestOfficial ?? state.LatestSeenTag;
             var release = await ReadJsonAsync<GitHubRelease>(LatestReleaseApi, token).ConfigureAwait(false);
-            if (TryParseVersion(currentVersion, out var installed) && TryParseVersion(release?.TagName, out var latest) && latest > installed)
-            {
-                if (!string.Equals(state.LatestSeenTag, release!.TagName, StringComparison.OrdinalIgnoreCase))
-                    notices.Add($"检测到官方 v2rayN {release.TagName}。官方 GUI 永远不会安装；只等待已签名的 Quiet Control Center 完整包。");
-                state.LatestSeenTag = release.TagName;
-                await _state.WriteStateAsync(state, token).ConfigureAwait(false);
-            }
+            if (string.IsNullOrWhiteSpace(release?.TagName) || !TryParseVersion(release.TagName, out var latest))
+                throw new InvalidDataException();
 
-            var channel = await _state.ReadChannelAsync(token).ConfigureAwait(false);
-            if (!IsConfigured(channel, out var manifestUri)) return new(notices, false);
-            var manifest = await ReadJsonAsync<QuietUpdateManifest>(manifestUri!, token).ConfigureAwait(false);
-            if (!ValidateManifest(manifest, channel!, out _) || !TryParseVersion(manifest!.AppVersion, out var custom) || !TryParseVersion(currentVersion, out installed) || custom <= installed)
-                return new(notices, false);
-
-            var started = await DownloadVerifyAndLaunchAsync(manifest, channel!, token).ConfigureAwait(false);
-            if (started) notices.Add($"已验证 Quiet Control Center {manifest.AppVersion} 的签名、完整包哈希和产品标记，正在安全更新。");
-            return new(notices, started);
+            state.LatestOfficial = release.TagName;
+            state.LatestSeenTag = release.TagName;
+            if (TryParseVersion(currentVersion, out var installed) && latest > installed
+                && !string.Equals(previousOfficial, release.TagName, StringComparison.OrdinalIgnoreCase))
+                notices.Add($"检测到官方 v2rayN {release.TagName}。官方 GUI 永远不会安装；只等待已签名的 Quiet Control Center 完整包。");
+            await PersistStateAsync(state, true, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch { return new(notices, false); }
+        catch { errors.Add(OfficialQueryError); }
+
+        try
+        {
+            var channel = await _state.ReadChannelAsync(token).ConfigureAwait(false);
+            if (IsConfigured(channel, out var manifestUri))
+            {
+                var manifest = await ReadJsonAsync<QuietUpdateManifest>(manifestUri!, token).ConfigureAwait(false);
+                if (!ValidateManifest(manifest, channel!, out _))
+                {
+                    errors.Add(CustomValidationError);
+                }
+                else
+                {
+                    state.LatestCustom = manifest!.AppVersion;
+                    await PersistStateAsync(state, true, token).ConfigureAwait(false);
+                    if (TryParseVersion(manifest.AppVersion, out var custom)
+                        && TryParseVersion(currentVersion, out var installed) && custom > installed)
+                    {
+                        try
+                        {
+                            upgradeStarted = await DownloadVerifyAndLaunchAsync(manifest, channel!, token).ConfigureAwait(false);
+                            if (upgradeStarted)
+                                notices.Add($"已验证 Quiet Control Center {manifest.AppVersion} 的签名、完整包哈希和产品标记，正在安全更新。");
+                            else
+                                errors.Add(CustomInstallError);
+                        }
+                        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                        catch { errors.Add(CustomInstallError); }
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch { errors.Add(CustomQueryError); }
+
+        if (errors.Count == 0) state.LastSuccessUtc = now;
+        state.LastCompletedUtc = now;
+        state.LastError = errors.Count == 0 ? null : string.Join("；", errors.Distinct(StringComparer.Ordinal));
+        await PersistStateAsync(state, false, token).ConfigureAwait(false);
+        return new(notices, upgradeStarted, true);
     }
+
+    private async Task PersistStateAsync(QuietUpdateState state, bool isChecking, CancellationToken token)
+    {
+        try
+        {
+            await _state.WriteStateAsync(state, token).ConfigureAwait(false);
+            lock (_sync) _stateWriteFailed = false;
+            SetSnapshot(ToStatus(state, isChecking));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            lock (_sync) _stateWriteFailed = true;
+            SetSnapshot(ToStatus(state, isChecking) with { LastError = StateAccessError });
+        }
+    }
+
+    private void SetSnapshot(QuietUpdateStatus status)
+    {
+        lock (_sync) _snapshot = status;
+    }
+
+    private bool IsChecking { get { lock (_sync) return _inflight is not null; } }
+
+    private static QuietUpdateStatus ToStatus(QuietUpdateState? state, bool isChecking) => state is null
+        ? QuietUpdateStatus.Empty with { IsChecking = isChecking }
+        : new(state.LastAttemptUtc ?? state.LastCheckedUtc, state.LastSuccessUtc, state.LastError,
+            state.LatestOfficial ?? state.LatestSeenTag, state.LatestCustom, state.LastCompletedUtc, isChecking);
 
     private async Task<bool> DownloadVerifyAndLaunchAsync(QuietUpdateManifest manifest, QuietChannelConfig channel, CancellationToken token)
     {
@@ -436,8 +574,24 @@ public sealed class QuietUpgradeReady
     public string ParentExecutableSha256 { get; set; } = "";
 }
 
-public sealed record QuietUpdateResult(IReadOnlyList<string> Notices, bool UpgradeStarted);
-public sealed class QuietUpdateState { public DateTimeOffset? LastCheckedUtc { get; set; } public string? LatestSeenTag { get; set; } }
+public sealed record QuietUpdateResult(IReadOnlyList<string> Notices, bool UpgradeStarted, bool CheckPerformed = false);
+public sealed class QuietUpdateState
+{
+    // Legacy fields remain serialized so existing installations continue to observe the same schedule and notice history.
+    public DateTimeOffset? LastCheckedUtc { get; set; }
+    public string? LatestSeenTag { get; set; }
+    public DateTimeOffset? LastAttemptUtc { get; set; }
+    public DateTimeOffset? LastSuccessUtc { get; set; }
+    public DateTimeOffset? LastCompletedUtc { get; set; }
+    public string? LastError { get; set; }
+    public string? LatestOfficial { get; set; }
+    public string? LatestCustom { get; set; }
+}
+public sealed record QuietUpdateStatus(DateTimeOffset? LastAttemptUtc, DateTimeOffset? LastSuccessUtc,
+    string? LastError, string? LatestOfficial, string? LatestCustom, DateTimeOffset? LastCompletedUtc, bool IsChecking)
+{
+    public static QuietUpdateStatus Empty { get; } = new(null, null, null, null, null, null, false);
+}
 public sealed class QuietChannelConfig { public string? ManifestUrl { get; set; } public string? PublicKeyPem { get; set; } public string? ExpectedOwner { get; set; } public string? ExpectedRepository { get; set; } }
 public sealed class QuietUpdateManifest
 {

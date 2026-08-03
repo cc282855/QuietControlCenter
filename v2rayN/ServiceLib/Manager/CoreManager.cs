@@ -17,6 +17,14 @@ public class CoreManager
     private bool _linuxSudo = false;
     private Func<bool, string, Task>? _updateFunc;
     private const string _tag = "CoreHandler";
+    private long _generation;
+
+    public bool IsRunning
+    {
+        get => IsProcessRunning(_processService) || IsProcessRunning(_processPreService);
+    }
+
+    public long Generation => Interlocked.Read(ref _generation);
 
     public async Task Init(Config config, Func<bool, string, Task> updateFunc)
     {
@@ -92,10 +100,17 @@ public class CoreManager
         }
 
         await CoreStart(mainContext);
+        if (!IsProcessRunning(_processService))
+        {
+            AppManager.Instance.RunningCoreType = ECoreType.v2rayN;
+            return;
+        }
         await WaitForProxyPort(preContext);
         await CoreStartPreService(preContext);
 
-        AppManager.Instance.RunningCoreType = preContext?.RunCoreType ?? mainContext.RunCoreType;
+        AppManager.Instance.RunningCoreType = preContext is not null && IsProcessRunning(_processPreService)
+            ? preContext.RunCoreType
+            : mainContext.RunCoreType;
 
         if (_processService != null)
         {
@@ -146,35 +161,67 @@ public class CoreManager
 
     public async Task CoreStop()
     {
-        try
+        Interlocked.Increment(ref _generation);
+        if (_linuxSudo)
         {
-            if (_linuxSudo)
+            try
             {
                 await CoreAdminManager.Instance.KillProcessAsLinuxSudo();
-                _linuxSudo = false;
             }
-
-            if (_processService != null)
+            catch (Exception ex)
             {
-                await _processService.StopAsync();
-                _processService.Dispose();
-                _processService = null;
+                Logging.SaveLog(_tag, ex);
             }
+            _linuxSudo = false;
+        }
 
-            if (_processPreService != null)
-            {
-                await _processPreService.StopAsync();
-                _processPreService.Dispose();
-                _processPreService = null;
-            }
+        await StopProcessAsync(_processService, () => _processService = null);
+        await StopProcessAsync(_processPreService, () => _processPreService = null);
+
+        if (!IsProcessRunning(_processService) && !IsProcessRunning(_processPreService))
+        {
+            AppManager.Instance.RunningCoreType = ECoreType.v2rayN;
+        }
+    }
+
+    #region Private
+
+    private static bool IsProcessRunning(ProcessService? process)
+    {
+        try
+        {
+            return process is { HasExited: false };
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task StopProcessAsync(ProcessService? process, Action clearReference)
+    {
+        if (process is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await process.StopAsync();
         }
         catch (Exception ex)
         {
             Logging.SaveLog(_tag, ex);
         }
+        finally
+        {
+            if (!IsProcessRunning(process))
+            {
+                process.Dispose();
+                clearReference();
+            }
+        }
     }
-
-    #region Private
 
     private async Task CoreStart(CoreConfigContext context)
     {

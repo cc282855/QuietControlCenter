@@ -2,54 +2,94 @@ namespace ServiceLib.Services.Statistics;
 
 public class StatisticsXrayService
 {
-    private const long linkBase = 1024;
-    private ServerSpeedItem _serverSpeedItem = new();
-    private readonly Config _config;
-    private bool _exitFlag;
+    private readonly TrafficCounterRateCalculator _rateCalculator = new();
     private readonly Func<ServerSpeedItem, Task>? _updateFunc;
+    private readonly CancellationTokenSource _cancellation = new();
+    private readonly Task _runTask;
+    private long _lastSnapshotTimestamp;
     private string Url => $"{Global.HttpProtocol}{Global.Loopback}:{AppManager.Instance.StatePort}/debug/vars";
 
     public StatisticsXrayService(Config config, Func<ServerSpeedItem, Task> updateFunc)
     {
-        _config = config;
         _updateFunc = updateFunc;
-        _exitFlag = false;
-
-        _ = Task.Run(Run);
+        _runTask = Task.Run(Run);
     }
 
-    public void Close()
+    public async Task CloseAsync()
     {
-        _exitFlag = true;
+        _cancellation.Cancel();
+        try
+        {
+            await _runTask;
+        }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+        {
+        }
+        Reset();
+        _cancellation.Dispose();
     }
 
     private async Task Run()
     {
-        while (!_exitFlag)
+        try
         {
-            await Task.Delay(1000);
-            try
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while (await timer.WaitForNextTickAsync(_cancellation.Token))
             {
-                if (AppManager.Instance.RunningCoreType != ECoreType.Xray)
+                try
                 {
-                    continue;
-                }
+                    if (!CoreManager.Instance.IsRunning || !AppManager.Instance.IsRunningCore(ECoreType.Xray))
+                    {
+                        Reset();
+                        continue;
+                    }
 
-                var result = await HttpClientHelper.Instance.TryGetAsync(Url);
-                if (result != null)
+                    var generation = CoreManager.Instance.Generation;
+                    var result = await HttpClientHelper.Instance.TryGetAsync(Url, _cancellation.Token);
+                    var counters = result is null ? null : ParseCounters(result);
+                    if (counters is null || generation != CoreManager.Instance.Generation)
+                    {
+                        Reset();
+                        continue;
+                    }
+
+                    var now = Stopwatch.GetTimestamp();
+                    var elapsedSeconds = _lastSnapshotTimestamp == 0
+                        ? 0
+                        : Stopwatch.GetElapsedTime(_lastSnapshotTimestamp, now).TotalSeconds;
+                    _lastSnapshotTimestamp = now;
+                    if (_rateCalculator.TryCalculate(counters, elapsedSeconds, out var rate)
+                        && CoreManager.Instance.IsRunning
+                        && AppManager.Instance.IsRunningCore(ECoreType.Xray)
+                        && generation == CoreManager.Instance.Generation)
+                    {
+                        rate.CoreGeneration = generation;
+                        await _updateFunc?.Invoke(rate);
+                    }
+                }
+                catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
                 {
-                    var server = ParseOutput(result) ?? new ServerSpeedItem();
-                    await _updateFunc?.Invoke(server);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Logging.SaveLog(nameof(StatisticsXrayService), ex);
+                    Reset();
                 }
             }
-            catch
-            {
-                // ignored
-            }
+        }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+        {
         }
     }
 
-    private ServerSpeedItem? ParseOutput(string result)
+    private void Reset()
+    {
+        _rateCalculator.Reset();
+        _lastSnapshotTimestamp = 0;
+    }
+
+    private static ServerSpeedItem? ParseCounters(string result)
     {
         try
         {
@@ -59,7 +99,7 @@ public class StatisticsXrayService
                 return null;
             }
 
-            ServerSpeedItem server = new();
+            ServerSpeedItem counters = new();
             foreach (var key in source.stats.outbound.Keys.Cast<string>())
             {
                 var value = source.stats.outbound[key];
@@ -68,40 +108,22 @@ public class StatisticsXrayService
                     continue;
                 }
                 var state = JsonUtils.Deserialize<V2rayMetricsVarsLink>(value.ToString());
-
                 if (key.StartsWith(Global.ProxyTag))
                 {
-                    server.ProxyUp += state.uplink / linkBase;
-                    server.ProxyDown += state.downlink / linkBase;
+                    counters.ProxyUp += state.uplink;
+                    counters.ProxyDown += state.downlink;
                 }
                 else if (key == Global.DirectTag)
                 {
-                    server.DirectUp = state.uplink / linkBase;
-                    server.DirectDown = state.downlink / linkBase;
+                    counters.DirectUp += state.uplink;
+                    counters.DirectDown += state.downlink;
                 }
             }
-
-            if (server.DirectDown < _serverSpeedItem.DirectDown || server.ProxyDown < _serverSpeedItem.ProxyDown)
-            {
-                _serverSpeedItem = new();
-                return null;
-            }
-
-            ServerSpeedItem curItem = new()
-            {
-                ProxyUp = server.ProxyUp - _serverSpeedItem.ProxyUp,
-                ProxyDown = server.ProxyDown - _serverSpeedItem.ProxyDown,
-                DirectUp = server.DirectUp - _serverSpeedItem.DirectUp,
-                DirectDown = server.DirectDown - _serverSpeedItem.DirectDown,
-            };
-            _serverSpeedItem = server;
-            return curItem;
+            return counters;
         }
         catch
         {
-            // ignored
+            return null;
         }
-
-        return null;
     }
 }

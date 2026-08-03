@@ -1,125 +1,108 @@
-using System.Net.WebSockets;
-
 namespace ServiceLib.Services.Statistics;
 
 public class StatisticsSingboxService
 {
-    private readonly Config _config;
-    private bool _exitFlag;
-    private ClientWebSocket? webSocket;
     private readonly Func<ServerSpeedItem, Task>? _updateFunc;
-    private string Url => $"ws://{Global.Loopback}:{AppManager.Instance.StatePort2}/traffic";
-    private static readonly string _tag = "StatisticsSingboxService";
+    private readonly ClashTrafficSnapshotCalculator _trafficSnapshot = new();
+    private readonly CancellationTokenSource _cancellation = new();
+    private readonly Task _runTask;
+    private long _lastSnapshotTimestamp;
 
     public StatisticsSingboxService(Config config, Func<ServerSpeedItem, Task> updateFunc)
     {
-        _config = config;
         _updateFunc = updateFunc;
-        _exitFlag = false;
-
-        _ = Task.Run(Run);
+        _runTask = Task.Run(Run);
     }
 
-    private async Task Init()
+    public async Task CloseAsync()
     {
-        await Task.Delay(5000);
-
+        _cancellation.Cancel();
         try
         {
-            if (webSocket == null)
-            {
-                webSocket = new ClientWebSocket();
-                await webSocket.ConnectAsync(new Uri(Url), CancellationToken.None);
-            }
+            await _runTask;
         }
-        catch { }
-    }
-
-    public void Close()
-    {
-        try
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
         {
-            _exitFlag = true;
-            if (webSocket != null)
-            {
-                webSocket.Abort();
-                webSocket = null;
-            }
         }
-        catch (Exception ex)
-        {
-            Logging.SaveLog(_tag, ex);
-        }
+        Reset();
+        _cancellation.Dispose();
     }
 
     private async Task Run()
     {
-        await Init();
-
-        while (!_exitFlag)
-        {
-            await Task.Delay(1000);
-            try
-            {
-                if (!AppManager.Instance.IsRunningCore(ECoreType.sing_box))
-                {
-                    continue;
-                }
-                if (webSocket != null)
-                {
-                    if (webSocket.State is WebSocketState.Aborted or WebSocketState.Closed)
-                    {
-                        webSocket.Abort();
-                        webSocket = null;
-                        await Init();
-                        continue;
-                    }
-
-                    if (webSocket.State != WebSocketState.Open)
-                    {
-                        continue;
-                    }
-
-                    var buffer = new byte[1024];
-                    var res = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    while (!res.CloseStatus.HasValue)
-                    {
-                        var result = Encoding.UTF8.GetString(buffer, 0, res.Count);
-                        if (result.IsNotEmpty())
-                        {
-                            ParseOutput(result, out var up, out var down);
-
-                            await _updateFunc?.Invoke(new ServerSpeedItem()
-                            {
-                                ProxyUp = (long)(up / 1000),
-                                ProxyDown = (long)(down / 1000)
-                            });
-                        }
-                        res = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    }
-                }
-            }
-            catch
-            {
-            }
-        }
-    }
-
-    private void ParseOutput(string source, out ulong up, out ulong down)
-    {
-        up = 0;
-        down = 0;
         try
         {
-            var trafficItem = JsonUtils.Deserialize<TrafficItem>(source);
-            if (trafficItem != null)
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while (await timer.WaitForNextTickAsync(_cancellation.Token))
             {
-                up = trafficItem.Up;
-                down = trafficItem.Down;
+                try
+                {
+                    if (!CoreManager.Instance.IsRunning || !AppManager.Instance.IsRunningCore(ECoreType.sing_box))
+                    {
+                        Reset();
+                        continue;
+                    }
+
+                    var generation = CoreManager.Instance.Generation;
+                    var connections = await ClashApiManager.Instance.GetClashConnectionsAsync(_cancellation.Token);
+                    if (connections is null || generation != CoreManager.Instance.Generation)
+                    {
+                        Reset();
+                        continue;
+                    }
+
+                    var now = Stopwatch.GetTimestamp();
+                    var elapsedSeconds = _lastSnapshotTimestamp == 0
+                        ? 0
+                        : Stopwatch.GetElapsedTime(_lastSnapshotTimestamp, now).TotalSeconds;
+                    _lastSnapshotTimestamp = now;
+                    var delta = _trafficSnapshot.GetDelta(connections);
+                    if (!delta.HasBaseline || elapsedSeconds <= 0)
+                    {
+                        continue;
+                    }
+
+                    var update = new ServerSpeedItem
+                    {
+                        ProxyUp = ToKilobytesPerSecond(delta.ProxyUp, elapsedSeconds),
+                        ProxyDown = ToKilobytesPerSecond(delta.ProxyDown, elapsedSeconds),
+                        DirectUp = ToKilobytesPerSecond(delta.DirectUp, elapsedSeconds),
+                        DirectDown = ToKilobytesPerSecond(delta.DirectDown, elapsedSeconds),
+                        ProxyUpBytes = delta.ProxyUp,
+                        ProxyDownBytes = delta.ProxyDown,
+                        DirectUpBytes = delta.DirectUp,
+                        DirectDownBytes = delta.DirectDown,
+                        CoreGeneration = generation
+                    };
+                    if (CoreManager.Instance.IsRunning
+                        && AppManager.Instance.IsRunningCore(ECoreType.sing_box)
+                        && generation == CoreManager.Instance.Generation)
+                    {
+                        await _updateFunc?.Invoke(update);
+                    }
+                }
+                catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Logging.SaveLog(nameof(StatisticsSingboxService), ex);
+                    Reset();
+                }
             }
         }
-        catch
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
         {
         }
     }
+
+    private void Reset()
+    {
+        _trafficSnapshot.Reset();
+        _lastSnapshotTimestamp = 0;
+    }
+
+    private static long ToKilobytesPerSecond(long bytes, double elapsedSeconds) =>
+        (long)Math.Round(Math.Max(0, bytes) / elapsedSeconds / 1024d, MidpointRounding.AwayFromZero);
 }

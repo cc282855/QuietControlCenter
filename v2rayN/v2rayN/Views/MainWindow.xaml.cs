@@ -6,6 +6,7 @@ using MaterialDesignThemes.Wpf;
 using v2rayN.Base;
 using v2rayN.Manager;
 using v2rayN.Services;
+using ServiceLib.Services;
 
 namespace v2rayN.Views;
 
@@ -16,7 +17,12 @@ public partial class MainWindow
     private CheckUpdateView? _checkUpdateView;
     private BackupAndRestoreView? _backupAndRestoreView;
     private readonly CancellationTokenSource _quietUpdateCancellation = new();
+    private readonly QuietUpdateService _quietUpdateService = new();
+    private readonly CancellationTokenSource _liveMetricsCancellation = new();
+    private readonly ProxyPingClient _livePingClient;
+    private readonly ConnectionQualityMonitor _connectionQualityMonitor;
     private Task? _quietUpdateLoop;
+    private QuietUpdateResult? _lastHandledQuietUpdateResult;
 
     public MainWindow()
     {
@@ -25,6 +31,8 @@ public partial class MainWindow
         txtAppVersion.Text = Utils.GetVersion();
 
         _config = AppManager.Instance.Config;
+        _livePingClient = new ProxyPingClient();
+        _connectionQualityMonitor = new ConnectionQualityMonitor(_livePingClient, 10);
         ThreadPool.RegisterWaitForSingleObject(App.ProgramStarted, OnProgramStarted, null, -1, false);
 
         App.Current.SessionEnding += Current_SessionEnding;
@@ -46,22 +54,22 @@ public partial class MainWindow
             // Keep both surfaces on the same live view model.
             DataContext = ViewModel;
             this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedProxyDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "↑ 0 B/s" : value)
+                .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
                 .BindTo(this, v => v.txtHeroProxySpeed.Text)
                 .DisposeWith(disposables);
             this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedDirectDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "↓ 0 B/s" : value)
+                .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
                 .BindTo(this, v => v.txtHeroDirectSpeed.Text)
                 .DisposeWith(disposables);
-            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.RunningInfoDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "未连接" : value)
-                .BindTo(this, v => v.txtHeroRunningStatus.Text)
-                .DisposeWith(disposables);
             var connectionStateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            connectionStateTimer.Tick += (_, _) => UpdateConnectionStateBadge();
+            connectionStateTimer.Tick += LiveMetricsTimer_Tick;
             connectionStateTimer.Start();
             UpdateConnectionStateBadge();
-            Disposable.Create(connectionStateTimer.Stop).DisposeWith(disposables);
+            Disposable.Create(() =>
+            {
+                connectionStateTimer.Stop();
+                connectionStateTimer.Tick -= LiveMetricsTimer_Tick;
+            }).DisposeWith(disposables);
             //servers
             this.BindCommand(ViewModel, vm => vm.AddVmessServerCmd, v => v.menuAddVmessServer).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddVlessServerCmd, v => v.menuAddVlessServer).DisposeWith(disposables);
@@ -162,7 +170,11 @@ public partial class MainWindow
             AppEvents.AppExitRequested
               .AsObservable()
               .ObserveOn(RxSchedulers.MainThreadScheduler)
-              .Subscribe(_ => StorageUI())
+              .Subscribe(_ =>
+              {
+                  StopLiveMetrics();
+                  StorageUI();
+              })
               .DisposeWith(disposables);
 
             AppEvents.ShutdownRequested
@@ -229,6 +241,7 @@ public partial class MainWindow
     private async void Current_SessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
         _quietUpdateCancellation.Cancel();
+        StopLiveMetrics();
         Logging.SaveLog("Current_SessionEnding");
         StorageUI();
         await AppManager.Instance.AppExitAsync(false);
@@ -237,6 +250,7 @@ public partial class MainWindow
     private void Shutdown(bool obj)
     {
         _quietUpdateCancellation.Cancel();
+        StopLiveMetrics();
         Application.Current.Shutdown();
     }
 
@@ -451,32 +465,99 @@ public partial class MainWindow
         }
         RestoreUI();
         WriteStartupAcknowledgement();
+        _ = RefreshQuietUpdateStatusAsync();
         _quietUpdateLoop ??= RunQuietUpdateLoopAsync();
         _ = CaptureQaFrameIfRequestedAsync();
     }
 
     private async Task RunQuietUpdateLoopAsync()
     {
-        var scheduler = new QuietUpdateScheduler(new QuietUpdateService(), new SystemQuietDelay());
+        var scheduler = new QuietUpdateScheduler(_quietUpdateService, new SystemQuietDelay());
         try
         {
-            await scheduler.RunAsync(Utils.GetVersion(), async result =>
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    foreach (var notice in result.Notices)
-                        MainSnackbar.MessageQueue?.Enqueue(notice, null, null, null, false, true, TimeSpan.FromSeconds(12));
-                    if (result.UpgradeStarted)
-                    {
-                        StorageUI();
-                        _quietUpdateCancellation.Cancel();
-                        Application.Current.Shutdown();
-                    }
-                });
-            }, _quietUpdateCancellation.Token);
+            await scheduler.RunAsync(Utils.GetVersion(), HandleQuietUpdateResultAsync, _quietUpdateCancellation.Token);
         }
         catch (OperationCanceledException) { }
     }
+
+    private async void QuietUpdatePopup_Opened(object sender, RoutedEventArgs e)
+    {
+        await RefreshQuietUpdateStatusAsync();
+    }
+
+    private async void QuietUpdateCheckNow_Click(object sender, RoutedEventArgs e)
+    {
+        btnQuietUpdateCheckNow.IsEnabled = false;
+        txtQuietUpdateStatus.Text = "正在检查…";
+        try
+        {
+            var result = await _quietUpdateService.CheckNowAsync(Utils.GetVersion(), _quietUpdateCancellation.Token);
+            await HandleQuietUpdateResultAsync(result);
+        }
+        catch (OperationCanceledException) when (_quietUpdateCancellation.IsCancellationRequested) { }
+        catch
+        {
+            txtQuietUpdateStatus.Text = "更新检查失败";
+        }
+        finally
+        {
+            if (!_quietUpdateCancellation.IsCancellationRequested)
+            {
+                btnQuietUpdateCheckNow.IsEnabled = true;
+                await RefreshQuietUpdateStatusAsync();
+            }
+        }
+    }
+
+    private async Task HandleQuietUpdateResultAsync(QuietUpdateResult result)
+    {
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (ReferenceEquals(_lastHandledQuietUpdateResult, result)) return;
+            _lastHandledQuietUpdateResult = result;
+            foreach (var notice in result.Notices)
+                MainSnackbar.MessageQueue?.Enqueue(notice, null, null, null, false, true, TimeSpan.FromSeconds(12));
+            if (result.UpgradeStarted)
+            {
+                StorageUI();
+                _quietUpdateCancellation.Cancel();
+                StopLiveMetrics();
+                Application.Current.Shutdown();
+            }
+        });
+        if (!result.UpgradeStarted) await RefreshQuietUpdateStatusAsync();
+    }
+
+    private async Task RefreshQuietUpdateStatusAsync()
+    {
+        QuietUpdateStatus status;
+        try { status = await _quietUpdateService.GetStatusAsync(_quietUpdateCancellation.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (_quietUpdateCancellation.IsCancellationRequested) { return; }
+        catch { status = _quietUpdateService.Snapshot with { LastError = "更新状态读取失败", IsChecking = false }; }
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            txtQuietUpdateCurrentVersion.Text = Utils.GetVersion();
+            txtQuietUpdateOfficialVersion.Text = DisplayVersion(status.LatestOfficial);
+            txtQuietUpdateCustomVersion.Text = DisplayVersion(status.LatestCustom);
+            txtQuietUpdateLastAttempt.Text = DisplayUpdateTime(status.LastAttemptUtc);
+            txtQuietUpdateLastSuccess.Text = DisplayUpdateTime(status.LastSuccessUtc);
+            txtQuietUpdateStatus.Text = FormatQuietUpdateStatus(status);
+        });
+    }
+
+    private static string FormatQuietUpdateStatus(QuietUpdateStatus status)
+    {
+        if (status.IsChecking) return "正在检查…";
+        if (!string.IsNullOrWhiteSpace(status.LastError)) return status.LastError;
+        if (status.LastAttemptUtc is null) return "尚未检查";
+        if (status.LastCompletedUtc != status.LastAttemptUtc) return "上次检查未完成";
+        return status.LastSuccessUtc == status.LastCompletedUtc ? "检查成功" : "上次检查未完成";
+    }
+
+    private static string DisplayVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "尚未发现" : version;
+    private static string DisplayUpdateTime(DateTimeOffset? value)
+        => value is null ? "尚未检查" : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 
     private static void WriteStartupAcknowledgement()
     {
@@ -513,6 +594,12 @@ public partial class MainWindow
             if (args.Contains("--qcc-qa-reload", StringComparer.Ordinal)) await ViewModel.Reload();
             await Task.Delay(8000);
             UpdateConnectionStateBadge();
+            if (args.Contains("--qcc-qa-open-update", StringComparer.Ordinal))
+            {
+                await RefreshQuietUpdateStatusAsync();
+                pbQuietUpdate.IsPopupOpen = true;
+                await Dispatcher.Yield(DispatcherPriority.Loaded);
+            }
             UpdateLayout();
             var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
             bitmap.Render(this);
@@ -523,22 +610,76 @@ public partial class MainWindow
         finally
         {
             _quietUpdateCancellation.Cancel();
+            StopLiveMetrics();
             Application.Current.Shutdown();
         }
     }
 
-    private void UpdateConnectionStateBadge()
+    private async void LiveMetricsTimer_Tick(object? sender, EventArgs e)
     {
-        var connected = Enum.GetValues<ECoreType>()
-            .Where(coreType => coreType != ECoreType.v2rayN)
-            .Any(AppManager.Instance.IsRunningCore);
+        var connected = UpdateConnectionStateBadge();
+        ViewModel?.StatusBarViewModel.RefreshLiveTrafficState(connected);
+        if (!connected)
+        {
+            _connectionQualityMonitor.Reset();
+            txtHeroDelay.Text = "—";
+            txtHeroJitterLoss.Text = "— / —";
+            return;
+        }
+
+        try
+        {
+            var snapshot = await _connectionQualityMonitor.SampleAsync(_liveMetricsCancellation.Token);
+            if (snapshot is null)
+            {
+                return;
+            }
+            if (!CoreManager.Instance.IsRunning)
+            {
+                _connectionQualityMonitor.Reset();
+                txtHeroDelay.Text = "—";
+                txtHeroJitterLoss.Text = "— / —";
+                return;
+            }
+            txtHeroDelay.Text = snapshot.DelayMs is { } currentDelay ? $"{currentDelay} ms" : "超时";
+            txtHeroJitterLoss.Text = snapshot.JitterMs is { } jitter
+                ? $"{jitter} ms / {snapshot.LossPercent}%"
+                : $"— / {snapshot.LossPercent}%";
+        }
+        catch (OperationCanceledException) when (_liveMetricsCancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void StopLiveMetrics()
+    {
+        if (!_liveMetricsCancellation.IsCancellationRequested)
+        {
+            _liveMetricsCancellation.Cancel();
+        }
+        _livePingClient.Dispose();
+    }
+
+    private bool UpdateConnectionStateBadge()
+    {
+        var connected = CoreManager.Instance.IsRunning;
+        var coreName = AppManager.Instance.RunningCoreType switch
+        {
+            ECoreType.sing_box => "sing-box",
+            ECoreType.mihomo => "Mihomo",
+            ECoreType.Xray => "Xray",
+            ECoreType.v2fly or ECoreType.v2fly_v5 => "v2fly",
+            _ => AppManager.Instance.RunningCoreType.ToString()
+        };
         txtHeroConnectionState.Text = connected ? "已连接" : "未连接";
+        txtHeroRunningStatus.Text = connected ? $"{coreName} 运行中" : "未连接";
         txtHeroConnectionState.Foreground = connected
             ? (Brush)FindResource("QccSuccess")
             : (Brush)FindResource("QccMuted");
         borderHeroConnectionState.Background = new SolidColorBrush(
             connected ? Color.FromRgb(234, 248, 239) : Color.FromRgb(242, 244, 247));
-        borderHeroConnectionState.ToolTip = ViewModel?.StatusBarViewModel?.RunningInfoDisplay;
+        borderHeroConnectionState.ToolTip = txtHeroRunningStatus.Text;
+        return connected;
     }
 
     private void RestoreUI()

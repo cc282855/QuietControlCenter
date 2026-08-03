@@ -31,6 +31,28 @@ public sealed class QuietUpdateTests
         Assert.Null(await new FileQuietStateStore(dir).ReadStateAsync(default));
     }
 
+    [Fact] public async Task LegacyOnlyStateFeedsSnapshotAndDailySchedule()
+    {
+        var dir = Temp();
+        var last = DateTimeOffset.Parse("2026-07-28T00:00:00Z");
+        await File.WriteAllTextAsync(Path.Combine(dir, "update-state.json"),
+            "{\"lastCheckedUtc\":\"2026-07-28T00:00:00Z\",\"latestSeenTag\":\"7.24.4\"}");
+        var clock = new FakeClock { UtcNow = last.AddHours(23) };
+        var service = new QuietUpdateService(clock, state: new FileQuietStateStore(dir));
+        try
+        {
+            var status = await service.GetStatusAsync();
+            Assert.Equal(last, status.LastAttemptUtc);
+            Assert.Equal("7.24.4", status.LatestOfficial);
+            Assert.Null(status.LastCompletedUtc);
+            Assert.Equal(status, service.Snapshot);
+            Assert.Equal(TimeSpan.FromHours(1), await service.GetDelayUntilDueAsync());
+            clock.UtcNow = last.AddHours(24);
+            Assert.Equal(TimeSpan.Zero, await service.GetDelayUntilDueAsync());
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     [Fact] public async Task MissingChannelUsesPinnedProductionChannel()
     {
         var channel = await new FileQuietStateStore(Temp()).ReadChannelAsync(default);
@@ -84,14 +106,168 @@ public sealed class QuietUpdateTests
     [Fact] public async Task ConcurrentCallsAreCoalesced()
     {
         var http = new BlockingHttp(); var service = new QuietUpdateService(new FakeClock(), http, new MemoryStore());
-        var a = service.CheckAsync("7.24.3"); var b = service.CheckAsync("7.24.3");
-        Assert.Same(a, b); http.Release(); await Task.WhenAll(a, b); Assert.Equal(1, http.Calls);
+        var a = service.CheckAsync("7.24.3"); var b = service.CheckNowAsync("7.24.3");
+        http.Release();
+        var results = await Task.WhenAll(a, b);
+        Assert.All(results, result => Assert.True(result.CheckPerformed));
+        Assert.Equal(1, http.Calls);
+    }
+
+    [Fact] public async Task LateManualCheckUpgradesThrottledInflightWithoutMissingNetwork()
+    {
+        var now = DateTimeOffset.Parse("2026-07-29T00:00:00Z");
+        var clock = new LateForceClock(now);
+        var store = new MemoryStore { State = new QuietUpdateState { LastCheckedUtc = now } };
+        var http = new TrackingHttp(_ => JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.24.3" }));
+        var service = new QuietUpdateService(clock, http, store);
+
+        var scheduled = service.CheckAsync("7.24.3");
+        Assert.True(clock.WaitUntilLateForceWindow(TimeSpan.FromSeconds(5)));
+        var manual = service.CheckNowAsync("7.24.3");
+        clock.Release();
+        var results = await Task.WhenAll(scheduled, manual);
+
+        Assert.False(results[0].CheckPerformed);
+        Assert.True(results[1].CheckPerformed);
+        Assert.Single(http.Uris);
+    }
+
+    [Fact] public async Task CheckNowBypassesDailyThrottleOnly()
+    {
+        var clock = new FakeClock();
+        var store = new MemoryStore { State = new QuietUpdateState { LastCheckedUtc = clock.UtcNow } };
+        var http = new TrackingHttp(_ => JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.24.3" }));
+        var service = new QuietUpdateService(clock, http, store);
+
+        await service.CheckAsync("7.24.3");
+        Assert.Empty(http.Uris);
+        await service.CheckNowAsync("7.24.3");
+
+        Assert.Single(http.Uris);
+        Assert.Equal("api.github.com", http.Uris[0].Host);
+    }
+
+    [Fact] public async Task SuccessfulSegmentsPersistBackwardCompatibleStatus()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var manifest = Manifest();
+        manifest.Signature = Convert.ToBase64String(key.SignData(QuietUpdateService.CanonicalBytes(manifest), HashAlgorithmName.SHA256));
+        var clock = new FakeClock();
+        var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
+        var service = new QuietUpdateService(clock, new RouteHttp(
+            JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" }),
+            JsonSerializer.SerializeToUtf8Bytes(manifest)), store);
+
+        await service.CheckAsync("7.25.0");
+        var status = await service.GetStatusAsync();
+
+        Assert.Equal(clock.UtcNow, store.State!.LastCheckedUtc);
+        Assert.Equal("7.25.0", store.State.LatestSeenTag);
+        Assert.Equal(clock.UtcNow, status.LastAttemptUtc);
+        Assert.Equal(clock.UtcNow, status.LastSuccessUtc);
+        Assert.Equal("7.25.0", status.LatestOfficial);
+        Assert.Equal("7.25.0", status.LatestCustom);
+        Assert.Null(status.LastError);
+        Assert.Equal(status, service.Snapshot);
+    }
+
+    [Fact] public async Task OfficialFailureDoesNotDiscardValidatedCustomVersion()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var manifest = Manifest();
+        manifest.Signature = Convert.ToBase64String(key.SignData(QuietUpdateService.CanonicalBytes(manifest), HashAlgorithmName.SHA256));
+        var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
+        var http = new TrackingHttp(uri => uri.Host == "api.github.com"
+            ? throw new HttpRequestException("secret diagnostic must not persist")
+            : JsonSerializer.SerializeToUtf8Bytes(manifest));
+
+        await new QuietUpdateService(new FakeClock(), http, store).CheckAsync("7.25.0");
+
+        Assert.Equal("7.25.0", store.State!.LatestCustom);
+        Assert.Equal("官方版本查询失败", store.State.LastError);
+        Assert.DoesNotContain("secret", store.State.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact] public async Task CustomFailureDoesNotDiscardOfficialVersion()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
+        var http = new TrackingHttp(uri => uri.Host == "api.github.com"
+            ? JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" })
+            : throw new HttpRequestException("sensitive transport details"));
+
+        await new QuietUpdateService(new FakeClock(), http, store).CheckAsync("7.25.0");
+
+        Assert.Equal("7.25.0", store.State!.LatestOfficial);
+        Assert.Equal("7.25.0", store.State.LatestSeenTag);
+        Assert.Null(store.State.LatestCustom);
+        Assert.Equal("定制版查询失败", store.State.LastError);
+    }
+
+    [Fact] public async Task UnvalidatedManifestCannotBecomeLatestCustomVersion()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var manifest = Manifest();
+        manifest.Signature = Convert.ToBase64String(key.SignData(QuietUpdateService.CanonicalBytes(manifest), HashAlgorithmName.SHA256));
+        manifest.AppVersion = "98.0.0";
+        var store = new MemoryStore
+        {
+            State = new QuietUpdateState { LatestCustom = "7.24.3" },
+            Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem())
+        };
+        var http = new RouteHttp(
+            JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" }),
+            JsonSerializer.SerializeToUtf8Bytes(manifest));
+
+        await new QuietUpdateService(new FakeClock(), http, store).CheckAsync("7.24.3");
+
+        Assert.Equal("7.24.3", store.State!.LatestCustom);
+        Assert.Equal("定制版验证失败", store.State.LastError);
+    }
+
+    [Fact] public async Task OfficialReleaseAssetIsNeverDownloaded()
+    {
+        var http = new TrackingHttp(_ => JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            tag_name = "99.0.0",
+            assets = new[] { new { browser_download_url = "https://example.invalid/official-gui.zip" } }
+        }));
+
+        var result = await new QuietUpdateService(new FakeClock(), http, new MemoryStore()).CheckAsync("7.24.3");
+
+        Assert.False(result.UpgradeStarted);
+        Assert.Single(http.Uris);
+        Assert.Equal("https://api.github.com/repos/2dust/v2rayN/releases/latest", http.Uris[0].AbsoluteUri);
     }
 
     [Fact] public async Task NetworkFailureIsSilent()
     {
         var service = new QuietUpdateService(new FakeClock(), new ThrowHttp(), new MemoryStore());
         var result = await service.CheckAsync("7.24.3"); Assert.Empty(result.Notices); Assert.False(result.UpgradeStarted);
+    }
+
+    [Fact] public async Task StateWriteFailureIsSanitizedAndDoesNotEscape()
+    {
+        var service = new QuietUpdateService(new FakeClock(),
+            new FakeHttp(JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.24.3" })), new ThrowingStore(throwOnWrite: true));
+
+        var result = await service.CheckNowAsync("7.24.3");
+        var status = await service.GetStatusAsync();
+
+        Assert.True(result.CheckPerformed);
+        Assert.Equal("更新状态读写失败", status.LastError);
+        Assert.DoesNotContain("fixture secret", status.LastError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact] public async Task StateReadFailureIsSanitizedAndDoesNotEscape()
+    {
+        var service = new QuietUpdateService(new FakeClock(), state: new ThrowingStore(throwOnRead: true));
+
+        var result = await service.CheckNowAsync("7.24.3");
+        var status = await service.GetStatusAsync();
+
+        Assert.True(result.CheckPerformed);
+        Assert.Equal("更新状态读写失败", status.LastError);
     }
 
     [Fact] public async Task ValidSignedPackageReachesExternalHelper()
@@ -162,9 +338,11 @@ public sealed class QuietUpdateTests
     {
         var clock = new FakeClock(); var store = new MemoryStore(); var delay = new AdvancingDelay(clock);
         var service = new QuietUpdateService(clock, new FakeHttp(JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.24.3" })), store);
+        var published = 0;
         using var cts = new CancellationTokenSource(); delay.OnSecond = cts.Cancel;
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new QuietUpdateScheduler(service, delay).RunAsync("7.24.3", _ => Task.CompletedTask, cts.Token));
-        Assert.Equal(2, store.Writes);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new QuietUpdateScheduler(service, delay).RunAsync("7.24.3", _ => { published++; return Task.CompletedTask; }, cts.Token));
+        Assert.Equal(2, store.Attempts);
+        Assert.Equal(2, published);
     }
 
     [Theory]
@@ -259,14 +437,71 @@ public sealed class QuietUpdateTests
     }
 
     private sealed class FakeClock : IQuietClock { public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.Parse("2026-07-29T00:00:00Z"); }
+    private sealed class LateForceClock(DateTimeOffset now) : IQuietClock
+    {
+        private readonly ManualResetEventSlim _entered = new();
+        private readonly ManualResetEventSlim _release = new();
+        private int _reads;
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                if (Interlocked.Increment(ref _reads) == 2)
+                {
+                    _entered.Set();
+                    _release.Wait(TimeSpan.FromSeconds(10));
+                }
+                return now;
+            }
+        }
+        public bool WaitUntilLateForceWindow(TimeSpan timeout) => _entered.Wait(timeout);
+        public void Release() => _release.Set();
+    }
     private sealed class MemoryStore : IQuietStateStore
     {
-        public QuietUpdateState? State; public QuietChannelConfig? Channel; public int Writes;
+        public QuietUpdateState? State; public QuietChannelConfig? Channel; public int Writes; public int Attempts;
+        private DateTimeOffset? _lastPersistedAttempt;
         public Task<QuietUpdateState?> ReadStateAsync(CancellationToken t) { t.ThrowIfCancellationRequested(); return Task.FromResult(State); }
-        public Task WriteStateAsync(QuietUpdateState s, CancellationToken t) { t.ThrowIfCancellationRequested(); State = new() { LastCheckedUtc = s.LastCheckedUtc, LatestSeenTag = s.LatestSeenTag }; Writes++; return Task.CompletedTask; }
+        public Task WriteStateAsync(QuietUpdateState s, CancellationToken t)
+        {
+            t.ThrowIfCancellationRequested();
+            if (_lastPersistedAttempt != s.LastAttemptUtc && s.LastAttemptUtc is not null) Attempts++;
+            _lastPersistedAttempt = s.LastAttemptUtc;
+            State = new()
+            {
+                LastCheckedUtc = s.LastCheckedUtc,
+                LatestSeenTag = s.LatestSeenTag,
+                LastAttemptUtc = s.LastAttemptUtc,
+                LastSuccessUtc = s.LastSuccessUtc,
+                LastCompletedUtc = s.LastCompletedUtc,
+                LastError = s.LastError,
+                LatestOfficial = s.LatestOfficial,
+                LatestCustom = s.LatestCustom
+            };
+            Writes++;
+            return Task.CompletedTask;
+        }
         public Task<QuietChannelConfig?> ReadChannelAsync(CancellationToken t) => Task.FromResult(Channel);
     }
+    private sealed class ThrowingStore(bool throwOnRead = false, bool throwOnWrite = false) : IQuietStateStore
+    {
+        public Task<QuietUpdateState?> ReadStateAsync(CancellationToken token)
+            => throwOnRead ? throw new IOException("fixture secret read path") : Task.FromResult<QuietUpdateState?>(null);
+        public Task WriteStateAsync(QuietUpdateState state, CancellationToken token)
+            => throwOnWrite ? throw new UnauthorizedAccessException("fixture secret write path") : Task.CompletedTask;
+        public Task<QuietChannelConfig?> ReadChannelAsync(CancellationToken token) => Task.FromResult<QuietChannelConfig?>(null);
+    }
     private sealed class FakeHttp(byte[] bytes) : IQuietHttp { public Task<Stream> GetAsync(Uri u, CancellationToken t) { t.ThrowIfCancellationRequested(); return Task.FromResult<Stream>(new MemoryStream(bytes)); } }
+    private sealed class TrackingHttp(Func<Uri, byte[]> response) : IQuietHttp
+    {
+        public List<Uri> Uris { get; } = [];
+        public Task<Stream> GetAsync(Uri uri, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            Uris.Add(uri);
+            return Task.FromResult<Stream>(new MemoryStream(response(uri)));
+        }
+    }
     private sealed class ThrowHttp : IQuietHttp { public Task<Stream> GetAsync(Uri u, CancellationToken t) => throw new HttpRequestException(); }
     private sealed class FakeLauncher : IQuietProcessLauncher
     {

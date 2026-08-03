@@ -144,15 +144,21 @@ public sealed class ClashApiManager
         }
     }
 
-    public async Task<ClashConnections?> GetClashConnectionsAsync()
+    public Task<ClashConnections?> GetClashConnectionsAsync() => GetClashConnectionsAsync(CancellationToken.None);
+
+    public async Task<ClashConnections?> GetClashConnectionsAsync(CancellationToken cancellationToken)
     {
         try
         {
             var url = $"{GetApiUrl()}/connections";
-            var result = await HttpClientHelper.Instance.TryGetAsync(url);
+            var result = await HttpClientHelper.Instance.TryGetAsync(url, cancellationToken);
             var clashConnections = JsonUtils.Deserialize<ClashConnections>(result);
 
             return clashConnections;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

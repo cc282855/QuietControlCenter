@@ -99,20 +99,6 @@ public partial class StatusBarView
         }
     }
 
-    private async void AdvancedSettings_Click(object sender, RoutedEventArgs e)
-    {
-        btnAdvancedSettings.IsEnabled = false;
-        try
-        {
-            var settingViewModel = new OptionSettingViewModel();
-            await AppManager.Instance.WindowDialog.ShowDialogAsync(settingViewModel);
-        }
-        finally
-        {
-            btnAdvancedSettings.IsEnabled = true;
-        }
-    }
-
     private async void menuExit_Click(object sender, RoutedEventArgs e)
     {
         tbNotify.Dispose();

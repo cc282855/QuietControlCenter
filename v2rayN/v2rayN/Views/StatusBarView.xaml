@@ -23,10 +23,9 @@
             <Grid Margin="18,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.05*" />
-                    <ColumnDefinition Width="0.95*" />
-                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="0.85*" />
                     <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="1.1*" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0" Padding="0,0,20,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
@@ -87,16 +86,6 @@
                         <TextBlock x:Name="txtInboundLanDisplay" Grid.Row="1" Margin="0,7,0,0" Foreground="{StaticResource QccMuted}" FontSize="12" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </StackPanel>
-
-                <Border Grid.Column="4" Margin="18,0,0,0" Padding="18,0,0,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="1,0,0,0">
-                    <Button x:Name="btnAdvancedSettings" VerticalAlignment="Center" Style="{StaticResource QccSecondaryButton}" Click="AdvancedSettings_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Width="18" Height="18" Margin="0,0,8,0" Kind="CogOutline" />
-                            <TextBlock VerticalAlignment="Center" Text="高级设置" />
-                            <materialDesign:PackIcon Width="17" Height="17" Margin="8,0,0,0" Kind="ChevronRight" />
-                        </StackPanel>
-                    </Button>
-                </Border>
 
                 <StackPanel Visibility="Collapsed">
                     <TextBlock x:Name="txtSpeedProxyDisplay" />

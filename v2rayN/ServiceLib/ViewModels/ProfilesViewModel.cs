@@ -20,6 +20,8 @@ public class ProfilesViewModel : MyReactiveObject
     private readonly Dictionary<string, bool> _dicHeaderSort = new();
     private SpeedtestService? _speedtestService;
     private string? _pendingSelectIndexId;
+    private bool _updatingCountrySelection;
+    private readonly bool _persistNormalizedCountryAtStartup;
 
     #endregion private prop
 
@@ -28,6 +30,8 @@ public class ProfilesViewModel : MyReactiveObject
     public IObservableCollection<ProfileItemModel> ProfileItems { get; } = new ObservableCollectionExtended<ProfileItemModel>();
 
     public IObservableCollection<SubItem> SubItems { get; } = new ObservableCollectionExtended<SubItem>();
+
+    public IObservableCollection<CountryFilterItem> CountryItems { get; } = new ObservableCollectionExtended<CountryFilterItem>();
 
     [Reactive]
     public ProfileItemModel SelectedProfile { get; set; }
@@ -42,6 +46,9 @@ public class ProfilesViewModel : MyReactiveObject
 
     [Reactive]
     public string ServerFilter { get; set; }
+
+    [Reactive]
+    public string SelectedCountryCode { get; set; }
 
     #endregion ObservableCollection
 
@@ -96,6 +103,15 @@ public class ProfilesViewModel : MyReactiveObject
     public ProfilesViewModel()
     {
         _config = AppManager.Instance.Config;
+        var savedCountryCode = _config.UiItem.ProfilesCountryFilterCode;
+        SelectedCountryCode = CountryClassifier.NormalizeFilterCode(savedCountryCode);
+        _persistNormalizedCountryAtStartup = savedCountryCode.IsNotEmpty()
+            && !string.Equals(savedCountryCode, SelectedCountryCode, StringComparison.Ordinal);
+        if (_persistNormalizedCountryAtStartup)
+        {
+            _config.UiItem.ProfilesCountryFilterCode = SelectedCountryCode;
+        }
+        CountryItems.Add(new(CountryClassifier.AllCode, CountryClassifier.GetDisplayName(CountryClassifier.AllCode)));
 
         #region WhenAnyValue && ReactiveCommand
 
@@ -116,6 +132,10 @@ public class ProfilesViewModel : MyReactiveObject
           x => x.ServerFilter,
           y => y != null && _serverFilter != y)
               .Subscribe(async c => await ServerFilterChanged(c));
+        this.WhenAnyValue(x => x.SelectedCountryCode)
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Subscribe(async code => await CountrySelectedChangedAsync(code));
 
         //servers delete
         EditServerCmd = ReactiveCommand.CreateFromTask(async () =>
@@ -262,6 +282,11 @@ public class ProfilesViewModel : MyReactiveObject
         SelectedSub = new();
         SelectedMoveToGroup = new();
 
+        if (_persistNormalizedCountryAtStartup)
+        {
+            await ConfigHandler.SaveConfig(_config);
+        }
+
         await RefreshSubscriptions();
         //await RefreshServers();
     }
@@ -367,6 +392,30 @@ public class ProfilesViewModel : MyReactiveObject
         }
     }
 
+    private async Task CountrySelectedChangedAsync(string? code)
+    {
+        if (_updatingCountrySelection || code is null)
+        {
+            return;
+        }
+
+        var normalized = CountryClassifier.NormalizeFilterCode(code);
+        if (code.Length > 0 && normalized == CountryClassifier.AllCode)
+        {
+            return;
+        }
+        if (!string.Equals(normalized, SelectedCountryCode, StringComparison.Ordinal))
+        {
+            _updatingCountrySelection = true;
+            SelectedCountryCode = normalized;
+            _updatingCountrySelection = false;
+        }
+
+        _config.UiItem.ProfilesCountryFilterCode = normalized;
+        await ConfigHandler.SaveConfig(_config);
+        await RefreshServers();
+    }
+
     public async Task RefreshServers()
     {
         RefreshServersRequested.Publish();
@@ -380,6 +429,23 @@ public class ProfilesViewModel : MyReactiveObject
     {
         var lstModel = await GetProfileItemsEx(_config.SubIndexId, _serverFilter);
         _lstProfile = JsonUtils.Deserialize<List<ProfileItem>>(JsonUtils.Serialize(lstModel)) ?? [];
+
+        var availableCodes = CountryClassifier.GetAvailableCodes(lstModel ?? [], item => item.Remarks, item => item.Address);
+        var selectedCode = CountryClassifier.NormalizeFilterCode(SelectedCountryCode);
+        var optionCodes = availableCodes.ToList();
+        if (selectedCode != CountryClassifier.AllCode && !optionCodes.Contains(selectedCode, StringComparer.Ordinal))
+        {
+            optionCodes.Add(selectedCode);
+        }
+
+        _updatingCountrySelection = true;
+        CountryItems.Clear();
+        CountryItems.Add(new(CountryClassifier.AllCode, CountryClassifier.GetDisplayName(CountryClassifier.AllCode)));
+        CountryItems.AddRange(optionCodes.Select(code => new CountryFilterItem(code, CountryClassifier.GetDisplayName(code))));
+        SelectedCountryCode = selectedCode;
+        _updatingCountrySelection = false;
+
+        lstModel = CountryClassifier.ApplyFilter(lstModel ?? [], item => item.Remarks, item => item.Address, selectedCode).ToList();
 
         ProfileItems.Clear();
         ProfileItems.AddRange(lstModel ?? []);
@@ -447,6 +513,7 @@ public class ProfilesViewModel : MyReactiveObject
                         StreamSecurity = t.StreamSecurity,
                         Subid = t.Subid,
                         SubRemarks = t.SubRemarks,
+                        CountryCode = CountryClassifier.Classify(t.Remarks, t.Address),
                         IsActive = t.IndexId == _config.IndexId,
                         Sort = t33?.Sort ?? 0,
                         Delay = t33?.Delay ?? 0,

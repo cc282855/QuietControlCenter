@@ -31,6 +31,7 @@
         <Setter Property="Background" Value="{StaticResource QccCanvas}" />
         <Setter Property="Foreground" Value="{StaticResource QccText}" />
         <Setter Property="FontFamily" Value="{StaticResource QccFont}" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
         <Setter Property="TextOptions.TextHintingMode" Value="Fixed" />
@@ -48,7 +49,7 @@
     </Style>
 
     <Style x:Key="QccPrimaryButton" TargetType="Button">
-        <Setter Property="Height" Value="42" />
+        <Setter Property="Height" Value="40" />
         <Setter Property="Padding" Value="18,0" />
         <Setter Property="Foreground" Value="White" />
         <Setter Property="Background" Value="{StaticResource QccPrimary}" />
@@ -56,6 +57,12 @@
         <Setter Property="FontSize" Value="14" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style x:Key="QccCompactPrimaryButton" TargetType="Button" BasedOn="{StaticResource QccPrimaryButton}">
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="FontSize" Value="12" />
     </Style>
 
     <Style x:Key="QccSecondaryButton" TargetType="Button">
@@ -69,14 +76,14 @@
     </Style>
 
     <Style x:Key="QccNavButton" TargetType="Button">
-        <Setter Property="Height" Value="50" />
+        <Setter Property="Height" Value="44" />
         <Setter Property="Margin" Value="10,2" />
         <Setter Property="Padding" Value="14,0" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Foreground" Value="{StaticResource QccText}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="14" />
         <Setter Property="Cursor" Value="Hand" />
     </Style>
 
