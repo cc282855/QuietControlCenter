@@ -290,8 +290,8 @@ jobs:
               Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
               throw "Visual QA capture timed out: $($capture.Name)"
             }
-            if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $output -PathType Leaf)) {
-              Write-Host "Visual QA exit code: $($process.ExitCode)"
+            Write-Host "Visual QA exit code: $($process.ExitCode)"
+            if (-not (Test-Path -LiteralPath $output -PathType Leaf)) {
               $errorReport = "$output.error.txt"
               if (Test-Path -LiteralPath $errorReport -PathType Leaf) {
                 Get-Content -LiteralPath $errorReport | Write-Host
