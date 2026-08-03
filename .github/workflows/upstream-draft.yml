@@ -291,6 +291,16 @@ jobs:
               throw "Visual QA capture timed out: $($capture.Name)"
             }
             if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $output -PathType Leaf)) {
+              Write-Host "Visual QA exit code: $($process.ExitCode)"
+              $errorReport = "$output.error.txt"
+              if (Test-Path -LiteralPath $errorReport -PathType Leaf) {
+                Get-Content -LiteralPath $errorReport | Write-Host
+              }
+              $guiLogs = Join-Path $qaRoot 'guiLogs'
+              if (Test-Path -LiteralPath $guiLogs -PathType Container) {
+                Get-ChildItem -LiteralPath $guiLogs -Filter '*.txt' -File -Recurse |
+                  ForEach-Object { Write-Host "----- $($_.FullName) -----"; Get-Content -LiteralPath $_.FullName | Write-Host }
+              }
               throw "Visual QA capture failed: $($capture.Name)"
             }
           }

@@ -606,6 +606,11 @@ public partial class MainWindow
             await using var stream = new FileStream(Path.GetFullPath(args[index + 1]), FileMode.Create, FileAccess.Write, FileShare.None);
             encoder.Save(stream);
         }
+        catch (Exception ex)
+        {
+            var errorPath = Path.GetFullPath(args[index + 1]) + ".error.txt";
+            await File.WriteAllTextAsync(errorPath, ex.ToString());
+        }
         finally
         {
             _quietUpdateCancellation.Cancel();
