@@ -19,6 +19,7 @@
 
     <UserControl.Resources>
         <converters:DelayColorConverter x:Key="DelayColorConverter" />
+        <local:ActiveNodeMarkerConverter x:Key="ActiveNodeMarkerConverter" />
         <local:DelayDisplayConverter x:Key="DelayDisplayConverter" />
         <local:SpeedDisplayConverter x:Key="SpeedDisplayConverter" />
         <Style x:Key="QccInspectorLabel" TargetType="TextBlock" BasedOn="{StaticResource QccMutedText}">
@@ -254,6 +255,23 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
+                    <base:MyDGTextColumn
+                        x:Name="colActiveMarker"
+                        Width="30"
+                        MinWidth="30"
+                        Binding="{Binding IsActive, Converter={StaticResource ActiveNodeMarkerConverter}}"
+                        CanUserResize="False"
+                        ExName="ActiveMarker"
+                        Header="">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource QccDanger}" />
+                                <Setter Property="FontSize" Value="15" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="TextAlignment" Value="Center" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </base:MyDGTextColumn>
                     <base:MyDGTextColumn x:Name="colRemarks" Width="1.55*" MinWidth="170" Binding="{Binding Remarks}" ExName="Remarks" Header="节点名称" />
                     <base:MyDGTextColumn x:Name="colConfigType" Width="0.8*" MinWidth="82" Binding="{Binding ConfigType}" ExName="ConfigType" Header="协议" />
                     <base:MyDGTextColumn x:Name="colSubRemarks" Width="1.1*" MinWidth="120" Binding="{Binding SubRemarks}" ExName="SubRemarks" Header="分组" />
@@ -302,7 +320,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="选择节点后可在右侧查看详情；双击可按当前偏好激活或编辑" TextTrimming="CharacterEllipsis" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="单击查看节点详情；双击切换并使用节点；红色 ★ 表示当前活动节点" TextTrimming="CharacterEllipsis" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button x:Name="btnFastRealPing" VerticalAlignment="Center" Style="{StaticResource QccSecondaryButton}">
                             <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="TimerOutline" /><TextBlock VerticalAlignment="Center" Text="测延迟" /></StackPanel>

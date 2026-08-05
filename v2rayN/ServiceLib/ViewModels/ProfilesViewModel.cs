@@ -37,6 +37,9 @@ public class ProfilesViewModel : MyReactiveObject
     [Reactive]
     public ProfileItemModel SelectedProfile { get; set; }
 
+    [Reactive]
+    public string ActiveProfileRemarks { get; set; }
+
     public IList<ProfileItemModel> SelectedProfiles { get; set; }
 
     [Reactive]
@@ -434,6 +437,8 @@ public class ProfilesViewModel : MyReactiveObject
     public async Task RefreshServersBiz()
     {
         var lstModel = await GetProfileItemsEx(_config.SubIndexId, _serverFilter);
+        var activeProfile = await AppManager.Instance.GetProfileItem(_config.IndexId);
+        ActiveProfileRemarks = activeProfile?.Remarks ?? "尚未连接";
         _lstProfile = JsonUtils.Deserialize<List<ProfileItem>>(JsonUtils.Serialize(lstModel)) ?? [];
 
         var availableCodes = CountryClassifier.GetAvailableCodes(lstModel ?? [], item => item.Remarks, item => item.Address);

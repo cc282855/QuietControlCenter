@@ -265,9 +265,9 @@
                                         FontSize="{DynamicResource QccFontHero}"
                                         LineHeight="{DynamicResource QccLineHero}"
                                         Style="{StaticResource QccHeading}"
-                                        Text="{Binding ProfilesViewModel.SelectedProfile.Remarks, FallbackValue=尚未连接}"
+                                        Text="{Binding ProfilesViewModel.ActiveProfileRemarks, FallbackValue=尚未连接}"
                                         TextWrapping="Wrap"
-                                        ToolTip="{Binding ProfilesViewModel.SelectedProfile.Remarks}" />
+                                        ToolTip="{Binding ProfilesViewModel.ActiveProfileRemarks}" />
                                     <Border x:Name="borderHeroConnectionState" Grid.Column="1" Margin="6,1,0,0" Padding="6,2" VerticalAlignment="Top" Background="{StaticResource QccHover}" CornerRadius="8">
                                         <TextBlock x:Name="txtHeroConnectionState" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" FontWeight="SemiBold" Text="未连接" />
                                     </Border>

@@ -46,6 +46,15 @@ public sealed class SpeedDisplayConverter : IValueConverter
         Binding.DoNothing;
 }
 
+public sealed class ActiveNodeMarkerConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? "★" : string.Empty;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
+
 public partial class ProfilesView
 {
     private static Config _config;
@@ -315,15 +324,12 @@ public partial class ProfilesView
         e.Row.Header = $" {e.Row.GetIndex() + 1}";
     }
 
-    private void LstProfiles_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private async void LstProfiles_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (_config.UiItem.DoubleClick2Activate)
+        e.Handled = true;
+        if (ViewModel != null)
         {
-            ViewModel?.SetDefaultServer();
-        }
-        else
-        {
-            ViewModel?.EditServerAsync();
+            await ViewModel.SetDefaultServer();
         }
     }
 
@@ -334,7 +340,12 @@ public partial class ProfilesView
             return;
         }
 
-        var colName = ((MyDGTextColumn)colHeader.Column).ExName;
+        if (colHeader.Column is not MyDGTextColumn column || column.ExName == "ActiveMarker")
+        {
+            return;
+        }
+
+        var colName = column.ExName;
         ViewModel?.SortServer(colName);
     }
 

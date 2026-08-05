@@ -574,6 +574,37 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void ActiveNodeDisplay_UsesRealConfigAndDoubleClickActivation()
+    {
+        var root = FindProjectRoot();
+        var serviceRoot = Path.Combine(root, "v2rayN", "ServiceLib");
+        var profilesViewModel = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "ProfilesViewModel.cs"));
+        var mainWindow = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var profilesView = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
+        var profilesCodeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml.cs"));
+
+        Assert.Contains("public string ActiveProfileRemarks", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("GetProfileItem(_config.IndexId)", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("ActiveProfileRemarks = activeProfile?.Remarks ?? \"尚未连接\"", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("ProfilesViewModel.ActiveProfileRemarks", mainWindow, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProfilesViewModel.SelectedProfile.Remarks", mainWindow, StringComparison.Ordinal);
+
+        Assert.Contains("ActiveNodeMarkerConverter", profilesView, StringComparison.Ordinal);
+        Assert.Contains("ExName=\"ActiveMarker\"", profilesView, StringComparison.Ordinal);
+        Assert.Contains("QccDanger", profilesView, StringComparison.Ordinal);
+        Assert.Contains("红色 ★ 表示当前活动节点", profilesView, StringComparison.Ordinal);
+        Assert.Contains("private async void LstProfiles_MouseDoubleClick", profilesCodeBehind, StringComparison.Ordinal);
+        var doubleClickStart = profilesCodeBehind.IndexOf("private async void LstProfiles_MouseDoubleClick", StringComparison.Ordinal);
+        var doubleClickEnd = profilesCodeBehind.IndexOf("private void LstProfiles_ColumnHeader_Click", doubleClickStart, StringComparison.Ordinal);
+        Assert.True(doubleClickStart >= 0 && doubleClickEnd > doubleClickStart);
+        var doubleClickHandler = profilesCodeBehind[doubleClickStart..doubleClickEnd];
+        Assert.Contains("await ViewModel.SetDefaultServer()", doubleClickHandler, StringComparison.Ordinal);
+        Assert.Contains("e.Handled = true", doubleClickHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("DoubleClick2Activate", doubleClickHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("EditServerAsync", doubleClickHandler, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FirstSubscriptionUpdate_IsScopedAwaitedProxyOnlyAndPrivacyRedacted()
     {
         var root = FindProjectRoot();

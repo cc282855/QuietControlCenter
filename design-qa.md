@@ -70,6 +70,19 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Active-node truth and activation verification — 2026-08-05
+
+- The previous hero label was bound to `SelectedProfile.Remarks`, so a single row click made the heading look like the selected row was active even though the persisted `Config.IndexId` and running sing-box outbound remained unchanged. The active runtime check proved the mismatch: the selected quota row used port 58511 while `Config.IndexId` and the generated sing-box `proxy` outbound used the profile `日本1 高速中转A` on port 8819.
+- The hero label now binds to `ProfilesViewModel.ActiveProfileRemarks`, which is refreshed from `AppManager.Instance.GetProfileItem(_config.IndexId)`. A single click remains selection/details only.
+- Row double-click now always awaits `SetDefaultServer`; it no longer consults `DoubleClick2Activate` and cannot open edit. The existing context-menu and detail-panel edit actions remain available.
+- A dedicated 30-pixel marker column renders a red `★` only for `ProfileItemModel.IsActive == true`. The footer explicitly explains single-click details, double-click activation and the red-star meaning.
+- Release solution build: exit 0, 0 errors and one pre-existing out-of-scope `GlobalHotKeys` nullable warning. `ServiceLib.Tests`: 197/197. Rebuilt `v2rayN.Tests`: 71/71. `git diff --check`: exit 0.
+- Public marker: `QuietControlCenter / win-x64 / 7.24.4.15`; ZIP entries 36, marker payload hashes 35/35, mismatches 0, forbidden/private runtime entries 0 and `guiConfigs` 0. ZIP SHA-256: `A540338F7BBC3E954CA3341E13049FC4CF47B4F2CAB6486D808F144AFFFE6C8C`; size 190,875,559 bytes.
+- Local continuity was created with SQLite `.backup`; integrity is `ok`, with 2 subscriptions and 174 profiles. Clean and local marker/application hashes match exactly.
+- The running 7.24.4.14 Mika process PID 8144 remained unchanged and was not stopped or replaced. Its managed sing-box child restarted independently during packaging; no task command launched, stopped, restarted or signaled an application/core process. The new 7.24.4.15 executable was not launched.
+
+final result: passed
+
 ## High-DPI metrics and overall layout inspection — 2026-08-05
 
 ### Source visual truth
