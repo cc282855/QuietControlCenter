@@ -12,6 +12,12 @@ public class DownloadService
     public event ErrorEventHandler? Error;
 
     private static readonly string _tag = "DownloadService";
+    private readonly bool _redactSensitiveErrors;
+
+    public DownloadService(bool redactSensitiveErrors = false)
+    {
+        _redactSensitiveErrors = redactSensitiveErrors;
+    }
 
     /// <summary>
     /// Downloads data with the specified proxy and reports progress messages.
@@ -106,7 +112,17 @@ public class DownloadService
     /// </summary>
     public async Task<string?> TryDownloadString(string url, bool blProxy, string userAgent)
     {
+        return await TryDownloadString(url, blProxy, userAgent, requireProxy: false);
+    }
+
+    public async Task<string?> TryDownloadString(string url, bool blProxy, string userAgent, bool requireProxy)
+    {
         var webProxy = await GetWebProxy(blProxy);
+        if (blProxy && requireProxy && webProxy is null)
+        {
+            return null;
+        }
+
         return await TryDownloadString(url, webProxy, userAgent);
     }
 
@@ -126,12 +142,7 @@ public class DownloadService
         }
         catch (Exception ex)
         {
-            Logging.SaveLog(_tag, ex);
-            Error?.Invoke(this, new ErrorEventArgs(ex));
-            if (ex.InnerException != null)
-            {
-                Error?.Invoke(this, new ErrorEventArgs(ex.InnerException));
-            }
+            ReportError(ex);
         }
 
         try
@@ -144,12 +155,7 @@ public class DownloadService
         }
         catch (Exception ex)
         {
-            Logging.SaveLog(_tag, ex);
-            Error?.Invoke(this, new ErrorEventArgs(ex));
-            if (ex.InnerException != null)
-            {
-                Error?.Invoke(this, new ErrorEventArgs(ex.InnerException));
-            }
+            ReportError(ex);
         }
 
         return null;
@@ -201,12 +207,7 @@ public class DownloadService
         }
         catch (Exception ex)
         {
-            Logging.SaveLog(_tag, ex);
-            Error?.Invoke(this, new ErrorEventArgs(ex));
-            if (ex.InnerException != null)
-            {
-                Error?.Invoke(this, new ErrorEventArgs(ex.InnerException));
-            }
+            ReportError(ex);
         }
 
         return null;
@@ -228,14 +229,25 @@ public class DownloadService
         }
         catch (Exception ex)
         {
-            Logging.SaveLog(_tag, ex);
-            Error?.Invoke(this, new ErrorEventArgs(ex));
-            if (ex.InnerException != null)
-            {
-                Error?.Invoke(this, new ErrorEventArgs(ex.InnerException));
-            }
+            ReportError(ex);
         }
         return null;
+    }
+
+    private void ReportError(Exception exception)
+    {
+        if (_redactSensitiveErrors)
+        {
+            Logging.SaveLog("Subscription request failed.");
+            return;
+        }
+
+        Logging.SaveLog(_tag, exception);
+        Error?.Invoke(this, new ErrorEventArgs(exception));
+        if (exception.InnerException != null)
+        {
+            Error?.Invoke(this, new ErrorEventArgs(exception.InnerException));
+        }
     }
 
     /// <summary>

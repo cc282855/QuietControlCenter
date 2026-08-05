@@ -14,10 +14,10 @@
     x:TypeArguments="vms:StatusBarViewModel"
     Style="{StaticResource ViewGlobal}"
     mc:Ignorable="d">
-    <Grid Background="{StaticResource QccSurface}">
+    <Grid MinHeight="72" Background="{StaticResource QccSurface}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="24" />
+            <RowDefinition Height="Auto" MinHeight="48" />
+            <RowDefinition Height="Auto" MinHeight="24" />
         </Grid.RowDefinitions>
         <Border BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
             <Grid Margin="10,4">
@@ -35,7 +35,7 @@
                         <ComboBox
                             x:Name="cmbSystemProxy"
                             Grid.Column="1"
-                            Height="32"
+                            MinHeight="32"
                             Margin="8,0,0,0"
                             Padding="8,2"
                             AutomationProperties.Name="{x:Static resx:ResUI.menuSystemproxy}"
@@ -70,7 +70,7 @@
                         <ComboBox
                             x:Name="cmbRoutings2"
                             Grid.Column="1"
-                            Height="32"
+                            MinHeight="32"
                             Margin="8,0,0,0"
                             Padding="8,2"
                             AutomationProperties.Name="{x:Static resx:ResUI.menuRouting}"
@@ -193,6 +193,7 @@
                                 <ComboBox
                                     x:Name="cmbRoutings"
                                     MaxWidth="300"
+                                    MinHeight="32"
                                     materialDesign:HintAssist.Hint="{x:Static resx:ResUI.menuRouting}"
                                     AutomationProperties.Name="{x:Static resx:ResUI.menuRouting}"
                                     DisplayMemberPath="Remarks"
@@ -207,6 +208,7 @@
                                 <ComboBox
                                     x:Name="cmbServers"
                                     MaxWidth="300"
+                                    MinHeight="32"
                                     materialDesign:HintAssist.Hint="{x:Static resx:ResUI.menuServers}"
                                     AutomationProperties.Name="{x:Static resx:ResUI.menuServers}"
                                     DisplayMemberPath="Text"

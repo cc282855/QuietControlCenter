@@ -2,6 +2,8 @@ namespace ServiceLib.ViewModels;
 
 public class SubSettingViewModel : MyReactiveObject
 {
+    private readonly Func<string, Task<SubscriptionUpdateResult>>? _firstUpdateAsync;
+
     public Interaction<string, bool> ShowYesNoInteraction { get; } = new();
     public Interaction<string, Unit> ShareSubInteraction { get; } = new();
 
@@ -18,9 +20,10 @@ public class SubSettingViewModel : MyReactiveObject
     public ReactiveCommand<Unit, Unit> SubShareCmd { get; }
     public bool IsModified { get; set; }
 
-    public SubSettingViewModel()
+    public SubSettingViewModel(Func<string, Task<SubscriptionUpdateResult>>? firstUpdateAsync = null)
     {
         _config = AppManager.Instance.Config;
+        _firstUpdateAsync = firstUpdateAsync;
 
         var canEditRemove = this.WhenAnyValue(
            x => x.SelectedSource,
@@ -74,7 +77,7 @@ public class SubSettingViewModel : MyReactiveObject
                 return;
             }
         }
-        var subEditViewModel = new SubEditViewModel(item);
+        var subEditViewModel = new SubEditViewModel(item, _firstUpdateAsync);
         if (await AppManager.Instance.WindowDialog.ShowDialogAsync(subEditViewModel) == true)
         {
             await RefreshSubItems();

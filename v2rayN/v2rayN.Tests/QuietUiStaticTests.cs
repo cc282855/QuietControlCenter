@@ -91,18 +91,31 @@ public sealed class QuietUiStaticTests
         var mainXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
         var profilesXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
 
-        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"96\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"Auto\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("<Border Grid.Row=\"0\" MinHeight=\"96\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"contentStatusBarView\" Grid.Row=\"2\" MinHeight=\"72\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtHeroNodeName\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"{DynamicResource QccFontHero}\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"Wrap\"", mainXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxWidth=\"220\"", mainXaml, StringComparison.Ordinal);
 
+        foreach (var metricName in new[] { "txtHeroProxySpeed", "txtHeroDirectSpeed", "txtHeroDelay", "txtHeroJitterLoss" })
+        {
+            var metricStart = mainXaml.IndexOf($"x:Name=\"{metricName}\"", StringComparison.Ordinal);
+            Assert.True(metricStart >= 0);
+            var metricElement = mainXaml[metricStart..mainXaml.IndexOf("/>", metricStart, StringComparison.Ordinal)];
+            Assert.Contains("TextWrapping=\"Wrap\"", metricElement, StringComparison.Ordinal);
+            Assert.DoesNotContain("TextTrimming=", metricElement, StringComparison.Ordinal);
+        }
+        Assert.Contains("x:Name=\"btnDisconnect\" Height=\"34\"", mainXaml, StringComparison.Ordinal);
+
         Assert.Contains("x:Name=\"colProfileInspector\" Width=\"268\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtInspectorNodeName\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtInspectorAddress\"", profilesXaml, StringComparison.Ordinal);
-        Assert.Contains("<RowDefinition Height=\"20\" />", profilesXaml, StringComparison.Ordinal);
+        Assert.Equal(8, profilesXaml.Split("<RowDefinition Height=\"Auto\" MinHeight=\"20\" />", StringSplitOptions.None).Length - 1);
         Assert.Contains("QccCompactSecondaryButton", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("QccCompactPrimaryButton", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Height\" Value=\"34\" />", profilesXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxWidth=\"205\"", profilesXaml, StringComparison.Ordinal);
     }
 
@@ -118,10 +131,14 @@ public sealed class QuietUiStaticTests
 
         Assert.Contains("SizeChanged=\"MainWindow_SizeChanged\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"132\" />", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("<RowDefinition Height=\"72\" />", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"contentStatusBarView\" Grid.Row=\"2\" MinHeight=\"72\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("ApplyResponsiveTypography(e.NewSize.Width, e.NewSize.Height)", mainCode, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(rawScale, 0.92d, 1.18d)", mainCode, StringComparison.Ordinal);
         Assert.Contains("Math.Round(scale * 20d", mainCode, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(scale, 0.92d, 1.18d)", mainCode, StringComparison.Ordinal);
+        var quantizationIndex = mainCode.IndexOf("Math.Round(scale * 20d", StringComparison.Ordinal);
+        var finalClampIndex = mainCode.IndexOf("Math.Clamp(scale, 0.92d, 1.18d)", StringComparison.Ordinal);
+        Assert.True(quantizationIndex >= 0 && finalClampIndex > quantizationIndex);
         Assert.Contains("Resources[\"StdFontSize\"]", mainCode, StringComparison.Ordinal);
 
         foreach (var key in new[]
@@ -134,11 +151,14 @@ public sealed class QuietUiStaticTests
         }
 
         var persistentStatus = statusXaml[..statusXaml.IndexOf("<tb:TaskbarIcon", StringComparison.Ordinal)];
-        Assert.Contains("<RowDefinition Height=\"24\" />", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("<Grid MinHeight=\"72\"", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("<RowDefinition Height=\"Auto\" MinHeight=\"48\" />", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("<RowDefinition Height=\"Auto\" MinHeight=\"24\" />", persistentStatus, StringComparison.Ordinal);
         Assert.Contains("Text=\"系统代理与 TUN 实时同步\"", persistentStatus, StringComparison.Ordinal);
         Assert.DoesNotContain("HintAssist.Hint", persistentStatus, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"1\"", persistentStatus, StringComparison.Ordinal);
-        Assert.Contains("Height=\"32\"", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"32\"", persistentStatus, StringComparison.Ordinal);
+        Assert.DoesNotMatch("(?<!Min)Height=\"32\"", persistentStatus);
 
         var profileFilters = profilesXaml[profilesXaml.IndexOf("<!-- Search and filters -->", StringComparison.Ordinal)
             ..profilesXaml.IndexOf("<DataGrid", StringComparison.Ordinal)];
@@ -149,13 +169,29 @@ public sealed class QuietUiStaticTests
         Assert.Contains("Path=SelectedIndex", profileFilters, StringComparison.Ordinal);
         Assert.DoesNotContain("HintAssist.Hint=\"国家/地区\"", profileFilters, StringComparison.Ordinal);
         Assert.DoesNotContain("HintAssist.Hint=\"所有分组\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"borderProfileToolbar\" Grid.Row=\"0\" MinHeight=\"56\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"txtServerFilter\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"34\"", profileFilters, StringComparison.Ordinal);
+
+        Assert.Contains("x:Name=\"borderProfileTestActions\" Grid.Row=\"2\" MinHeight=\"36\"", profilesXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<RowDefinition Height=\"56\" />", profilesXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<RowDefinition Height=\"36\" />", profilesXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ColumnHeaderHeight=", profilesXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("RowHeight=", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"MinHeight\" Value=\"34\" />", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("EnableRowVirtualization=\"True\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"colSpeed\" Width=\"1*\" MinWidth=\"108\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("<Button Width=\"34\" Height=\"34\"", profilesXaml, StringComparison.Ordinal);
 
         var inspectorRows = profilesXaml[profilesXaml.IndexOf("<!-- Selected node inspector -->", StringComparison.Ordinal)..];
         var actionBorderIndex = inspectorRows.IndexOf("<Border Grid.Row=\"2\" Padding=\"10,7\"", StringComparison.Ordinal);
         var actionsIndex = inspectorRows.IndexOf("Text=\"节点操作\"", StringComparison.Ordinal);
         Assert.True(actionBorderIndex >= 0 && actionsIndex > actionBorderIndex);
-        Assert.True(inspectorRows.Split("<RowDefinition Height=\"Auto\" />", StringSplitOptions.None).Length >= 4);
-        Assert.Contains("<RowDefinition Height=\"*\" />", inspectorRows, StringComparison.Ordinal);
+        var inspectorGridRows = inspectorRows[..inspectorRows.IndexOf("</Grid.RowDefinitions>", StringComparison.Ordinal)];
+        Assert.Equal(2, inspectorGridRows.Split("<RowDefinition Height=\"Auto\" />", StringSplitOptions.None).Length - 1);
+        Assert.Equal(1, inspectorGridRows.Split("<RowDefinition Height=\"*\" />", StringSplitOptions.None).Length - 1);
+        Assert.Contains("<ScrollViewer Grid.Row=\"1\"", inspectorRows, StringComparison.Ordinal);
+        Assert.Contains("<Border Grid.Row=\"2\"", inspectorRows, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -210,7 +246,8 @@ public sealed class QuietUiStaticTests
         var quotaIndex = xaml.IndexOf("x:Name=\"cardSubscriptionQuota\"", StringComparison.Ordinal);
         var metricsIndex = xaml.IndexOf("x:Name=\"txtHeroProxySpeed\"", StringComparison.Ordinal);
         Assert.True(nodeIndex >= 0 && quotaIndex > nodeIndex && metricsIndex > quotaIndex);
-        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"96\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Border Grid.Row=\"0\" MinHeight=\"96\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"148\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"194\" />", xaml, StringComparison.Ordinal);
         foreach (var name in new[]
@@ -416,6 +453,102 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void QaCaptureAndPackagingScripts_ProtectRunningCoresAndPrivateRuntimeState()
+    {
+        var root = FindProjectRoot();
+        var captureScript = File.ReadAllText(Path.Combine(root, "tools", "capture-qcc-window.ps1"));
+        var packageScript = File.ReadAllText(Path.Combine(root, "tools", "package-qcc.ps1"));
+
+        Assert.Contains("if ($ReloadCore)", captureScript, StringComparison.Ordinal);
+        Assert.Contains("ReloadCore is forbidden", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$outputPath = [IO.Path]::GetFullPath($Output)", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$errorPath = $outputPath + '.error.txt'", captureScript, StringComparison.Ordinal);
+        Assert.Contains("Remove-Item -LiteralPath $outputPath -Force", captureScript, StringComparison.Ordinal);
+        Assert.Contains("Remove-Item -LiteralPath $errorPath -Force", captureScript, StringComparison.Ordinal);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(captureScript, @"Remove-Item\b").Count == 2);
+        Assert.Contains("$captureStartUtc = [DateTime]::UtcNow", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$captureFreshnessFloorUtc = $captureStartUtc.AddSeconds(-2)", captureScript, StringComparison.Ordinal);
+        Assert.True(
+            captureScript.IndexOf("$captureStartUtc = [DateTime]::UtcNow", StringComparison.Ordinal)
+            < captureScript.IndexOf("Start-Process", StringComparison.Ordinal));
+        Assert.Contains("if ($process.ExitCode -notin @(0, -1))", captureScript, StringComparison.Ordinal);
+        Assert.Contains("App.OnExit terminates the WPF process with Process.Kill()", captureScript, StringComparison.Ordinal);
+        Assert.Contains("Test-Path -LiteralPath $errorPath -PathType Leaf", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$outputFile.Length -le 0", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$outputFile.LastWriteTimeUtc -lt $captureFreshnessFloorUtc", captureScript, StringComparison.Ordinal);
+        Assert.Contains("@('sing-box', 'mihomo', 'xray')", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$baselineCoreProcesses = @(Get-CoreProcessSnapshot)", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$finalCoreProcesses = @(Get-CoreProcessSnapshot)", captureScript, StringComparison.Ordinal);
+        Assert.Contains("Compare-Object -ReferenceObject $baselineCoreProcesses -DifferenceObject $finalCoreProcesses", captureScript, StringComparison.Ordinal);
+        Assert.Contains("if ($timedOut -and -not $process.HasExited)", captureScript, StringComparison.Ordinal);
+        Assert.Contains("Stop-Process -Id $process.Id -Force", captureScript, StringComparison.Ordinal);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(captureScript, @"Stop-Process\b").Count == 1);
+        Assert.DoesNotContain("ForEach-Object { Stop-Process", captureScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stop-Process -Name", captureScript, StringComparison.Ordinal);
+
+        Assert.Contains("$artifactRootResolved.Equals($expectedArtifact, [StringComparison]::OrdinalIgnoreCase)", packageScript, StringComparison.Ordinal);
+        foreach (var sensitiveName in new[] { "guiConfigs", "guiLogs", "guiTemps", "logs", "binConfigs" })
+        {
+            Assert.Contains($"'{sensitiveName}'", packageScript, StringComparison.Ordinal);
+        }
+        foreach (var sensitiveExtension in new[] { ".db", ".sqlite", ".sqlite3", ".log", ".wal", ".shm", ".journal", ".db-wal", ".db-shm", ".db-journal", ".key", ".pem", ".pfx", ".p12", ".pk8", ".pkcs8", ".ppk", ".snk" })
+        {
+            Assert.Contains($"'{sensitiveExtension}'", packageScript, StringComparison.Ordinal);
+        }
+        Assert.Contains("$sensitiveBaseNamePattern", packageScript, StringComparison.Ordinal);
+        Assert.Contains("id_(?:rsa|dsa|ecdsa|ed25519)", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$privateKeyTextPattern", packageScript, StringComparison.Ordinal);
+        Assert.Contains("BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY", packageScript, StringComparison.Ordinal);
+        Assert.Contains("PuTTY-User-Key-File-", packageScript, StringComparison.Ordinal);
+        Assert.Contains("Count=$($sensitivePayloads.Count)", packageScript, StringComparison.Ordinal);
+        Assert.Contains("Count=$($unexpectedTextPayloads.Count)", packageScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("$sensitivePayloads[0].Name", packageScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("$textPayload.Name", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$plausibleTextExtensions", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$plausibleTextExtensions -contains $_.Extension.ToLowerInvariant()", packageScript, StringComparison.Ordinal);
+        foreach (var textExtension in new[] { ".toml", ".csv", ".url" })
+        {
+            Assert.Contains($"'{textExtension}'", packageScript, StringComparison.Ordinal);
+        }
+        Assert.Contains("[string]::IsNullOrEmpty($_.Extension)", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$bytes = [IO.File]::ReadAllBytes($textPayload.FullName)", packageScript, StringComparison.Ordinal);
+        Assert.Contains("[Text.Encoding]::Unicode.GetString", packageScript, StringComparison.Ordinal);
+        Assert.Contains("[Text.Encoding]::BigEndianUnicode.GetString", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$bytes[0] -eq 0xfe -and $bytes[1] -eq 0xff", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$evenNullCount", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$oddNullCount", packageScript, StringComparison.Ordinal);
+        Assert.Contains("if ($value -eq 0)", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$controlByteCount * 20 -ge $byteCount", packageScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get-Content -LiteralPath $textPayload.FullName -Raw", packageScript, StringComparison.Ordinal);
+        Assert.Contains("$subscriptionSchemePattern", packageScript, StringComparison.Ordinal);
+        foreach (var scheme in new[] { "vmess", "vless", "ss", "ssr", "trojan", "hysteria", "hysteria2", "hy2", "tuic", "socks", "socks5", "wireguard", "anytls", "naive" })
+        {
+            Assert.Contains(scheme, packageScript, StringComparison.Ordinal);
+        }
+        var schemePatternLine = packageScript.Split('\n').Single(line => line.StartsWith("$subscriptionSchemePattern", StringComparison.Ordinal));
+        Assert.DoesNotContain("|http|", schemePatternLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("|https", schemePatternLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("https?)://", schemePatternLine, StringComparison.Ordinal);
+        Assert.Contains("function Assert-NoUnexpectedTextPayloads", packageScript, StringComparison.Ordinal);
+        Assert.Contains("Unexpected text payload is forbidden", packageScript, StringComparison.Ordinal);
+        Assert.True(
+            packageScript.IndexOf("Assert-NoUnexpectedTextPayloads $artifactRootResolved", StringComparison.Ordinal)
+            < packageScript.IndexOf("$files = [ordered]@{}", StringComparison.Ordinal));
+        Assert.Contains("$files[$relative] = (Get-FileHash", packageScript, StringComparison.Ordinal);
+        Assert.Contains("version=$Version; files=$files", packageScript, StringComparison.Ordinal);
+
+        var firstSensitiveGuard = packageScript.IndexOf("Assert-NoSensitivePayload $artifactRootResolved", StringComparison.Ordinal);
+        var artifactCleanup = packageScript.IndexOf("# Publish output is immutable", StringComparison.Ordinal);
+        var markerWrite = packageScript.IndexOf("ConvertTo-Json -Depth 5", StringComparison.Ordinal);
+        var finalSensitiveGuard = packageScript.LastIndexOf("Assert-NoSensitivePayload $artifactRootResolved", StringComparison.Ordinal);
+        var finalUnexpectedTextGuard = packageScript.LastIndexOf("Assert-NoUnexpectedTextPayloads $artifactRootResolved", StringComparison.Ordinal);
+        Assert.True(firstSensitiveGuard >= 0 && firstSensitiveGuard < artifactCleanup);
+        Assert.True(markerWrite >= 0 && finalSensitiveGuard > markerWrite);
+        Assert.True(markerWrite >= 0 && finalUnexpectedTextGuard > markerWrite);
+    }
+
+    [Fact]
     public void MikaTaskbarAndTrayIconPolicy_LeavesMenuIconsUnchanged()
     {
         var root = FindProjectRoot();
@@ -438,6 +571,54 @@ public sealed class QuietUiStaticTests
         {
             Assert.True(appIcon.SequenceEqual(File.ReadAllBytes(Path.Combine(resources, name))), $"{name} must use the Mika tray icon.");
         }
+    }
+
+    [Fact]
+    public void FirstSubscriptionUpdate_IsScopedAwaitedProxyOnlyAndPrivacyRedacted()
+    {
+        var root = FindProjectRoot();
+        var serviceRoot = Path.Combine(root, "v2rayN", "ServiceLib");
+        var main = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "MainWindowViewModel.cs"));
+        var profiles = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "ProfilesViewModel.cs"));
+        var settings = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "SubSettingViewModel.cs"));
+        var edit = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "SubEditViewModel.cs"));
+        var handler = File.ReadAllText(Path.Combine(serviceRoot, "Handler", "SubscriptionHandler.cs"));
+        var download = File.ReadAllText(Path.Combine(serviceRoot, "Services", "DownloadService.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(serviceRoot, "Services", "SubscriptionUpdateCoordinator.cs"));
+
+        Assert.Contains("new SubscriptionUpdateCoordinator(ExecuteSubscriptionUpdateAsync)", main, StringComparison.Ordinal);
+        Assert.Contains("new ProfilesViewModel(UpdateNewSubscriptionAsync)", main, StringComparison.Ordinal);
+        Assert.Contains("new SubSettingViewModel(UpdateNewSubscriptionAsync)", main, StringComparison.Ordinal);
+        Assert.Contains("UseProxy: true", main, StringComparison.Ordinal);
+        Assert.Contains("AllowDirectFallback: false", main, StringComparison.Ordinal);
+        Assert.Contains("IsAutomatic: true", main, StringComparison.Ordinal);
+        Assert.Contains("AllowDirectFallback: true", main, StringComparison.Ordinal);
+        Assert.Contains("new SubEditViewModel(item, _firstUpdateAsync)", profiles, StringComparison.Ordinal);
+        Assert.Contains("new SubEditViewModel(item, _firstUpdateAsync)", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Subscribe", settings, StringComparison.Ordinal);
+
+        Assert.Contains("_wasNew = subItem.Id.IsNullOrEmpty()", edit, StringComparison.Ordinal);
+        Assert.Contains("await AppManager.Instance.GetSubItem(persistedId)", edit, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.CompareExchange(ref _firstUpdateConsumed, 1, 0)", edit, StringComparison.Ordinal);
+        Assert.Contains("result = await _firstUpdateAsync!(persistedId)", edit, StringComparison.Ordinal);
+        Assert.Contains("FirstSubscriptionUpdatePolicy.SkippedFeedback", edit, StringComparison.Ordinal);
+        Assert.Contains("FirstSubscriptionUpdatePolicy.FailedFeedback", edit, StringComparison.Ordinal);
+
+        Assert.Contains("private readonly SemaphoreSlim _gate = new(1, 1)", coordinator, StringComparison.Ordinal);
+        Assert.Contains("_inFlightBySubscriptionId.TryGetValue(initialId", coordinator, StringComparison.Ordinal);
+        Assert.Contains("return await _updateAsync(request)", coordinator, StringComparison.Ordinal);
+        Assert.Contains("return SubscriptionUpdateResult.Failed", coordinator, StringComparison.Ordinal);
+
+        Assert.Contains("allowDirectFallback && blProxy", handler, StringComparison.Ordinal);
+        Assert.Contains("requireProxy: blProxy && !allowDirectFallback", handler, StringComparison.Ordinal);
+        Assert.Contains("new DownloadService(redactSensitiveErrors: true)", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("result.Length <", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("Logging.SaveLog(result)", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetException().Message", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("ex.Message", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("Logging.SaveLog(\"UpdateSubscription\", ex)", handler, StringComparison.Ordinal);
+        Assert.Contains("if (blProxy && requireProxy && webProxy is null)", download, StringComparison.Ordinal);
+        Assert.Contains("Logging.SaveLog(\"Subscription request failed.\")", download, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

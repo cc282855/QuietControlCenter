@@ -241,13 +241,13 @@
                 <!-- Main workspace -->
                 <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
-                        <RowDefinition x:Name="rowConnectionSummary" Height="96" />
+                        <RowDefinition x:Name="rowConnectionSummary" Height="Auto" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="72" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Connection summary -->
-                    <Border Grid.Row="0" Background="{StaticResource QccCanvas}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
+                    <Border Grid.Row="0" MinHeight="96" Background="{StaticResource QccCanvas}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
                         <Grid Margin="14,7,14,7">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1.05*" />
@@ -332,11 +332,11 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
                                         <StackPanel Margin="8,2" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txtHeroProxySpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextTrimming="CharacterEllipsis" ToolTip="代理实时上传 / 下载" />
+                                            <TextBlock x:Name="txtHeroProxySpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="代理实时上传 / 下载" />
                                             <TextBlock Margin="0,1,0,0" FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="代理流量" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="8,2" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txtHeroDirectSpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextTrimming="CharacterEllipsis" ToolTip="直连实时上传 / 下载" />
+                                            <TextBlock x:Name="txtHeroDirectSpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="直连实时上传 / 下载" />
                                             <TextBlock Margin="0,1,0,0" FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="直连流量" />
                                         </StackPanel>
                                     </Grid>
@@ -344,8 +344,8 @@
                                 <Border Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,0" Style="{StaticResource QccCard}">
                                     <Grid Margin="8,0">
                                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                                        <StackPanel VerticalAlignment="Center"><TextBlock FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="延迟" /><TextBlock x:Name="txtHeroDelay" Margin="0,1,0,0" FontSize="{DynamicResource QccFontBody}" Text="—" ToolTip="经当前代理到测速地址的每秒响应延迟" /></StackPanel>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="抖动 / 丢包" /><TextBlock x:Name="txtHeroJitterLoss" Margin="0,1,0,0" FontSize="{DynamicResource QccFontBody}" Text="— / —" ToolTip="最近 10 次应用层探测的抖动 / 超时比例" /></StackPanel>
+                                        <StackPanel VerticalAlignment="Center"><TextBlock FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="延迟" /><TextBlock x:Name="txtHeroDelay" Margin="0,1,0,0" FontSize="{DynamicResource QccFontBody}" Text="—" TextWrapping="Wrap" ToolTip="经当前代理到测速地址的每秒响应延迟" /></StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="抖动 / 丢包" /><TextBlock x:Name="txtHeroJitterLoss" Margin="0,1,0,0" FontSize="{DynamicResource QccFontBody}" Text="— / —" TextWrapping="Wrap" ToolTip="最近 10 次应用层探测的抖动 / 超时比例" /></StackPanel>
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="运行状态" /><TextBlock x:Name="txtHeroRunningStatus" Margin="0,1,0,0" FontSize="{DynamicResource QccFontBody}" Text="未连接" TextWrapping="Wrap" /></StackPanel>
                                     </Grid>
                                 </Border>
@@ -355,7 +355,7 @@
                                 <Button x:Name="btnHeroSwitch" Height="34" Padding="12,0" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccPrimaryButton}" Click="ShowProfiles_Click">
                                     <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="SwapHorizontal" /><TextBlock VerticalAlignment="Center" Text="切换节点" /></StackPanel>
                                 </Button>
-                                <Button x:Name="btnDisconnect" Height="32" Margin="0,6,0,0" Padding="12,0" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccSecondaryButton}" Click="Disconnect_Click" ToolTip="停止当前代理核心；重新载入配置可再次连接">
+                                <Button x:Name="btnDisconnect" Height="34" Margin="0,6,0,0" Padding="12,0" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccSecondaryButton}" Click="Disconnect_Click" ToolTip="停止当前代理核心；重新载入配置可再次连接">
                                     <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Foreground="{StaticResource QccDanger}" Kind="Power" /><TextBlock VerticalAlignment="Center" Text="断开连接" /></StackPanel>
                                 </Button>
                             </StackPanel>
@@ -371,7 +371,7 @@
                         </TabControl>
                     </Grid>
 
-                    <ContentControl x:Name="contentStatusBarView" Grid.Row="2" />
+                    <ContentControl x:Name="contentStatusBarView" Grid.Row="2" MinHeight="72" />
                 </Grid>
             </Grid>
 

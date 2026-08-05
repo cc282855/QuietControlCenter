@@ -70,6 +70,53 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## High-DPI metrics and overall layout inspection — 2026-08-05
+
+### Source visual truth
+
+- User-supplied clipping reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-e976e5b2-87fa-4b48-bb8f-9a2ebeb4f3c8.png`, 2036x1232 pixels.
+- The reported defect was concentrated in the top live-metrics cards: delay, jitter/loss and speed/status content did not have enough vertical space. The final inspection also covered the node toolbar, DataGrid, inspector actions, combined test buttons and bottom status controls.
+
+### Rendered implementation
+
+- Minimum viewport: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.13-layout\visual-qa\layout-1120x720.png`, 1120x720, SHA-256 `2A8EDEB0FD03050CC42F08907555ED1E16AF665A9FC9948423C8D28963172373`.
+- Intermediate viewport: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.13-layout\visual-qa\layout-1365x819.png`, 1365x819, SHA-256 `65015314431B7FCF6CBF95910B5F5DDE204A9280D74049D32313EF9413B64BDD`.
+- Normal viewport: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.13-layout\visual-qa\layout-1487x1058.png`, 1487x1058, SHA-256 `266A7B496DB703AC039B9FADF4763D81BAEBF006895CD21A09EF09F3C23728F7`.
+- Windows registered scaling was 150% (`AppliedDPI=144`) for all three captures.
+- QA states intentionally exercised all quality colors: 260 ms / 70 ms / 8% red; 145 ms / 35 ms / 2% yellow; 78 ms / 12 ms / 0% green.
+
+### Comparison evidence
+
+- Full-window comparison: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.13-layout\visual-qa\comparison-reference-vs-layout-1365x819.png`, SHA-256 `3FCB3D2D27730F69FF10ABB6A209BEF005F0EF9534460E659ADD37E47F074CD4`.
+- Focused metrics comparison: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.13-layout\visual-qa\comparison-top-metrics-reference-vs-layout.png`, SHA-256 `B139D1CE85C3C51209FACE4E91DD1061D9E3F47038C2B07510A5A62BDF6DC8FF`.
+
+### Findings
+
+- Fonts and typography: the existing responsive typography remains clamped to 0.92–1.18 after 0.05-step quantization. Metric values may wrap instead of being ellipsized, so both upload/download speed and their labels remain visible.
+- Spacing and layout rhythm: fixed summary, toolbar, DataGrid and inspector heights were replaced by content-driven rows with minimum heights. This keeps the compact structure while allowing 150% DPI text to occupy its required space.
+- Top metrics: proxy/direct speed, delay, jitter/loss and runtime status are simultaneously visible in all three frames. No value, unit or label is clipped.
+- Node work area: the node toolbar, empty/list area, right inspector and node actions keep their boundaries. The inspector uses the center star row for scrolling and preserves the action row at the bottom.
+- Testing and status controls: `测延迟`, `延迟+速度`, system proxy, TUN, route mode and both port-status lines remain inside every tested viewport.
+- DataGrid: headers and rows have minimum heights rather than forced heights; long cells remain accessible through the existing horizontal/vertical scrolling behavior.
+- Process isolation: captures did not reload a core. Pre-existing `米卡.exe` PIDs 53988 and 69932 and `sing-box.exe` PID 79076 remained present after visual inspection; no user application or proxy-core process was closed, restarted or replaced.
+- Privacy: the visual fixture was isolated and did not use the user's saved subscription/configuration database. No subscription URL was read or recorded.
+
+### Comparison history
+
+- Pass 1 reproduced the 150% DPI clipping risk and identified fixed vertical dimensions in summary/status, toolbar, DataGrid and inspector regions.
+- Pass 2 converted the affected layout rows to Auto plus minimum heights, enabled metric wrapping and constrained responsive font scaling.
+- Pass 3 rendered all three native output sizes and the source comparisons. No actionable P0, P1 or P2 visual issue remains.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: unusually long provider or node text may still require the existing scrollbars; this is intentional and does not hide persistent controls.
+
+final result: passed
+
 ## Responsive typography and compact status-bar inspection — 2026-08-04
 
 ### Source visual truth
@@ -224,5 +271,19 @@ P0: none
 P1: none
 
 P2: none
+
+final result: passed
+
+## First-save subscription update verification — 2026-08-05
+
+- A subscription created through either subscription entry point is persisted first, reloaded by its generated opaque ID, and automatically updated once only when it remains enabled and has an HTTP(S) address. Edits, invalid or disabled items, empty IDs, validation failures and persistence failures do not start an automatic update.
+- The awaited callback is scoped `MainWindowViewModel -> ProfilesViewModel/SubSettingViewModel -> SubEditViewModel`; there is no new global event or fire-and-forget subscription callback. One coordinator serializes all manual and automatic updates and coalesces concurrent requests that began with the same non-empty ID.
+- Automatic first updates require the existing proxy, target only the newly persisted ID, and prohibit direct fallback. Manual update behavior retains direct fallback compatibility.
+- Subscription response bodies, short bodies, URLs and exception details are not emitted by the subscription handler. Automatic failure leaves the saved subscription in place and restores pre-existing nodes if parsing fails.
+- Release build: exit 0, 0 warnings, 0 errors. `ServiceLib.Tests`: 195/195. `v2rayN.Tests`: 70/70. `git diff --check`: exit 0.
+- Public clean package marker: product `QuietControlCenter`, platform `win-x64`, version `7.24.4.14`; 35/35 immutable files matched their marker SHA-256 values. The ZIP contains 36 file entries including the marker and no runtime/config/database/log/key/sidecar/debug content. Its payload set matches 7.24.4.13 with no added or removed basename, and the unbranded build app host is not present.
+- Public ZIP SHA-256: `864B316232004C66D94A36DFAF18602375561AFD6F1F3122DDC7BE6D3106C4E5`. It remained unchanged after local continuity was created.
+- Local continuity database was created with SQLite `.backup`; integrity is `ok`, with 2 subscription rows and 174 profile rows. The public ZIP and clean package contain no `guiConfigs` directory.
+- Process isolation before and after: `sing-box` PID 66500 and Mika PIDs 53988/69932 were unchanged. No application or proxy executable was launched, stopped, restarted, signaled or replaced.
 
 final result: passed

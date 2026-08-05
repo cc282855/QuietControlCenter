@@ -234,6 +234,7 @@ public partial class MainWindow
         var rawScale = Math.Min(width / 1120d, height / 720d);
         var scale = Math.Clamp(rawScale, 0.92d, 1.18d);
         scale = Math.Round(scale * 20d, MidpointRounding.AwayFromZero) / 20d;
+        scale = Math.Clamp(scale, 0.92d, 1.18d);
         if (Math.Abs(scale - _responsiveFontScale) < 0.001d)
         {
             return;

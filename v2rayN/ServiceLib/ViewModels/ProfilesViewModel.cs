@@ -22,6 +22,7 @@ public class ProfilesViewModel : MyReactiveObject
     private string? _pendingSelectIndexId;
     private bool _updatingCountrySelection;
     private readonly bool _persistNormalizedCountryAtStartup;
+    private readonly Func<string, Task<SubscriptionUpdateResult>>? _firstUpdateAsync;
 
     #endregion private prop
 
@@ -100,9 +101,10 @@ public class ProfilesViewModel : MyReactiveObject
 
     #region Init
 
-    public ProfilesViewModel()
+    public ProfilesViewModel(Func<string, Task<SubscriptionUpdateResult>>? firstUpdateAsync = null)
     {
         _config = AppManager.Instance.Config;
+        _firstUpdateAsync = firstUpdateAsync;
         var savedCountryCode = _config.UiItem.ProfilesCountryFilterCode;
         SelectedCountryCode = CountryClassifier.NormalizeFilterCode(savedCountryCode);
         _persistNormalizedCountryAtStartup = savedCountryCode.IsNotEmpty()
@@ -981,7 +983,7 @@ public class ProfilesViewModel : MyReactiveObject
                 return;
             }
         }
-        var subEditViewModel = new SubEditViewModel(item);
+        var subEditViewModel = new SubEditViewModel(item, _firstUpdateAsync);
         if (await AppManager.Instance.WindowDialog.ShowDialogAsync(subEditViewModel) == true)
         {
             await RefreshSubscriptions();

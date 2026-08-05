@@ -4,6 +4,8 @@ namespace ServiceLib.ViewModels;
 
 public class MainWindowViewModel : MyReactiveObject
 {
+    private readonly SubscriptionUpdateCoordinator _subscriptionUpdateCoordinator;
+
     public Interaction<Unit, string?> ReadTextFromClipboardInteraction { get; } = new();
     public Interaction<Unit, byte[]?> ScanScreenInteraction { get; } = new();
     public Interaction<Unit, string?> BrowseImageFileInteraction { get; } = new();
@@ -11,7 +13,7 @@ public class MainWindowViewModel : MyReactiveObject
 
     public bool DesignMode { get; set; }
 
-    public ProfilesViewModel ProfilesViewModel { get; } = new();
+    public ProfilesViewModel ProfilesViewModel { get; }
     public MsgViewModel MsgViewModel { get; } = new();
     public ClashProxiesViewModel ClashProxiesViewModel { get; } = new();
     public ClashConnectionsViewModel ClashConnectionsViewModel { get; } = new();
@@ -91,6 +93,8 @@ public class MainWindowViewModel : MyReactiveObject
     public MainWindowViewModel()
     {
         _config = AppManager.Instance.Config;
+        _subscriptionUpdateCoordinator = new SubscriptionUpdateCoordinator(ExecuteSubscriptionUpdateAsync);
+        ProfilesViewModel = new ProfilesViewModel(UpdateNewSubscriptionAsync);
         BlIsWindows = Utils.IsWindows();
         MainGirdOrientation = _config.UiItem.MainGirdOrientation;
 
@@ -534,16 +538,39 @@ public class MainWindowViewModel : MyReactiveObject
 
     private async Task SubSettingAsync()
     {
-        var subSettingViewModel = new SubSettingViewModel();
+        var subSettingViewModel = new SubSettingViewModel(UpdateNewSubscriptionAsync);
         if (await AppManager.Instance.WindowDialog.ShowDialogAsync(subSettingViewModel) == true)
         {
             await RefreshSubscriptions();
         }
     }
 
-    public async Task UpdateSubscriptionProcess(string subId, bool blProxy)
+    public async Task<SubscriptionUpdateResult> UpdateSubscriptionProcess(string subId, bool blProxy)
     {
-        await Task.Run(async () => await SubscriptionHandler.UpdateProcess(_config, subId, blProxy, UpdateTaskHandler));
+        return await _subscriptionUpdateCoordinator.UpdateAsync(new SubscriptionUpdateRequest(
+            subId,
+            blProxy,
+            AllowDirectFallback: true,
+            IsAutomatic: false));
+    }
+
+    private async Task<SubscriptionUpdateResult> UpdateNewSubscriptionAsync(string subscriptionId)
+    {
+        return await _subscriptionUpdateCoordinator.UpdateAsync(new SubscriptionUpdateRequest(
+            subscriptionId,
+            UseProxy: true,
+            AllowDirectFallback: false,
+            IsAutomatic: true));
+    }
+
+    private async Task<SubscriptionUpdateResult> ExecuteSubscriptionUpdateAsync(SubscriptionUpdateRequest request)
+    {
+        return await Task.Run(async () => await SubscriptionHandler.UpdateProcess(
+            _config,
+            request.SubscriptionId,
+            request.UseProxy,
+            UpdateTaskHandler,
+            request.AllowDirectFallback));
     }
 
     #endregion Subscription

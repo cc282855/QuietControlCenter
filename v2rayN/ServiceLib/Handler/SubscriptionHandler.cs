@@ -2,7 +2,12 @@ namespace ServiceLib.Handler;
 
 public static class SubscriptionHandler
 {
-    public static async Task UpdateProcess(Config config, string subId, bool blProxy, Func<bool, string, Task> updateFunc)
+    public static async Task<SubscriptionUpdateResult> UpdateProcess(
+        Config config,
+        string subId,
+        bool blProxy,
+        Func<bool, string, Task> updateFunc,
+        bool allowDirectFallback = true)
     {
         await updateFunc?.Invoke(false, ResUI.MsgUpdateSubscriptionStart);
         var subItem = await AppManager.Instance.SubItems();
@@ -10,9 +15,10 @@ public static class SubscriptionHandler
         if (subItem is not { Count: > 0 })
         {
             await updateFunc?.Invoke(false, ResUI.MsgNoValidSubscription);
-            return;
+            return SubscriptionUpdateResult.Failed;
         }
 
+        var attemptedCount = 0;
         var successCount = 0;
         foreach (var item in subItem)
         {
@@ -23,21 +29,19 @@ public static class SubscriptionHandler
                     continue;
                 }
 
-                var hashCode = $"{item.Remarks}->";
+                const string hashCode = "订阅->";
                 if (item.Enabled == false)
                 {
                     await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgSkipSubscriptionUpdate}");
                     continue;
                 }
 
-                // Create download handler
-                var downloadHandle = CreateDownloadHandler(hashCode, updateFunc);
+                attemptedCount++;
+                var downloadHandle = new DownloadService(redactSensitiveErrors: true);
                 await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgStartGettingSubscriptions}");
 
-                // Get all subscription content (main subscription + additional subscriptions)
-                var result = await DownloadAllSubscriptions(config, item, blProxy, downloadHandle);
+                var result = await DownloadAllSubscriptions(config, item, blProxy, allowDirectFallback, downloadHandle);
 
-                // Process download result
                 if (await ProcessDownloadResult(config, item.Id, result, hashCode, updateFunc))
                 {
                     successCount++;
@@ -45,16 +49,16 @@ public static class SubscriptionHandler
 
                 await updateFunc?.Invoke(false, "-------------------------------------------------------");
             }
-            catch (Exception ex)
+            catch
             {
-                var hashCode = $"{item.Remarks}->";
-                Logging.SaveLog("UpdateSubscription", ex);
-                await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgFailedImportSubscription}: {ex.Message}");
+                Logging.SaveLog("Subscription update failed.");
+                await updateFunc?.Invoke(false, $"订阅->{ResUI.MsgFailedImportSubscription}");
                 await updateFunc?.Invoke(false, "-------------------------------------------------------");
             }
         }
 
         await updateFunc?.Invoke(successCount > 0, $"{ResUI.MsgUpdateSubscriptionEnd}");
+        return new SubscriptionUpdateResult(successCount > 0, attemptedCount, successCount);
     }
 
     private static bool IsValidSubscription(SubItem item, string subId)
@@ -80,22 +84,20 @@ public static class SubscriptionHandler
         return true;
     }
 
-    private static DownloadService CreateDownloadHandler(string hashCode, Func<bool, string, Task> updateFunc)
+    private static async Task<string> DownloadSubscriptionContent(
+        DownloadService downloadHandle,
+        string url,
+        bool blProxy,
+        bool allowDirectFallback,
+        string userAgent)
     {
-        var downloadHandle = new DownloadService();
-        downloadHandle.Error += (sender2, args) =>
-        {
-            updateFunc?.Invoke(false, $"{hashCode}{args.GetException().Message}");
-        };
-        return downloadHandle;
-    }
+        var result = await downloadHandle.TryDownloadString(
+            url,
+            blProxy,
+            userAgent,
+            requireProxy: blProxy && !allowDirectFallback);
 
-    private static async Task<string> DownloadSubscriptionContent(DownloadService downloadHandle, string url, bool blProxy, string userAgent)
-    {
-        var result = await downloadHandle.TryDownloadString(url, blProxy, userAgent);
-
-        // If download with proxy fails, try direct connection
-        if (blProxy && result.IsNullOrEmpty())
+        if (allowDirectFallback && blProxy && result.IsNullOrEmpty())
         {
             result = await downloadHandle.TryDownloadString(url, false, userAgent);
         }
@@ -103,21 +105,29 @@ public static class SubscriptionHandler
         return result ?? string.Empty;
     }
 
-    private static async Task<string> DownloadAllSubscriptions(Config config, SubItem item, bool blProxy, DownloadService downloadHandle)
+    private static async Task<string> DownloadAllSubscriptions(
+        Config config,
+        SubItem item,
+        bool blProxy,
+        bool allowDirectFallback,
+        DownloadService downloadHandle)
     {
-        // Download main subscription content
-        var result = await DownloadMainSubscription(config, item, blProxy, downloadHandle);
+        var result = await DownloadMainSubscription(config, item, blProxy, allowDirectFallback, downloadHandle);
 
-        // Process additional subscription links (if any)
         if (item.ConvertTarget.IsNullOrEmpty() && item.MoreUrl.TrimEx().IsNotEmpty())
         {
-            result = await DownloadAdditionalSubscriptions(item, result, blProxy, downloadHandle);
+            result = await DownloadAdditionalSubscriptions(item, result, blProxy, allowDirectFallback, downloadHandle);
         }
 
         return result;
     }
 
-    private static async Task<string> DownloadMainSubscription(Config config, SubItem item, bool blProxy, DownloadService downloadHandle)
+    private static async Task<string> DownloadMainSubscription(
+        Config config,
+        SubItem item,
+        bool blProxy,
+        bool allowDirectFallback,
+        DownloadService downloadHandle)
     {
         // Prepare subscription URL and download directly
         var url = Utils.GetPunycode(item.Url.TrimEx());
@@ -143,10 +153,15 @@ public static class SubscriptionHandler
         }
 
         // Download and return result directly
-        return await DownloadSubscriptionContent(downloadHandle, url, blProxy, item.UserAgent);
+        return await DownloadSubscriptionContent(downloadHandle, url, blProxy, allowDirectFallback, item.UserAgent);
     }
 
-    private static async Task<string> DownloadAdditionalSubscriptions(SubItem item, string mainResult, bool blProxy, DownloadService downloadHandle)
+    private static async Task<string> DownloadAdditionalSubscriptions(
+        SubItem item,
+        string mainResult,
+        bool blProxy,
+        bool allowDirectFallback,
+        DownloadService downloadHandle)
     {
         var result = mainResult;
 
@@ -166,7 +181,12 @@ public static class SubscriptionHandler
                 continue;
             }
 
-            var additionalResult = await DownloadSubscriptionContent(downloadHandle, url2, blProxy, item.UserAgent);
+            var additionalResult = await DownloadSubscriptionContent(
+                downloadHandle,
+                url2,
+                blProxy,
+                allowDirectFallback,
+                item.UserAgent);
 
             if (additionalResult.IsNotEmpty())
             {
@@ -195,27 +215,49 @@ public static class SubscriptionHandler
 
         await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgGetSubscriptionSuccessfully}");
 
-        // If result is too short, display content directly
-        if (result.Length < 99)
-        {
-            await updateFunc?.Invoke(false, $"{hashCode}{result}");
-        }
-
         await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgStartParsingSubscription}");
 
-        // Add servers to configuration
-        var ret = await ConfigHandler.AddBatchServers(config, result, id, true);
-        if (ret <= 0)
+        var originalProfiles = await AppManager.Instance.ProfileItems(id) ?? [];
+        var originalIndexId = config.IndexId;
+        int ret;
+        try
         {
-            Logging.SaveLog("FailedImportSubscription");
-            Logging.SaveLog(result);
+            ret = await ConfigHandler.AddBatchServers(config, result, id, true);
+        }
+        catch
+        {
+            await RestoreProfilesAsync(config, id, originalProfiles, originalIndexId);
+            Logging.SaveLog("Subscription parsing failed.");
+            await updateFunc?.Invoke(false, $"{hashCode}{ResUI.MsgFailedImportSubscription}");
+            return false;
         }
 
-        // Update completion message
+        if (ret <= 0)
+        {
+            await RestoreProfilesAsync(config, id, originalProfiles, originalIndexId);
+            Logging.SaveLog("Subscription import failed.");
+        }
+
         await updateFunc?.Invoke(false, ret > 0
                 ? $"{hashCode}{ResUI.MsgUpdateSubscriptionEnd}"
                 : $"{hashCode}{ResUI.MsgFailedImportSubscription}");
 
         return ret > 0;
+    }
+
+    private static async Task RestoreProfilesAsync(
+        Config config,
+        string subscriptionId,
+        IReadOnlyCollection<ProfileItem> originalProfiles,
+        string originalIndexId)
+    {
+        await ConfigHandler.RemoveServersViaSubid(config, subscriptionId, true);
+        foreach (var profile in originalProfiles)
+        {
+            await SQLiteHelper.Instance.ReplaceAsync(profile);
+        }
+
+        config.IndexId = originalIndexId;
+        await ConfigHandler.SaveConfig(config);
     }
 }
