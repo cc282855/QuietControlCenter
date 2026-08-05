@@ -661,6 +661,83 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void MikaBrandAssets_AreFrozenMultiSizeAndCoverDesktopAndUpdaterSurfaces()
+    {
+        const string expectedChromaHash = "C4A7CBE53799F29077BEC13202C6D6C702327D9965F2F1D9B0A3378A2E02590B";
+        const string expectedMasterHash = "DF739064E84E9F038923268D997CD0FB1D6FBDDCA51F0B38CFE96E9BF512C9F4";
+        const string expectedLogoHash = "DA38A8F947350EE5F30D4521E57F9A6B7ABDA6EE665839C8145B65380B018F63";
+        const string expectedIconHash = "D64BFDC8BF4FCA88F485A19BA65BF6F559AA68C33065FFBB79432FCEA9650B1D";
+        var root = FindProjectRoot();
+        var branding = Path.Combine(root, "branding");
+        var wpfResources = Path.Combine(root, "v2rayN", "v2rayN", "Resources");
+        var desktopAssets = Path.Combine(root, "v2rayN", "v2rayN.Desktop", "Assets");
+        var appIcon = Path.Combine(wpfResources, "v2rayN.ico");
+
+        static string Sha256(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+        static (int Width, int Height, byte ColorType) ReadPngHeader(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+            Assert.True(bytes.Length >= 26 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }));
+            return (
+                System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(16, 4)),
+                System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(20, 4)),
+                bytes[25]);
+        }
+
+        Assert.Equal(expectedChromaHash, Sha256(Path.Combine(branding, "source", "mika-wind-gate-chroma-source.png")));
+        var master = Path.Combine(branding, "master", "mika-wind-gate-transparent-1024.png");
+        Assert.Equal(expectedMasterHash, Sha256(master));
+        Assert.Equal((1024, 1024, (byte)6), ReadPngHeader(master));
+        Assert.Equal(expectedLogoHash, Sha256(Path.Combine(wpfResources, "MikaLogo.png")));
+        Assert.Equal((512, 512, (byte)6), ReadPngHeader(Path.Combine(wpfResources, "MikaLogo.png")));
+        Assert.Equal(expectedIconHash, Sha256(appIcon));
+
+        var iconBytes = File.ReadAllBytes(appIcon);
+        Assert.Equal((ushort)0, BitConverter.ToUInt16(iconBytes, 0));
+        Assert.Equal((ushort)1, BitConverter.ToUInt16(iconBytes, 2));
+        Assert.Equal((ushort)9, BitConverter.ToUInt16(iconBytes, 4));
+        var expectedSizes = new[] { 16, 20, 24, 32, 40, 48, 64, 128, 256 };
+        for (var index = 0; index < expectedSizes.Length; index++)
+        {
+            var entry = 6 + index * 16;
+            var width = iconBytes[entry] == 0 ? 256 : iconBytes[entry];
+            var height = iconBytes[entry + 1] == 0 ? 256 : iconBytes[entry + 1];
+            var offset = BitConverter.ToInt32(iconBytes, entry + 12);
+            Assert.Equal(expectedSizes[index], width);
+            Assert.Equal(expectedSizes[index], height);
+            Assert.Equal((ushort)32, BitConverter.ToUInt16(iconBytes, entry + 6));
+            Assert.True(iconBytes.AsSpan(offset, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }));
+        }
+
+        foreach (var path in new[]
+                 {
+                     Path.Combine(wpfResources, "NotifyIcon1.ico"),
+                     Path.Combine(wpfResources, "NotifyIcon2.ico"),
+                     Path.Combine(wpfResources, "NotifyIcon3.ico"),
+                     Path.Combine(wpfResources, "NotifyIcon4.ico"),
+                     Path.Combine(desktopAssets, "v2rayN.ico"),
+                     Path.Combine(desktopAssets, "NotifyIcon1.ico"),
+                     Path.Combine(desktopAssets, "NotifyIcon2.ico"),
+                     Path.Combine(desktopAssets, "NotifyIcon3.ico"),
+                     Path.Combine(desktopAssets, "NotifyIcon4.ico"),
+                     Path.Combine(root, "v2rayN", "AmazTool", "Resources", "v2rayN.ico")
+                 })
+        {
+            Assert.Equal(expectedIconHash, Sha256(path));
+        }
+
+        Assert.Equal((256, 256, (byte)6), ReadPngHeader(Path.Combine(root, "v2rayN", "v2rayN.Desktop", "v2rayN.png")));
+        foreach (var name in new[] { "mika-brand-contact-light-1024.png", "mika-brand-contact-dark-1024.png" })
+        {
+            Assert.Equal((1024, 1024, (byte)2), ReadPngHeader(Path.Combine(branding, "evidence", name)));
+        }
+
+        var amazProject = File.ReadAllText(Path.Combine(root, "v2rayN", "AmazTool", "AmazTool.csproj"));
+        Assert.Contains("<ApplicationIcon>Resources\\v2rayN.ico</ApplicationIcon>", amazProject, StringComparison.Ordinal);
+        Assert.Contains("<EmbeddedResource Include=\"Resources\\v2rayN.ico\">", amazProject, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ActiveNodeDisplay_UsesRealConfigAndDoubleClickActivation()
     {
         var root = FindProjectRoot();
