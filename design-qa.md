@@ -301,3 +301,14 @@ final result: passed
 - Process isolation: Mika PIDs 53988/69932 remained unchanged. The user-controlled Mika process 53988 independently replaced its child `sing-box` PID 66500 with PID 87620 during the verification interval; no build, test, packaging, or QA command launched, stopped, restarted, signaled, or replaced an application/core process, and the active connection remained running.
 
 final result: passed
+
+## Administrator launch policy verification — 2026-08-05
+
+- `v2rayN/v2rayN/app.manifest` now embeds `<requestedExecutionLevel level="requireAdministrator" uiAccess="false" />`, and `v2rayN.csproj` continues to use that manifest through `ApplicationManifest`. This policy therefore follows every future locally built or auto-updated `米卡.exe`; it does not depend on shortcut properties.
+- The manifest was extracted back from both the staged and final local `米卡.exe` with Windows `mt.exe`. Both reported `requireAdministrator` and `uiAccess=false`; the final file version is `7.24.4.16`.
+- Release solution build: exit 0, 0 errors and one pre-existing out-of-scope `GlobalHotKeys` nullable warning. `ServiceLib.Tests`: 197/197. Rebuilt `v2rayN.Tests`: 72/72. `git diff --check`: exit 0.
+- Public marker: `QuietControlCenter / win-x64 / 7.24.4.16`; ZIP entries 36, marker payload hashes 35/35, mismatches 0, forbidden/private runtime entries 0 and `guiConfigs` 0. ZIP SHA-256: `48149C3743DABF8475CD66776661B9392F9F04889825110287D1AA2CDC4CB945`; size 190,875,220 bytes.
+- After the user independently launched 7.24.4.15, local continuity was refreshed from that active version with SQLite `.backup`; integrity is `ok`, with 2 subscriptions and 174 profiles. No subscription values were inspected.
+- The task did not launch, stop, restart or signal the active Mika or sing-box processes. The new 7.24.4.16 executable was not launched.
+
+final result: passed

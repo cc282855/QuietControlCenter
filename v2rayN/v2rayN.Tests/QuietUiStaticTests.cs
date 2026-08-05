@@ -605,6 +605,21 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void MikaExecutable_AlwaysRequestsAdministratorPrivileges()
+    {
+        var root = FindProjectRoot();
+        var projectRoot = Path.Combine(root, "v2rayN", "v2rayN");
+        var project = File.ReadAllText(Path.Combine(projectRoot, "v2rayN.csproj"));
+        var manifest = File.ReadAllText(Path.Combine(projectRoot, "app.manifest"));
+
+        Assert.Contains("<ApplicationManifest>app.manifest</ApplicationManifest>", project, StringComparison.Ordinal);
+        Assert.Contains("<requestedPrivileges>", manifest, StringComparison.Ordinal);
+        Assert.Contains("requestedExecutionLevel level=\"requireAdministrator\" uiAccess=\"false\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("requestedExecutionLevel level=\"asInvoker\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("requestedExecutionLevel level=\"highestAvailable\"", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FirstSubscriptionUpdate_IsScopedAwaitedProxyOnlyAndPrivacyRedacted()
     {
         var root = FindProjectRoot();
