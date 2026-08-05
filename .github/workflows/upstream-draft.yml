@@ -118,7 +118,7 @@ jobs:
           $namespaces.AddNamespace('base', 'clr-namespace:v2rayN.Base')
           $namespaces.AddNamespace('p', 'http://schemas.microsoft.com/winfx/2006/xaml/presentation')
           $root = $xaml.DocumentElement
-          if ($root.GetAttribute('Title') -ne '米卡' -or
+          if ($root.GetAttribute('Title') -ne '玄同' -or
               $root.GetAttribute('Style') -ne '{StaticResource QccWindow}') {
             throw 'Customized main window guard failed; title or QccWindow style is missing.'
           }
@@ -215,9 +215,9 @@ jobs:
           $smokeRoot = Join-Path $env:RUNNER_TEMP "qcc-final-zip-smoke-$([Guid]::NewGuid().ToString('N'))"
           New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
           Expand-Archive -LiteralPath $zip -DestinationPath $smokeRoot -Force
-          $exe = Join-Path $smokeRoot 'v2rayN.exe'
+          $exe = Join-Path $smokeRoot '玄同.exe'
           if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
-            throw "Final ZIP does not contain v2rayN.exe at its root: $zip"
+            throw "Final ZIP does not contain 玄同.exe at its root: $zip"
           }
           $process = $null
           $startedAt = [DateTime]::UtcNow
@@ -230,7 +230,7 @@ jobs:
               if ($process.HasExited) {
                 throw "Final ZIP startup smoke test process exited early with code $($process.ExitCode)."
               }
-              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle.StartsWith('米卡')) {
+              if ($process.MainWindowHandle -ne [IntPtr]::Zero -and $process.MainWindowTitle.StartsWith('玄同')) {
                 break
               }
             } while ([DateTime]::UtcNow -lt $deadline)
@@ -251,7 +251,7 @@ jobs:
             $process.Refresh()
             if ($process.HasExited) { throw 'Final ZIP startup smoke test process did not remain alive.' }
             if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Final ZIP did not create a main window within 30 seconds.' }
-            if (-not $process.MainWindowTitle.StartsWith('米卡')) {
+            if (-not $process.MainWindowTitle.StartsWith('玄同')) {
               throw "Unexpected final ZIP main window title: '$($process.MainWindowTitle)'"
             }
             Write-Host "Final ZIP startup smoke test passed for PID $($process.Id)."
@@ -273,7 +273,7 @@ jobs:
           New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null
           New-Item -ItemType Directory -Path artifacts/visual-qa -Force | Out-Null
           Expand-Archive -LiteralPath $zip -DestinationPath $qaRoot -Force
-          $exe = Join-Path $qaRoot 'v2rayN.exe'
+          $exe = Join-Path $qaRoot '玄同.exe'
           $captures = @(
             @{ Name = 'qcc-1120x720-good.png'; Width = 1120; Height = 720; Delay = 78; Jitter = 12; Loss = 0 },
             @{ Name = 'qcc-1120x720-warning.png'; Width = 1120; Height = 720; Delay = 145; Jitter = 35; Loss = 2 },
@@ -368,11 +368,11 @@ jobs:
           $repository = "${{ github.repository }}"
           $version = "${{ steps.prepare.outputs.version }}"
           $upstreamTag = "${{ steps.prepare.outputs.tag }}"
-          $title = "米卡 $version"
+          $title = "玄同 $version"
           $notes = @"
-          ## 米卡 $version
+          ## 玄同 $version
 
-          本版本基于官方 v2rayN $upstreamTag 构建，并保留米卡定制界面与自动更新能力。
+          本版本基于官方 v2rayN $upstreamTag 构建，并保留玄同定制界面与自动更新能力。
 
           ### 发布校验
 
@@ -382,7 +382,7 @@ jobs:
           - 产品标记及逐文件 SHA-256 校验通过
           - P-256 更新清单签名校验通过
 
-          官方 GUI 版本只用于检测更新，不会直接覆盖米卡定制界面。软件自动安装仅接受本仓库发布并通过签名验证的完整包。
+          官方 GUI 版本只用于检测更新，不会直接覆盖玄同定制界面。软件自动安装仅接受本仓库发布并通过签名验证的完整包。
           "@
           $expectedAssets = @($zip, 'quiet-update-manifest.json')
           $PSNativeCommandUseErrorActionPreference = $false

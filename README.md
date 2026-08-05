@@ -1,4 +1,4 @@
-# Quiet Control Center
+# 玄同 / Xuantong
 
 [中文](#中文) · [English](#english) · [Releases](https://github.com/cc282855/QuietControlCenter/releases)
 
@@ -9,9 +9,9 @@
 
 ### 项目介绍
 
-Quiet Control Center 是基于 [2dust/v2rayN](https://github.com/2dust/v2rayN) 开发的 Windows x64 完整客户端。它保留 v2rayN 的节点、订阅、路由、系统代理、TUN、Clash API、热键和内核管理能力，并重新设计主窗口、节点列表、连接状态和软件更新体验。
+玄同是基于 [2dust/v2rayN](https://github.com/2dust/v2rayN) 开发的 Windows x64 完整客户端。它保留 v2rayN 的节点、订阅、路由、系统代理、TUN、Clash API、热键和内核管理能力，并重新设计主窗口、节点列表、连接状态和软件更新体验。
 
-本项目不是 v2rayN 官方版本。官方 GUI 包只用于发现新版本，不会直接覆盖 Quiet Control Center 的界面。
+本项目不是 v2rayN 官方版本。官方 GUI 包只用于发现新版本，不会直接覆盖玄同界面。
 
 ### 主要功能
 
@@ -30,7 +30,7 @@ Quiet Control Center 是基于 [2dust/v2rayN](https://github.com/2dust/v2rayN) �
 
 1. 在 [Releases](https://github.com/cc282855/QuietControlCenter/releases) 下载最新的 `QuietControlCenter-*-win-x64.zip`。
 2. 解压到一个独立目录，不要覆盖官方 v2rayN 的安装目录。
-3. 运行 `v2rayN.exe`。
+3. 运行 `玄同.exe`。
 
 这是一个完整代理客户端。多个客户端同时控制相同端口、系统代理或 TUN 时可能冲突，请自行规划端口与运行方式。
 
@@ -50,9 +50,9 @@ GitHub Actions 每天检查官方 v2rayN Release。检测到新版本后，流�
 
 ### About
 
-Quiet Control Center is a complete Windows x64 client derived from [2dust/v2rayN](https://github.com/2dust/v2rayN). It retains node, subscription, routing, system proxy, TUN, Clash API, hotkey, and core-management capabilities while redesigning the main window, profile list, connection status, and update experience.
+Xuantong is a complete Windows x64 client derived from [2dust/v2rayN](https://github.com/2dust/v2rayN). It retains node, subscription, routing, system proxy, TUN, Clash API, hotkey, and core-management capabilities while redesigning the main window, profile list, connection status, and update experience.
 
-This is not an official v2rayN distribution. Official GUI packages are used for version discovery only and never overwrite the Quiet Control Center interface.
+This is not an official v2rayN distribution. Official GUI packages are used for version discovery only and never overwrite the Xuantong interface.
 
 ### Features
 
@@ -71,7 +71,7 @@ This is not an official v2rayN distribution. Official GUI packages are used for 
 
 1. Download the latest `QuietControlCenter-*-win-x64.zip` from [Releases](https://github.com/cc282855/QuietControlCenter/releases).
 2. Extract it into a separate directory. Do not overwrite an official v2rayN installation.
-3. Run `v2rayN.exe`.
+3. Run `玄同.exe`.
 
 This is a full proxy client. Running multiple clients that control the same ports, system proxy, or TUN configuration can cause conflicts; plan the ports and runtime mode accordingly.
 
@@ -94,5 +94,5 @@ See [BUILDING.md](BUILDING.md) for the reproducible build and signed-update desi
 
 ## License and attribution / 许可证与致谢
 
-Quiet Control Center is derived from [v2rayN](https://github.com/2dust/v2rayN) and is distributed under the [GNU General Public License v3.0](LICENSE). The v2rayN name and upstream project belong to their respective maintainers.
-Quiet Control Center 基于 [v2rayN](https://github.com/2dust/v2rayN) 开发，并按照 [GNU GPL v3.0](LICENSE) 发布。v2rayN 名称及上游项目归其维护者所有。
+Xuantong is derived from [v2rayN](https://github.com/2dust/v2rayN) and is distributed under the [GNU General Public License v3.0](LICENSE). The v2rayN name and upstream project belong to their respective maintainers.
+玄同基于 [v2rayN](https://github.com/2dust/v2rayN) 开发，并按照 [GNU GPL v3.0](LICENSE) 发布。v2rayN 名称及上游项目归其维护者所有。

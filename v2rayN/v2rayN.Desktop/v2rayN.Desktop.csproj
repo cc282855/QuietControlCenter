@@ -5,7 +5,12 @@
 		<ApplicationIcon>Assets\v2rayN.ico</ApplicationIcon>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-		<AssemblyName>v2rayN</AssemblyName>
+		<AssemblyName>玄同</AssemblyName>
+		<RootNamespace>v2rayN</RootNamespace>
+		<Title>玄同</Title>
+		<AssemblyTitle>玄同</AssemblyTitle>
+		<Product>玄同</Product>
+		<Description>玄同</Description>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CETCompat>false</CETCompat>
 	</PropertyGroup>

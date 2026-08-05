@@ -2,6 +2,9 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
+		<Title>玄同更新助手</Title>
+		<Product>玄同</Product>
+		<Description>玄同安全更新助手</Description>
 		<ApplicationIcon>Resources\v2rayN.ico</ApplicationIcon>
 	</PropertyGroup>
 

@@ -9,7 +9,7 @@
     xmlns:resx="clr-namespace:ServiceLib.Resx;assembly=ServiceLib"
     xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
     xmlns:vms="clr-namespace:ServiceLib.ViewModels;assembly=ServiceLib"
-    Title="米卡"
+    Title="玄同"
     Width="1440"
     Height="960"
     MinWidth="1040"
@@ -63,7 +63,7 @@
                         <Border Width="28" Height="28" Background="Transparent" ClipToBounds="True" CornerRadius="8">
                             <Image Source="/Resources/MikaLogo.png" Stretch="Uniform" />
                         </Border>
-                        <TextBlock Margin="9,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="{DynamicResource QccFontHero}" FontWeight="SemiBold" Text="米卡" />
+                        <TextBlock Margin="9,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource QccDisplayFont}" FontSize="{DynamicResource QccFontHero}" FontWeight="SemiBold" Text="玄同" />
                         <TextBlock x:Name="txtAppVersion" Margin="11,1,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" />
                     </StackPanel>
 
@@ -233,7 +233,7 @@
                         <StackPanel Grid.Row="2" Margin="12,0,10,10">
                             <TextBlock Style="{StaticResource QccMutedText}" Text="核心与组件" />
                             <TextBlock Margin="0,4,0,0" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontTiny}" LineHeight="{DynamicResource QccFontBody}" Text="Xray / sing-box / mihomo" TextWrapping="Wrap" />
-                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="更新核心组件" Cursor="Hand" ToolTip="定制客户端仅通过 Quiet Control Center 完整包更新" />
+                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="更新核心组件" Cursor="Hand" ToolTip="玄同界面仅通过签名完整包更新" />
                         </StackPanel>
                     </Grid>
                 </Border>

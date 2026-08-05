@@ -150,7 +150,7 @@ def build_outputs(repo_root: Path) -> dict[Path, bytes]:
 
     manifest = {
         "schema": 1,
-        "brand": "米卡",
+        "brand": "玄同",
         "source": {
             "chroma": str(chroma_path.relative_to(repo_root)).replace("\\", "/"),
             "chromaSha256": CHROMA_SHA256,

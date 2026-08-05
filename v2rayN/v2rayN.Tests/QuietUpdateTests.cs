@@ -32,7 +32,7 @@ public sealed class QuietUpdateTests
         var waiting = latest with { LatestOfficial = "7.24.5" };
         var available = latest with { LatestOfficial = "7.24.5", LatestCustom = "7.24.4.1" };
 
-        Assert.Equal("当前已是最新版（当前 7.24.4 / 米卡最新 7.24.4）", QuietUpdateService.GetStatusMessage(latest, "v2rayN - V7.24.4 - X64"));
+        Assert.Equal("当前已是最新版（当前 7.24.4 / 玄同最新 7.24.4）", QuietUpdateService.GetStatusMessage(latest, "v2rayN - V7.24.4 - X64"));
         Assert.Equal("官方已有新版本 7.24.5，定制版正在适配", QuietUpdateService.GetStatusMessage(waiting, "7.24.4"));
         Assert.Equal("检测到定制版 7.24.4.1，正在准备更新", QuietUpdateService.GetStatusMessage(available, "7.24.4"));
         Assert.Equal("正在检查…", QuietUpdateService.GetStatusMessage(latest with { IsChecking = true }, "7.24.4"));
@@ -294,9 +294,9 @@ public sealed class QuietUpdateTests
         {
             using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, true))
             {
-                var exe = zip.CreateEntry("v2rayN.exe"); await using (var s = exe.Open()) await s.WriteAsync(payload);
+                var exe = zip.CreateEntry("玄同.exe"); await using (var s = exe.Open()) await s.WriteAsync(payload);
                 var marker = zip.CreateEntry("qcc-package.json"); await using var ms = marker.Open();
-                await JsonSerializer.SerializeAsync(ms, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["v2rayN.exe"] = payloadHash } });
+                await JsonSerializer.SerializeAsync(ms, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["玄同.exe"] = payloadHash } });
             }
             zipBytes = buffer.ToArray();
         }
@@ -305,7 +305,7 @@ public sealed class QuietUpdateTests
         var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
         var http = new RouteHttp(JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" }), JsonSerializer.SerializeToUtf8Bytes(manifest), zipBytes);
         var helper = Path.Combine(AppContext.BaseDirectory, "AmazTool.exe");
-        var origin = Path.Combine(AppContext.BaseDirectory, "v2rayN.exe");
+        var origin = Path.Combine(AppContext.BaseDirectory, "玄同.exe");
         File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "where.exe"), helper, true);
         File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "where.exe"), origin, true);
         var launcher = new FakeLauncher();
@@ -329,8 +329,8 @@ public sealed class QuietUpdateTests
         {
             using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, true))
             {
-                var exe = zip.CreateEntry("v2rayN.exe"); using (var s = exe.Open()) s.Write(payload);
-                var marker = zip.CreateEntry("qcc-package.json"); using var ms = marker.Open(); JsonSerializer.Serialize(ms, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["v2rayN.exe"] = payloadHash } });
+                var exe = zip.CreateEntry("玄同.exe"); using (var s = exe.Open()) s.Write(payload);
+                var marker = zip.CreateEntry("qcc-package.json"); using var ms = marker.Open(); JsonSerializer.Serialize(ms, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["玄同.exe"] = payloadHash } });
             }
             zipBytes = buffer.ToArray();
         }
@@ -338,7 +338,7 @@ public sealed class QuietUpdateTests
         var responses = Enumerable.Range(0, 2).SelectMany(_ => new[] { JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" }), JsonSerializer.SerializeToUtf8Bytes(manifest), zipBytes }).ToArray();
         var clock = new FakeClock(); var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
         var launcher = new FlakyLauncher(); var delay = new AdvancingDelay(clock); using var cts = new CancellationTokenSource(); delay.OnSecond = cts.Cancel;
-        var helper = Path.Combine(AppContext.BaseDirectory, "AmazTool.exe"); var origin = Path.Combine(AppContext.BaseDirectory, "v2rayN.exe");
+        var helper = Path.Combine(AppContext.BaseDirectory, "AmazTool.exe"); var origin = Path.Combine(AppContext.BaseDirectory, "玄同.exe");
         File.Copy(SystemExe("where.exe"), helper, true); File.Copy(SystemExe("where.exe"), origin, true);
         try
         {
@@ -430,9 +430,9 @@ public sealed class QuietUpdateTests
         {
             using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, true))
             {
-                var exe = zip.CreateEntry("v2rayN.exe"); await using (var stream = exe.Open()) await stream.WriteAsync(payload);
+                var exe = zip.CreateEntry("玄同.exe"); await using (var stream = exe.Open()) await stream.WriteAsync(payload);
                 var marker = zip.CreateEntry("qcc-package.json"); await using var markerStream = marker.Open();
-                await JsonSerializer.SerializeAsync(markerStream, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["v2rayN.exe"] = payloadHash } });
+                await JsonSerializer.SerializeAsync(markerStream, new { product = "QuietControlCenter", platform = "win-x64", version = "7.25.0", files = new Dictionary<string, string> { ["玄同.exe"] = payloadHash } });
             }
             zipBytes = buffer.ToArray();
         }
@@ -443,7 +443,7 @@ public sealed class QuietUpdateTests
         var store = new MemoryStore { Channel = Config("https://github.com/owner/repo/releases/download/v/manifest.json", key.ExportSubjectPublicKeyInfoPem()) };
         var http = new RouteHttp(JsonSerializer.SerializeToUtf8Bytes(new { tag_name = "7.25.0" }), JsonSerializer.SerializeToUtf8Bytes(manifest), zipBytes);
         var helper = Path.Combine(AppContext.BaseDirectory, "AmazTool.exe");
-        var origin = Path.Combine(AppContext.BaseDirectory, "v2rayN.exe");
+        var origin = Path.Combine(AppContext.BaseDirectory, "玄同.exe");
         File.Copy(SystemExe("where.exe"), helper, true);
         File.Copy(SystemExe("where.exe"), origin, true);
         try { return await new QuietUpdateService(new FakeClock(), http, store, launcher, readyTimeout).CheckAsync("7.24.3", cancellationToken); }

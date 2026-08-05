@@ -52,7 +52,7 @@
 
         <StackPanel>
             <Border Margin="4,0,4,8" Padding="10,7" Background="{StaticResource QccPrimarySoft}" CornerRadius="8">
-                <TextBlock Foreground="#FF315C9B" Text="此处仅更新代理核心与 Geo 数据；Quiet Control Center 界面仅通过定制完整包更新。" TextWrapping="Wrap" />
+                <TextBlock Foreground="#FF315C9B" Text="此处仅更新代理核心与 Geo 数据；玄同界面仅通过签名完整包更新。" TextWrapping="Wrap" />
             </Border>
             <ListView
                 x:Name="lstCheckUpdates"

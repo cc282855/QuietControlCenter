@@ -54,9 +54,9 @@ internal static class UpgradeApp
         {
             EnsureAbsent(stage, backup, failed);
             ExtractValidated(package, stage, instruction.ExpectedPackageSha256);
-            var marker = ValidateMarker(stage, instruction.ExpectedVersion, false);
+            var marker = ValidateMarker(stage, instruction.ExpectedVersion, false, instruction.MainExecutable);
             PreserveMutableData(install, stage, marker);
-            ValidateMarker(stage, instruction.ExpectedVersion, true);
+            ValidateMarker(stage, instruction.ExpectedVersion, true, instruction.MainExecutable);
 
             signalReady(new UpgradeReady(
                 instruction.Token,
@@ -176,7 +176,7 @@ internal static class UpgradeApp
         }
     }
 
-    private static PackageMarker ValidateMarker(string stage, string expectedVersion, bool allowMutableExtras)
+    private static PackageMarker ValidateMarker(string stage, string expectedVersion, bool allowMutableExtras, string mainExecutable)
     {
         var markerPath = Path.Combine(stage, "qcc-package.json");
         var marker = JsonSerializer.Deserialize<PackageMarker>(File.ReadAllText(markerPath), JsonOptions())
@@ -200,7 +200,7 @@ internal static class UpgradeApp
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (!actualFiles.SetEquals(marker.Files.Keys.Select(path => path.Replace('\\', '/'))))
             throw new InvalidDataException("Package contains unmarked payload files.");
-        if (!marker.Files.Keys.Any(k => string.Equals(k.Replace('/', Path.DirectorySeparatorChar), "v2rayN.exe", StringComparison.OrdinalIgnoreCase)))
+        if (!marker.Files.Keys.Any(k => string.Equals(k.Replace('/', Path.DirectorySeparatorChar), mainExecutable, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("Main executable is not covered by marker.");
         return marker;
     }
@@ -305,7 +305,7 @@ internal static class UpgradeApp
         public string Product { get; set; } = "";
         public string PackagePath { get; set; } = "";
         public string InstallDirectory { get; set; } = "";
-        public string MainExecutable { get; set; } = "v2rayN.exe";
+        public string MainExecutable { get; set; } = "玄同.exe";
         public string ExpectedPackageSha256 { get; set; } = "";
         public string ExpectedVersion { get; set; } = "";
         public string OriginExecutablePath { get; set; } = "";

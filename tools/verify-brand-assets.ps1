@@ -10,7 +10,7 @@ $expectedChroma = 'C4A7CBE53799F29077BEC13202C6D6C702327D9965F2F1D9B0A3378A2E025
 $expectedMaster = 'DF739064E84E9F038923268D997CD0FB1D6FBDDCA51F0B38CFE96E9BF512C9F4'
 $expectedIcon = 'D64BFDC8BF4FCA88F485A19BA65BF6F559AA68C33065FFBB79432FCEA9650B1D'
 $expectedSizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
-$mainExecutableName = ([char]0x7C73).ToString() + [char]0x5361 + '.exe'
+$mainExecutableName = ([char]0x7384).ToString() + [char]0x540C + '.exe'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }

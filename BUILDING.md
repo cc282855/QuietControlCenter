@@ -1,6 +1,6 @@
-# Quiet Control Center 7.24.3
+# 玄同 / Xuantong 构建与更新
 
-The customized UI is a maintained patch layer over upstream v2rayN. The official GUI is detection-only forever: the built-in update panel contains only core and Geo updates. A complete Quiet Control Center package is the only allowed GUI update.
+玄同的定制 UI 是维护在上游 v2rayN 之上的补丁层。官方 GUI 永远只用于版本发现；界面更新只接受本仓库签名的完整包。为兼容既有签名、仓库和已安装客户端，更新协议的内部产品标识继续使用 `QuietControlCenter`。
 
 ## Daily lifecycle
 

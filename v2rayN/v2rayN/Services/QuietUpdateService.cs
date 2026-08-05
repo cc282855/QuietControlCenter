@@ -130,6 +130,7 @@ public sealed class QuietUpdateScheduler
 
 public sealed partial class QuietUpdateService
 {
+    private const string BrandExecutableName = "玄同.exe";
     private const string OfficialQueryError = "官方版本查询失败";
     private const string CustomQueryError = "定制版查询失败";
     private const string CustomValidationError = "定制版验证失败";
@@ -262,7 +263,7 @@ public sealed partial class QuietUpdateService
             state.LatestSeenTag = release.TagName;
             if (TryParseVersion(currentVersion, out var installed) && latest > installed
                 && !string.Equals(previousOfficial, release.TagName, StringComparison.OrdinalIgnoreCase))
-                notices.Add($"检测到官方 v2rayN {release.TagName}。官方 GUI 永远不会安装；只等待已签名的 Quiet Control Center 完整包。");
+                notices.Add($"检测到官方 v2rayN {release.TagName}。官方 GUI 永远不会安装；只等待已签名的玄同完整包。");
             await PersistStateAsync(state, true, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
@@ -289,7 +290,7 @@ public sealed partial class QuietUpdateService
                         {
                             upgradeStarted = await DownloadVerifyAndLaunchAsync(manifest, channel!, token).ConfigureAwait(false);
                             if (upgradeStarted)
-                                notices.Add($"已验证 Quiet Control Center {manifest.AppVersion} 的签名、完整包哈希和产品标记，正在安全更新。");
+                                notices.Add($"已验证玄同 {manifest.AppVersion} 的签名、完整包哈希和产品标记，正在安全更新。");
                             else
                                 errors.Add(CustomInstallError);
                         }
@@ -360,7 +361,7 @@ public sealed partial class QuietUpdateService
             ValidatePackageMarker(package, manifest);
 
             var helperSource = Path.Combine(AppContext.BaseDirectory, "AmazTool.exe");
-            var originExecutable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "v2rayN.exe"));
+            var originExecutable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, BrandExecutableName));
             if (!File.Exists(helperSource) || !File.Exists(originExecutable)) throw new InvalidDataException("Updater helper or origin executable is unavailable.");
             var helper = Path.Combine(work, "AmazTool.exe"); File.Copy(helperSource, helper);
             var tokenValue = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
@@ -373,7 +374,7 @@ public sealed partial class QuietUpdateService
             var instruction = new
             {
                 schema = 1, product = "QuietControlCenter", packagePath = package, installDirectory,
-                mainExecutable = "v2rayN.exe", expectedPackageSha256 = manifest.Sha256, expectedVersion = manifest.AppVersion,
+                mainExecutable = BrandExecutableName, expectedPackageSha256 = manifest.Sha256, expectedVersion = manifest.AppVersion,
                 originExecutablePath = originExecutable, originExecutableSha256 = HashFile(originExecutable),
                 processId = current.Id, processStartTimeUtc = new DateTimeOffset(current.StartTime.ToUniversalTime(), TimeSpan.Zero), token = tokenValue, ackPath = ack
             };
@@ -451,7 +452,7 @@ public sealed partial class QuietUpdateService
         if (TryParseVersion(status.LatestOfficial, out var official) && official > installed)
             return $"官方已有新版本 {status.LatestOfficial}，定制版正在适配";
         return TryParseVersion(status.LatestCustom, out custom)
-            ? $"当前已是最新版（当前 {installed} / 米卡最新 {custom}）"
+            ? $"当前已是最新版（当前 {installed} / 玄同最新 {custom}）"
             : $"当前已是最新版（当前 {installed}）";
     }
     public static bool IsConfigured(QuietChannelConfig? c, out Uri? manifest)

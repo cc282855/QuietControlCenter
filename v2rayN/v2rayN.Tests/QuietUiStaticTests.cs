@@ -439,6 +439,24 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void XuantongExecutableName_IsConsistentAcrossUpdateAndReleaseChain()
+    {
+        var root = FindProjectRoot();
+        var service = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Services", "QuietUpdateService.cs"));
+        var helper = File.ReadAllText(Path.Combine(root, "v2rayN", "AmazTool", "UpgradeApp.cs"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "upstream-draft.yml"));
+
+        Assert.Contains("BrandExecutableName = \"玄同.exe\"", service, StringComparison.Ordinal);
+        Assert.Contains("mainExecutable = BrandExecutableName", service, StringComparison.Ordinal);
+        Assert.Contains("instruction.MainExecutable", helper, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"v2rayN.exe\", StringComparison.OrdinalIgnoreCase", helper, StringComparison.Ordinal);
+        Assert.Contains("Join-Path $smokeRoot '玄同.exe'", workflow, StringComparison.Ordinal);
+        Assert.Contains("Join-Path $qaRoot '玄同.exe'", workflow, StringComparison.Ordinal);
+        Assert.Contains("product = 'QuietControlCenter'", workflow, StringComparison.Ordinal);
+        Assert.Contains("QuietControlCenter-$version-win-x64.zip", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindow_AllQccStaticResourcesAreDefinedAtApplicationScope()
     {
         var root = FindProjectRoot();
@@ -463,7 +481,7 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
-    public void MainWindow_UsesMikaBrandAndLogoAssets()
+    public void MainWindow_UsesXuantongBrandAndLogoAssets()
     {
         var root = FindProjectRoot();
         var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
@@ -471,12 +489,17 @@ public sealed class QuietUiStaticTests
         var project = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "v2rayN.csproj"));
         var resources = Path.Combine(root, "v2rayN", "v2rayN", "Resources");
 
-        Assert.Contains("Title=\"米卡\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"米卡\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"玄同\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"玄同\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Source=\"/Resources/MikaLogo.png\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Kind=\"ShieldCheck\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Title = $\"米卡 -", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("Title = $\"玄同 -", codeBehind, StringComparison.Ordinal);
         Assert.Contains("<ApplicationIcon>Resources\\v2rayN.ico</ApplicationIcon>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyName>玄同</AssemblyName>", project, StringComparison.Ordinal);
+        Assert.Contains("<RootNamespace>v2rayN</RootNamespace>", project, StringComparison.Ordinal);
+        Assert.Contains("<Title>玄同</Title>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyTitle>玄同</AssemblyTitle>", project, StringComparison.Ordinal);
+        Assert.Contains("<Product>玄同</Product>", project, StringComparison.Ordinal);
         Assert.Contains("<Resource Include=\"Resources\\MikaLogo.png\" />", project, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(resources, "MikaLogo.png")));
         Assert.True(File.Exists(Path.Combine(resources, "v2rayN.ico")));
@@ -735,6 +758,12 @@ public sealed class QuietUiStaticTests
         var amazProject = File.ReadAllText(Path.Combine(root, "v2rayN", "AmazTool", "AmazTool.csproj"));
         Assert.Contains("<ApplicationIcon>Resources\\v2rayN.ico</ApplicationIcon>", amazProject, StringComparison.Ordinal);
         Assert.Contains("<EmbeddedResource Include=\"Resources\\v2rayN.ico\">", amazProject, StringComparison.Ordinal);
+        Assert.Contains("<Product>玄同</Product>", amazProject, StringComparison.Ordinal);
+
+        var desktopProject = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN.Desktop", "v2rayN.Desktop.csproj"));
+        Assert.Contains("<AssemblyName>玄同</AssemblyName>", desktopProject, StringComparison.Ordinal);
+        Assert.Contains("<RootNamespace>v2rayN</RootNamespace>", desktopProject, StringComparison.Ordinal);
+        Assert.Contains("<Product>玄同</Product>", desktopProject, StringComparison.Ordinal);
     }
 
     [Fact]
