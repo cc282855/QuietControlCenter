@@ -272,7 +272,13 @@
                                         <TextBlock x:Name="txtHeroConnectionState" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" FontWeight="SemiBold" Text="未连接" />
                                     </Border>
                                 </Grid>
-                                <TextBlock Margin="0,4,0,0" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="连接状态由当前活动配置实时同步" TextWrapping="Wrap" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    Foreground="{StaticResource QccMuted}"
+                                    FontSize="{DynamicResource QccFontSmall}"
+                                    Text="{Binding ProfilesViewModel.ActiveSubscriptionDisplay, FallbackValue=订阅：—}"
+                                    TextTrimming="CharacterEllipsis"
+                                    ToolTip="{Binding ProfilesViewModel.ActiveSubscriptionDisplay}" />
                             </StackPanel>
 
                             <Border x:Name="cardSubscriptionQuota" Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource QccCard}">

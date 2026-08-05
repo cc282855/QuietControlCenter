@@ -40,6 +40,9 @@ public class ProfilesViewModel : MyReactiveObject
     [Reactive]
     public string ActiveProfileRemarks { get; set; }
 
+    [Reactive]
+    public string ActiveSubscriptionDisplay { get; set; }
+
     public IList<ProfileItemModel> SelectedProfiles { get; set; }
 
     [Reactive]
@@ -439,6 +442,21 @@ public class ProfilesViewModel : MyReactiveObject
         var lstModel = await GetProfileItemsEx(_config.SubIndexId, _serverFilter);
         var activeProfile = await AppManager.Instance.GetProfileItem(_config.IndexId);
         ActiveProfileRemarks = activeProfile?.Remarks ?? "尚未连接";
+        if (activeProfile is null)
+        {
+            ActiveSubscriptionDisplay = "订阅：—";
+        }
+        else if (activeProfile.Subid.IsNullOrEmpty())
+        {
+            ActiveSubscriptionDisplay = "订阅：本地节点";
+        }
+        else
+        {
+            var activeSubscription = await AppManager.Instance.GetSubItem(activeProfile.Subid);
+            ActiveSubscriptionDisplay = activeSubscription is null
+                ? "订阅：来源已移除"
+                : SubscriptionSourceDisplay.Format(activeSubscription.Remarks);
+        }
         _lstProfile = JsonUtils.Deserialize<List<ProfileItem>>(JsonUtils.Serialize(lstModel)) ?? [];
 
         var availableCodes = CountryClassifier.GetAvailableCodes(lstModel ?? [], item => item.Remarks, item => item.Address);

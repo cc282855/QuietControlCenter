@@ -584,9 +584,14 @@ public sealed class QuietUiStaticTests
         var profilesCodeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml.cs"));
 
         Assert.Contains("public string ActiveProfileRemarks", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("public string ActiveSubscriptionDisplay", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("GetProfileItem(_config.IndexId)", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("GetSubItem(activeProfile.Subid)", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionSourceDisplay.Format(activeSubscription.Remarks)", profilesViewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("SubscriptionSourceDisplay.Format(activeSubscription.Remarks, activeSubscription.Url)", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("ActiveProfileRemarks = activeProfile?.Remarks ?? \"尚未连接\"", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("ProfilesViewModel.ActiveProfileRemarks", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("ProfilesViewModel.ActiveSubscriptionDisplay", mainWindow, StringComparison.Ordinal);
         Assert.DoesNotContain("ProfilesViewModel.SelectedProfile.Remarks", mainWindow, StringComparison.Ordinal);
 
         Assert.Contains("ActiveNodeMarkerConverter", profilesView, StringComparison.Ordinal);

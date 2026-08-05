@@ -70,6 +70,17 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Active subscription name display verification — 2026-08-05
+
+- The current-node card now resolves the real active profile's subscription and displays only its trimmed remarks as `订阅：名称`. The formatter accepts no URL argument, so domains, paths, query strings and tokens cannot enter this UI text path. Local nodes, removed sources, no active node and unnamed subscriptions use explicit Chinese placeholders.
+- Release solution build for `7.24.4.17`: exit 0, 0 warnings and 0 errors. `ServiceLib.Tests`: 202/202. `v2rayN.Tests`: 72/72. `git diff --check`: exit 0.
+- Public marker: `QuietControlCenter / win-x64 / 7.24.4.17`; ZIP entries 36, marker payload hashes 35/35, clean-package mismatches 0, ZIP mismatches 0, and forbidden/private runtime entries 0. ZIP SHA-256: `AED18BF66C303CBB680E2BAFC4F320DD6D69EDF9F0A6F0C5ED48A22EB48B1A11`; size 190,875,149 bytes.
+- Windows `mt.exe` extracted both clean and local executable manifests; both report `requireAdministrator` with `uiAccess=false`. The packaged executable file version is `7.24.4.17`.
+- The local continuity database was created from the currently used `7.24.4.15` data with SQLite online backup; integrity is `ok`, with 2 subscription rows and 174 profile rows. No subscription value was inspected or printed. The public ZIP and clean package contain no configuration database, logs, key material or `guiConfigs` directory.
+- The task did not launch, stop, restart, signal or overwrite the active Mika PID 85116 or sing-box PID 83768. The new `7.24.4.17` executable was not launched.
+
+final result: passed
+
 ## Active-node truth and activation verification — 2026-08-05
 
 - The previous hero label was bound to `SelectedProfile.Remarks`, so a single row click made the heading look like the selected row was active even though the persisted `Config.IndexId` and running sing-box outbound remained unchanged. The active runtime check proved the mismatch: the selected quota row used port 58511 while `Config.IndexId` and the generated sing-box `proxy` outbound used the profile `日本1 高速中转A` on port 8819.
