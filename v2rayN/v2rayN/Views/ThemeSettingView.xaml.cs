@@ -7,12 +7,25 @@ namespace v2rayN.Views;
 /// </summary>
 public partial class ThemeSettingView
 {
+    private sealed record ThemeOption(string Value, string Display);
+
     public ThemeSettingView()
     {
         InitializeComponent();
         ViewModel = new ThemeSettingViewModel();
 
-        cmbCurrentTheme.ItemsSource = Utils.GetEnumNames<ETheme>().Take(3).ToList();
+        cmbCurrentTheme.ItemsSource = new[]
+        {
+            new ThemeOption(nameof(ETheme.FollowSystem), "跟随系统"),
+            new ThemeOption(nameof(ETheme.Light), "浅色"),
+            new ThemeOption(nameof(ETheme.Dark), "深色"),
+            new ThemeOption(nameof(ETheme.Aquatic), "水蓝"),
+            new ThemeOption(nameof(ETheme.Desert), "沙漠"),
+            new ThemeOption(nameof(ETheme.Dusk), "黄昏"),
+            new ThemeOption(nameof(ETheme.NightSky), "夜空"),
+        };
+        cmbCurrentTheme.DisplayMemberPath = nameof(ThemeOption.Display);
+        cmbCurrentTheme.SelectedValuePath = nameof(ThemeOption.Value);
         cmbCurrentFontSize.ItemsSource = Enumerable.Range(Global.MinFontSize, Global.MinFontSizeCount).ToList();
         cmbCurrentLanguage.ItemsSource = Global.Languages;
 

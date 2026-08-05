@@ -91,19 +91,71 @@ public sealed class QuietUiStaticTests
         var mainXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
         var profilesXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
 
-        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"120\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"96\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtHeroNodeName\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"18\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"{DynamicResource QccFontHero}\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"Wrap\"", mainXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxWidth=\"220\"", mainXaml, StringComparison.Ordinal);
 
-        Assert.Contains("x:Name=\"colProfileInspector\" Width=\"320\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"colProfileInspector\" Width=\"268\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtInspectorNodeName\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"txtInspectorAddress\"", profilesXaml, StringComparison.Ordinal);
-        Assert.Contains("<RowDefinition Height=\"22\" />", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("<RowDefinition Height=\"20\" />", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("QccCompactSecondaryButton", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("QccCompactPrimaryButton", profilesXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxWidth=\"205\"", profilesXaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_UsesResponsiveTypographyAndACompleteCompactStatusBar()
+    {
+        var root = FindProjectRoot();
+        var mainXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var mainCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+        var profilesXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
+        var statusXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "StatusBarView.xaml"));
+        var themeXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Resources", "QuietControlTheme.xaml"));
+
+        Assert.Contains("SizeChanged=\"MainWindow_SizeChanged\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"132\" />", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("<RowDefinition Height=\"72\" />", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("ApplyResponsiveTypography(e.NewSize.Width, e.NewSize.Height)", mainCode, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(rawScale, 0.92d, 1.18d)", mainCode, StringComparison.Ordinal);
+        Assert.Contains("Math.Round(scale * 20d", mainCode, StringComparison.Ordinal);
+        Assert.Contains("Resources[\"StdFontSize\"]", mainCode, StringComparison.Ordinal);
+
+        foreach (var key in new[]
+                 {
+                     "QccFontTiny", "QccFontSmall", "QccFontBody", "QccFontStrong",
+                     "QccFontTitle", "QccFontHero", "QccFontLarge", "QccLineTitle", "QccLineHero"
+                 })
+        {
+            Assert.Contains($"x:Key=\"{key}\"", themeXaml, StringComparison.Ordinal);
+        }
+
+        var persistentStatus = statusXaml[..statusXaml.IndexOf("<tb:TaskbarIcon", StringComparison.Ordinal)];
+        Assert.Contains("<RowDefinition Height=\"24\" />", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("Text=\"系统代理与 TUN 实时同步\"", persistentStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain("HintAssist.Hint", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"1\"", persistentStatus, StringComparison.Ordinal);
+        Assert.Contains("Height=\"32\"", persistentStatus, StringComparison.Ordinal);
+
+        var profileFilters = profilesXaml[profilesXaml.IndexOf("<!-- Search and filters -->", StringComparison.Ordinal)
+            ..profilesXaml.IndexOf("<DataGrid", StringComparison.Ordinal)];
+        Assert.Contains("<ColumnDefinition Width=\"160\" />", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"国家/地区\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"订阅分组\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("Text=\"全部地区\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("Path=SelectedIndex", profileFilters, StringComparison.Ordinal);
+        Assert.DoesNotContain("HintAssist.Hint=\"国家/地区\"", profileFilters, StringComparison.Ordinal);
+        Assert.DoesNotContain("HintAssist.Hint=\"所有分组\"", profileFilters, StringComparison.Ordinal);
+
+        var inspectorRows = profilesXaml[profilesXaml.IndexOf("<!-- Selected node inspector -->", StringComparison.Ordinal)..];
+        var actionBorderIndex = inspectorRows.IndexOf("<Border Grid.Row=\"2\" Padding=\"10,7\"", StringComparison.Ordinal);
+        var actionsIndex = inspectorRows.IndexOf("Text=\"节点操作\"", StringComparison.Ordinal);
+        Assert.True(actionBorderIndex >= 0 && actionsIndex > actionBorderIndex);
+        Assert.True(inspectorRows.Split("<RowDefinition Height=\"Auto\" />", StringSplitOptions.None).Length >= 4);
+        Assert.Contains("<RowDefinition Height=\"*\" />", inspectorRows, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -132,6 +184,89 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void SubscriptionNavigation_ExposesAProxiedUpdateButton()
+    {
+        var root = FindProjectRoot();
+        var mainXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var mainCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+
+        var subscriptionIndex = mainXaml.IndexOf("x:Name=\"btnNavSubscription\"", StringComparison.Ordinal);
+        var updateIndex = mainXaml.IndexOf("x:Name=\"btnNavSubscriptionUpdate\"", StringComparison.Ordinal);
+        var routingIndex = mainXaml.IndexOf("x:Name=\"btnNavRouting\"", StringComparison.Ordinal);
+        Assert.True(subscriptionIndex >= 0 && updateIndex > subscriptionIndex && routingIndex > updateIndex);
+        Assert.Contains("Text=\"更新订阅\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"通过本地代理更新全部已启用订阅\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("vm => vm.SubUpdateViaProxyCmd, v => v.btnNavSubscriptionUpdate", mainCode, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConnectionSummary_SubscriptionQuotaIsBoundedThrottledAndQaDeterministic()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+
+        var nodeIndex = xaml.IndexOf("x:Name=\"txtHeroNodeName\"", StringComparison.Ordinal);
+        var quotaIndex = xaml.IndexOf("x:Name=\"cardSubscriptionQuota\"", StringComparison.Ordinal);
+        var metricsIndex = xaml.IndexOf("x:Name=\"txtHeroProxySpeed\"", StringComparison.Ordinal);
+        Assert.True(nodeIndex >= 0 && quotaIndex > nodeIndex && metricsIndex > quotaIndex);
+        Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"96\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"148\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"194\" />", xaml, StringComparison.Ordinal);
+        foreach (var name in new[]
+                 {
+                     "cardSubscriptionQuota", "txtSubscriptionQuotaPrimary",
+                     "txtSubscriptionQuotaSecondary", "btnSubscriptionQuotaRefresh"
+                 })
+        {
+            Assert.Contains($"x:Name=\"{name}\"", xaml, StringComparison.Ordinal);
+        }
+        Assert.Contains("Text=\"订阅余量\"", xaml, StringComparison.Ordinal);
+
+        Assert.Contains("SubscriptionQuotaRefreshInterval = TimeSpan.FromMinutes(5)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("_subscriptionQuotaSingleFlight", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("CancelSubscriptionQuotaRequest", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("var currentProfileId = _config.IndexId", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("GetProfileItem(profileId)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("activeProfile?.Subid", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("subscription.Enabled", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("subscription.Url", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("subscription.UserAgent", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("subscription.MoreUrl", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("subscription.Convert", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("useLocalSocksProxy: true", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("CoreManager.Instance.IsRunning", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("_subscriptionQuotaLastCompletedUtc = null", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("_subscriptionQuotaLastCompletedUtc = DateTimeOffset.UtcNow", codeBehind, StringComparison.Ordinal);
+
+        var quotaCodeStart = codeBehind.IndexOf("private void SubscriptionQuotaRefresh_Click", StringComparison.Ordinal);
+        var quotaCodeEnd = codeBehind.IndexOf("private void ApplyQaQualitySampleIfRequested", quotaCodeStart, StringComparison.Ordinal);
+        var quotaCode = codeBehind[quotaCodeStart..quotaCodeEnd];
+        Assert.DoesNotContain("SubIndexId", quotaCode, StringComparison.Ordinal);
+
+        var timerStart = codeBehind.IndexOf("private async void LiveMetricsTimer_Tick", StringComparison.Ordinal);
+        var timerEnd = codeBehind.IndexOf("private void ResetHeroQualityMetrics", timerStart, StringComparison.Ordinal);
+        var timerMethod = codeBehind[timerStart..timerEnd];
+        Assert.Contains("UpdateSubscriptionQuotaAgeAndSchedule()", timerMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("FetchAsync", timerMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetSubItem", timerMethod, StringComparison.Ordinal);
+
+        Assert.Contains("--qcc-qa-quota-sample", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("\"success\" =>", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("\"unsupported\" =>", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("\"expired\" =>", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("不读取配置或网络", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaQaRenderTime", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("new(2026, 8, 4, 8, 0, 0, TimeSpan.Zero)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("RenderSubscriptionQuotaResult(_subscriptionQuotaResult, SubscriptionQuotaQaRenderTime)", codeBehind, StringComparison.Ordinal);
+        var qaMethodStart = codeBehind.IndexOf("private bool ApplyQaSubscriptionQuotaSampleIfRequested", StringComparison.Ordinal);
+        var qaMethodEnd = codeBehind.IndexOf("private void ApplyQaQualitySampleIfRequested", qaMethodStart, StringComparison.Ordinal);
+        var qaMethod = codeBehind[qaMethodStart..qaMethodEnd];
+        Assert.Contains("var now = SubscriptionQuotaQaRenderTime", qaMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("DateTimeOffset.UtcNow", qaMethod, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SoftwareUpdatePopup_HasPersistentStatusContractAndSharedService()
     {
         var root = FindProjectRoot();
@@ -139,7 +274,7 @@ public sealed class QuietUiStaticTests
         var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
 
         var softwareUpdateIndex = xaml.IndexOf("x:Name=\"pbQuietUpdate\"", StringComparison.Ordinal);
-        var coreUpdateIndex = xaml.IndexOf("x:Name=\"menuCheckUpdate\"", StringComparison.Ordinal);
+        var coreUpdateIndex = xaml.IndexOf("x:Name=\"pbCoreUpdate\"", StringComparison.Ordinal);
         Assert.True(softwareUpdateIndex >= 0 && coreUpdateIndex > softwareUpdateIndex);
         Assert.Contains("Text=\"软件更新\"", xaml, StringComparison.Ordinal);
         foreach (var name in new[]
@@ -160,6 +295,13 @@ public sealed class QuietUiStaticTests
         Assert.Contains("HandleQuietUpdateResultAsync", codeBehind, StringComparison.Ordinal);
         Assert.Contains("QuietUpdatePopup_Opened", codeBehind, StringComparison.Ordinal);
         Assert.Contains("QuietUpdateService.GetStatusMessage", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"contentCoreUpdate\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CoreUpdatePopup_Opened", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("PrepareCoreUpdatePopup", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.ApplicationIdle", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("pbCoreUpdate.IsPopupOpen = true", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("--qcc-qa-open-core-update", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("DialogHost.Show(_checkUpdateView", codeBehind, StringComparison.Ordinal);
         var clickHandler = codeBehind[codeBehind.IndexOf("private async void QuietUpdateCheckNow_Click", StringComparison.Ordinal)..];
         Assert.True(clickHandler.Split("pbQuietUpdate.IsPopupOpen = true;", StringSplitOptions.None).Length >= 3);
         Assert.Contains("更新检查失败，请稍后重试", clickHandler, StringComparison.Ordinal);
@@ -174,9 +316,11 @@ public sealed class QuietUiStaticTests
         Assert.Contains("x:Name=\"windowOutline\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderBrush=\"#FFD8DCE2\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderThickness=\"1\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"12\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"10\" />", theme, StringComparison.Ordinal);
-        Assert.Contains("DropShadowEffect", theme, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"16\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"12\" />", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("DropShadowEffect", theme, StringComparison.Ordinal);
+        Assert.Contains("UseLayoutRounding", theme, StringComparison.Ordinal);
+        Assert.Contains("QccSurfaceRaisedColor", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("txtQuietUpdateEvidence", xaml, StringComparison.Ordinal);
     }
 
@@ -269,6 +413,31 @@ public sealed class QuietUiStaticTests
         Assert.True(
             captureMethod.IndexOf("pbQuietUpdate.IsPopupOpen = true;", StringComparison.Ordinal)
             < captureMethod.IndexOf("UpdateLayout();", captureMethod.IndexOf("pbQuietUpdate.IsPopupOpen = true;", StringComparison.Ordinal), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MikaTaskbarAndTrayIconPolicy_LeavesMenuIconsUnchanged()
+    {
+        var root = FindProjectRoot();
+        var appXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "App.xaml"));
+        var mainWindow = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var windowsManager = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Manager", "WindowsManager.cs"));
+        var resources = Path.Combine(root, "v2rayN", "v2rayN", "Resources");
+
+        Assert.Contains("Icon=\"/Resources/v2rayN.ico\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("pack://application:,,,/Resources/v2rayN.ico", windowsManager, StringComparison.Ordinal);
+        Assert.Contains("Task.FromResult(Properties.Resources.NotifyIcon1)", windowsManager, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetNotifyIcon4Routing", windowsManager, StringComparison.Ordinal);
+        Assert.DoesNotContain("CustomIcon", windowsManager, StringComparison.Ordinal);
+        Assert.DoesNotContain("Utils.GetPath", windowsManager, StringComparison.Ordinal);
+        Assert.DoesNotContain("Source=\"/Resources/MikaLogo.png\"", appXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Style TargetType=\"{x:Type materialDesign:PackIcon}\">", appXaml, StringComparison.Ordinal);
+
+        var appIcon = File.ReadAllBytes(Path.Combine(resources, "v2rayN.ico"));
+        foreach (var name in new[] { "NotifyIcon1.ico", "NotifyIcon2.ico", "NotifyIcon3.ico", "NotifyIcon4.ico" })
+        {
+            Assert.True(appIcon.SequenceEqual(File.ReadAllBytes(Path.Combine(resources, name))), $"{name} must use the Mika tray icon.");
+        }
     }
 
     private static string FindProjectRoot()

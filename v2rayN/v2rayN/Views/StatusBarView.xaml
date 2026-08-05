@@ -14,78 +14,80 @@
     x:TypeArguments="vms:StatusBarViewModel"
     Style="{StaticResource ViewGlobal}"
     mc:Ignorable="d">
-    <Grid Background="White">
+    <Grid Background="{StaticResource QccSurface}">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
-            <RowDefinition Height="34" />
+            <RowDefinition Height="24" />
         </Grid.RowDefinitions>
         <Border BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
-            <Grid Margin="18,10">
+            <Grid Margin="10,4">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.05*" />
-                    <ColumnDefinition Width="0.85*" />
-                    <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="1.2*" />
+                    <ColumnDefinition Width="0.9*" />
+                    <ColumnDefinition Width="1.2*" />
+                    <ColumnDefinition Width="1.55*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Padding="0,0,20,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Foreground="{StaticResource QccText}" FontSize="13" FontWeight="SemiBold" Text="系统代理" />
+                <Border Grid.Column="0" Padding="0,0,10,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccText}" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="系统代理" />
                         <ComboBox
                             x:Name="cmbSystemProxy"
-                            Height="36"
-                            Margin="0,7,0,0"
-                            Padding="10,3"
-                            materialDesign:HintAssist.Hint="{x:Static resx:ResUI.menuSystemproxy}"
+                            Grid.Column="1"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Padding="8,2"
                             AutomationProperties.Name="{x:Static resx:ResUI.menuSystemproxy}"
-                            FontSize="13"
+                            FontSize="{DynamicResource QccFontBody}"
                             Style="{StaticResource MaterialDesignOutlinedComboBox}">
                             <ComboBoxItem Content="{x:Static resx:ResUI.menuSystemProxyClear}" />
                             <ComboBoxItem Content="{x:Static resx:ResUI.menuSystemProxySet}" />
                             <ComboBoxItem Content="{x:Static resx:ResUI.menuSystemProxyNothing}" />
                             <ComboBoxItem Content="{x:Static resx:ResUI.menuSystemProxyPac}" />
                         </ComboBox>
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Border Grid.Column="1" Padding="20,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
-                    <StackPanel x:Name="spEnableTun" VerticalAlignment="Center">
-                        <TextBlock Foreground="{StaticResource QccText}" FontSize="13" FontWeight="SemiBold" Text="TUN 模式" />
-                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                <Border Grid.Column="1" Padding="10,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
+                    <StackPanel x:Name="spEnableTun" VerticalAlignment="Center" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccText}" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="TUN 模式" />
+                        <StackPanel Margin="8,0,0,0" VerticalAlignment="Center" Orientation="Horizontal">
                             <ToggleButton
                                 x:Name="togEnableTun"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 AutomationProperties.Name="{x:Static resx:ResUI.TbEnableTunAs}" />
-                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="12" Text="{x:Static resx:ResUI.TbEnableTunAs}" />
+                            <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="{x:Static resx:ResUI.TbEnableTunAs}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Padding="20,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Foreground="{StaticResource QccText}" FontSize="13" FontWeight="SemiBold" Text="路由模式" />
+                <Border Grid.Column="2" Padding="10,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccText}" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="路由模式" />
                         <ComboBox
                             x:Name="cmbRoutings2"
-                            Height="36"
-                            Margin="0,7,0,0"
-                            Padding="10,3"
-                            materialDesign:HintAssist.Hint="{x:Static resx:ResUI.menuRouting}"
+                            Grid.Column="1"
+                            Height="32"
+                            Margin="8,0,0,0"
+                            Padding="8,2"
                             AutomationProperties.Name="{x:Static resx:ResUI.menuRouting}"
                             DisplayMemberPath="Remarks"
-                            FontSize="13"
+                            FontSize="{DynamicResource QccFontBody}"
                             Style="{StaticResource MaterialDesignOutlinedComboBox}" />
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
-                <StackPanel Grid.Column="3" Margin="20,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Foreground="{StaticResource QccText}" FontSize="13" FontWeight="SemiBold" Text="端口状态" />
-                    <Grid Margin="0,7,0,0">
-                        <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                        <TextBlock x:Name="txtInboundDisplay" Foreground="{StaticResource QccMuted}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="txtInboundLanDisplay" Grid.Row="1" Margin="0,7,0,0" Foreground="{StaticResource QccMuted}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                    </Grid>
-                </StackPanel>
+                <Grid Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccText}" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="端口状态" />
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="txtInboundDisplay" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="txtInboundLanDisplay" Margin="0,2,0,0" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
 
                 <StackPanel Visibility="Collapsed">
                     <TextBlock x:Name="txtSpeedProxyDisplay" />
@@ -96,21 +98,21 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Background="#FFFBFCFE" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
-            <Grid Margin="18,0">
+        <Border Grid.Row="1" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
+            <Grid Margin="10,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="1.15*" />
                     <ColumnDefinition Width="1*" />
                     <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                    <Ellipse Width="8" Height="8" Margin="0,0,8,0" Fill="{StaticResource QccMuted}" />
-                    <TextBlock x:Name="txtBottomRunningStatus" Foreground="{StaticResource QccMuted}" FontSize="12" Text="未连接" TextTrimming="CharacterEllipsis" />
+                    <Ellipse Width="7" Height="7" Margin="0,0,6,0" Fill="{StaticResource QccMuted}" />
+                    <TextBlock x:Name="txtBottomRunningStatus" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="未连接" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="12" Text="{Binding InboundDisplay, StringFormat=本地：{0}, FallbackValue=本地：—}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="12" Text="{Binding SelectedRouting.Remarks, StringFormat=路由：{0}, FallbackValue=路由：—}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="12" Text="系统代理 / TUN 状态实时同步" />
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="{Binding InboundDisplay, StringFormat=本地：{0}, FallbackValue=本地：—}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="{Binding SelectedRouting.Remarks, StringFormat=路由：{0}, FallbackValue=路由：—}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="3" Margin="12,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="系统代理与 TUN 实时同步" />
             </Grid>
         </Border>
 

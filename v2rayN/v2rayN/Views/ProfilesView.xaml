@@ -13,7 +13,7 @@
     d:DesignHeight="560"
     d:DesignWidth="1240"
     x:TypeArguments="vms:ProfilesViewModel"
-    Background="White"
+    Background="{StaticResource QccSurface}"
     FontFamily="{StaticResource QccFont}"
     mc:Ignorable="d">
 
@@ -22,45 +22,45 @@
         <local:DelayDisplayConverter x:Key="DelayDisplayConverter" />
         <local:SpeedDisplayConverter x:Key="SpeedDisplayConverter" />
         <Style x:Key="QccInspectorLabel" TargetType="TextBlock" BasedOn="{StaticResource QccMutedText}">
-            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontSize" Value="{DynamicResource QccFontSmall}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="QccInspectorValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="QccCompactSecondaryButton" TargetType="Button" BasedOn="{StaticResource QccSecondaryButton}">
             <Setter Property="Height" Value="32" />
             <Setter Property="Padding" Value="8,0" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
         </Style>
         <Style x:Key="QccCompactPrimaryButton" TargetType="Button" BasedOn="{StaticResource QccPrimaryButton}">
             <Setter Property="Height" Value="32" />
             <Setter Property="Padding" Value="8,0" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
         </Style>
     </UserControl.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition x:Name="colProfileInspector" Width="320" />
+            <ColumnDefinition x:Name="colProfileInspector" Width="268" />
         </Grid.ColumnDefinitions>
 
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="66" />
+                <RowDefinition Height="56" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="40" />
+                <RowDefinition Height="36" />
             </Grid.RowDefinitions>
 
             <!-- Search and filters -->
             <Border Grid.Row="0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,1">
-                <Grid Margin="12,12">
+                <Grid Margin="10,9">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="1.65*" />
-                        <ColumnDefinition Width="130" />
+                        <ColumnDefinition Width="160" />
                         <ColumnDefinition Width="1.05*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -69,7 +69,7 @@
                     <Button
                         x:Name="btnProfileColumns"
                         Width="36"
-                        Height="40"
+                        Height="34"
                         Margin="0,0,8,0"
                         Style="{StaticResource QccIconButton}"
                         ToolTip="显示或隐藏节点字段">
@@ -92,30 +92,51 @@
                     <TextBox
                         x:Name="txtServerFilter"
                         Grid.Column="1"
-                        Height="40"
+                        Height="34"
                         Padding="12,8"
                         VerticalContentAlignment="Center"
+                        FontSize="{DynamicResource QccFontBody}"
                         materialDesign:HintAssist.Hint="搜索节点（名称、备注、地址）"
                         materialDesign:TextFieldAssist.HasClearButton="True"
                         Style="{StaticResource MaterialDesignOutlinedTextBox}" />
-                    <ComboBox
-                        x:Name="lstCountry"
-                        Grid.Column="2"
-                        Height="40"
-                        Margin="10,0,0,0"
-                        Padding="10,4"
-                        DisplayMemberPath="DisplayName"
-                        SelectedValuePath="Code"
-                        materialDesign:HintAssist.Hint="国家/地区"
-                        Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+                    <Grid Grid.Column="2" Margin="10,0,0,0">
+                        <ComboBox
+                            x:Name="lstCountry"
+                            Height="34"
+                            Padding="10,4"
+                            AutomationProperties.Name="国家/地区"
+                            DisplayMemberPath="DisplayName"
+                            FontSize="{DynamicResource QccFontBody}"
+                            SelectedValuePath="Code"
+                            Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+                        <TextBlock
+                            Margin="11,0,30,0"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource QccMuted}"
+                            FontSize="{DynamicResource QccFontSmall}"
+                            IsHitTestVisible="False"
+                            Text="全部地区">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=lstCountry, Path=SelectedIndex}" Value="-1">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
                     <ComboBox
                         x:Name="lstGroup"
                         Grid.Column="3"
-                        Height="40"
+                        Height="34"
                         Margin="10,0,0,0"
                         Padding="10,4"
+                        AutomationProperties.Name="订阅分组"
                         DisplayMemberPath="Remarks"
-                        materialDesign:HintAssist.Hint="所有分组"
+                        FontSize="{DynamicResource QccFontBody}"
                         Style="{StaticResource MaterialDesignOutlinedComboBox}" />
                     <Button x:Name="btnEditSub" Grid.Column="4" Margin="6,0,0,0" Style="{StaticResource QccIconButton}" ToolTip="编辑订阅">
                         <materialDesign:PackIcon Width="19" Height="19" Kind="PlaylistEdit" />
@@ -134,22 +155,22 @@
                 x:Name="lstProfiles"
                 Grid.Row="1"
                 AutoGenerateColumns="False"
-                Background="White"
+                Background="{StaticResource QccSurface}"
                 BorderThickness="0"
                 CanUserAddRows="False"
                 CanUserDeleteRows="False"
                 CanUserReorderColumns="True"
                 CanUserResizeRows="False"
                 CanUserSortColumns="False"
-                ColumnHeaderHeight="38"
+                ColumnHeaderHeight="34"
                 EnableRowVirtualization="True"
-                FontSize="13"
+                FontSize="{DynamicResource QccFontBody}"
                 GridLinesVisibility="Horizontal"
                 HeadersVisibility="Column"
                 HorizontalGridLinesBrush="{StaticResource QccBorder}"
                 IsReadOnly="True"
                 RowHeaderWidth="0"
-                RowHeight="39"
+                RowHeight="34"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 SelectionMode="Extended"
@@ -158,14 +179,14 @@
                 VerticalGridLinesBrush="Transparent">
                 <DataGrid.Resources>
                     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
-                        <Setter Property="Background" Value="#FFFBFCFE" />
+                        <Setter Property="Background" Value="{StaticResource QccSurfaceRaised}" />
                         <Setter Property="Foreground" Value="{StaticResource QccMuted}" />
                         <Setter Property="FontWeight" Value="SemiBold" />
                         <Setter Property="Padding" Value="12,0" />
                         <EventSetter Event="Click" Handler="LstProfiles_ColumnHeader_Click" />
                     </Style>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource MaterialDesignDataGridRow}">
-                        <Setter Property="Background" Value="White" />
+                        <Setter Property="Background" Value="{StaticResource QccSurface}" />
                         <Setter Property="BorderThickness" Value="0" />
                         <EventSetter Event="MouseDoubleClick" Handler="LstProfiles_MouseDoubleClick" />
                         <Style.Triggers>
@@ -254,7 +275,7 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <Border Grid.Row="1" Panel.ZIndex="2" Background="White">
+            <Border Grid.Row="1" Panel.ZIndex="2" Background="{StaticResource QccSurface}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Collapsed" />
@@ -269,19 +290,19 @@
                     <Border Width="54" Height="54" HorizontalAlignment="Center" Background="{StaticResource QccPrimarySoft}" CornerRadius="18">
                         <materialDesign:PackIcon Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource QccPrimary}" Kind="ServerNetworkOff" />
                     </Border>
-                    <TextBlock Margin="0,16,0,0" HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="还没有可用节点" />
+                    <TextBlock Margin="0,16,0,0" HorizontalAlignment="Center" FontSize="{DynamicResource QccFontLarge}" FontWeight="SemiBold" Text="还没有可用节点" />
                     <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="{StaticResource QccMuted}" Text="添加订阅后同步节点，或右键列表导入本地配置。" TextAlignment="Center" TextWrapping="Wrap" />
                     <Button x:Name="btnEmptyAddSub" Margin="0,18,0,0" HorizontalAlignment="Center" Style="{StaticResource QccPrimaryButton}" Content="添加订阅" />
                 </StackPanel>
             </Border>
 
             <Border Grid.Row="2" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,1,0">
-                <Grid Margin="18,0">
+                <Grid Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="12" Text="选择节点后可在右侧查看详情；双击可按当前偏好激活或编辑" TextTrimming="CharacterEllipsis" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="选择节点后可在右侧查看详情；双击可按当前偏好激活或编辑" TextTrimming="CharacterEllipsis" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button x:Name="btnFastRealPing" VerticalAlignment="Center" Style="{StaticResource QccSecondaryButton}">
                             <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="TimerOutline" /><TextBlock VerticalAlignment="Center" Text="测延迟" /></StackPanel>
@@ -295,16 +316,17 @@
         </Grid>
 
         <!-- Selected node inspector -->
-        <Border Grid.Column="1" Background="#FFFCFDFE" BorderBrush="{StaticResource QccBorder}" BorderThickness="1,0,0,0">
+        <Border Grid.Column="1" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="1,0,0,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Border Padding="14,8" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
+                <Border Padding="12,7" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
                     <Grid>
-                        <TextBlock VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Text="节点详情" />
+                        <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="节点详情" />
                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                             <Button Width="32" Height="32" Style="{StaticResource QccIconButton}" ToolTip="收藏"><materialDesign:PackIcon Width="16" Height="16" Kind="StarOutline" /></Button>
                             <Button Width="32" Height="32" Style="{StaticResource QccIconButton}" ToolTip="更多"><materialDesign:PackIcon Width="16" Height="16" Kind="DotsVertical" /></Button>
@@ -313,21 +335,21 @@
                 </Border>
 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="14,9,14,7">
+                    <StackPanel Margin="12,8,12,6">
                         <TextBlock
                             x:Name="txtInspectorNodeName"
-                            FontSize="16"
-                            LineHeight="19"
+                            FontSize="{DynamicResource QccFontTitle}"
+                            LineHeight="{DynamicResource QccLineTitle}"
                             Style="{StaticResource QccHeading}"
                             Text="{Binding SelectedProfile.Remarks, FallbackValue=请选择节点}"
                             TextWrapping="Wrap"
                             ToolTip="{Binding SelectedProfile.Remarks}" />
 
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="68" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="60" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="22" /><RowDefinition Height="22" /><RowDefinition Height="22" /><RowDefinition Height="22" />
-                                <RowDefinition Height="22" /><RowDefinition Height="22" /><RowDefinition Height="22" /><RowDefinition Height="22" />
+                                <RowDefinition Height="20" /><RowDefinition Height="20" /><RowDefinition Height="20" /><RowDefinition Height="20" />
+                                <RowDefinition Height="20" /><RowDefinition Height="20" /><RowDefinition Height="20" /><RowDefinition Height="20" />
                             </Grid.RowDefinitions>
                             <TextBlock Style="{StaticResource QccInspectorLabel}" Text="协议" /><TextBlock Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.ConfigType, FallbackValue=—}" />
                             <TextBlock Grid.Row="1" Style="{StaticResource QccInspectorLabel}" Text="传输协议" /><TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Network, FallbackValue=—}" />
@@ -342,10 +364,10 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <Border Grid.Row="2" Padding="12,8" Background="#FFFCFDFE" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
+                <Border Grid.Row="2" Padding="10,7" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
                     <StackPanel>
-                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="节点操作" />
-                        <UniformGrid Margin="0,6,0,0" Columns="2" Rows="3">
+                        <TextBlock FontSize="{DynamicResource QccFontBody}" FontWeight="SemiBold" Text="节点操作" />
+                        <UniformGrid Margin="0,5,0,0" Columns="2" Rows="3">
                             <Button x:Name="btnDetailPing" Margin="0,0,4,4" Style="{StaticResource QccCompactSecondaryButton}" Content="测试延迟" />
                             <Button x:Name="btnDetailSpeed" Margin="4,0,0,4" Style="{StaticResource QccCompactSecondaryButton}" Content="测试速度" />
                             <Button x:Name="btnDetailCopy" Margin="0,0,4,4" Style="{StaticResource QccCompactSecondaryButton}" Content="复制节点" />

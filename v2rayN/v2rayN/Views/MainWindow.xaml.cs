@@ -21,12 +21,28 @@ public partial class MainWindow
     private readonly CancellationTokenSource _liveMetricsCancellation = new();
     private readonly ProxyPingClient _livePingClient;
     private readonly ConnectionQualityMonitor _connectionQualityMonitor;
+    private readonly SubscriptionQuotaService _subscriptionQuotaService = new();
+    private readonly SemaphoreSlim _subscriptionQuotaSingleFlight = new(1, 1);
     private Task? _quietUpdateLoop;
     private QuietUpdateResult? _lastHandledQuietUpdateResult;
+    private CancellationTokenSource? _subscriptionQuotaRequestCancellation;
+    private Task? _subscriptionQuotaRefreshTask;
+    private SubscriptionQuotaResult? _subscriptionQuotaResult;
+    private DateTimeOffset? _subscriptionQuotaLastCompletedUtc;
+    private string _subscriptionQuotaProfileId = string.Empty;
+    private string _subscriptionQuotaSubId = string.Empty;
+    private long _subscriptionQuotaGeneration;
+    private double _responsiveFontScale = -1;
+    private bool _subscriptionQuotaQaMode = Environment.GetCommandLineArgs()
+        .Contains("--qcc-qa-quota-sample", StringComparer.Ordinal);
+    private static readonly TimeSpan SubscriptionQuotaRefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly DateTimeOffset SubscriptionQuotaQaRenderTime =
+        new(2026, 8, 4, 8, 0, 0, TimeSpan.Zero);
 
     public MainWindow()
     {
         InitializeComponent();
+        ApplyResponsiveTypography(Width, Height);
 
         txtAppVersion.Text = Utils.GetVersion();
 
@@ -41,9 +57,9 @@ public partial class MainWindow
         menuSettingsSetUWP.Click += MenuSettingsSetUWP_Click;
         menuPromotion.Click += MenuPromotion_Click;
         menuClose.Click += MenuClose_Click;
-        menuCheckUpdate.Click += MenuCheckUpdate_Click;
         btnNewUpdate.Click += MenuCheckUpdate_Click;
         menuBackupAndRestore.Click += MenuBackupAndRestore_Click;
+        Loaded += MainWindow_Loaded;
 
         pbTheme.Content ??= new ThemeSettingView();
 
@@ -65,6 +81,7 @@ public partial class MainWindow
             connectionStateTimer.Tick += LiveMetricsTimer_Tick;
             connectionStateTimer.Start();
             UpdateConnectionStateBadge();
+            UpdateSubscriptionQuotaAgeAndSchedule();
             Disposable.Create(() =>
             {
                 connectionStateTimer.Stop();
@@ -92,6 +109,7 @@ public partial class MainWindow
             //sub
             this.BindCommand(ViewModel, vm => vm.SubSettingCmd, v => v.menuSubSetting).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.SubSettingCmd, v => v.btnNavSubscription).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.SubUpdateViaProxyCmd, v => v.btnNavSubscriptionUpdate).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.SubUpdateCmd, v => v.menuSubUpdate).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.SubUpdateViaProxyCmd, v => v.menuSubUpdateViaProxy).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.SubGroupUpdateCmd, v => v.menuSubGroupUpdate).DisposeWith(disposables);
@@ -201,6 +219,41 @@ public partial class MainWindow
 
     #region Event
 
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyResponsiveTypography(e.NewSize.Width, e.NewSize.Height);
+    }
+
+    private void ApplyResponsiveTypography(double width, double height)
+    {
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        var rawScale = Math.Min(width / 1120d, height / 720d);
+        var scale = Math.Clamp(rawScale, 0.92d, 1.18d);
+        scale = Math.Round(scale * 20d, MidpointRounding.AwayFromZero) / 20d;
+        if (Math.Abs(scale - _responsiveFontScale) < 0.001d)
+        {
+            return;
+        }
+
+        _responsiveFontScale = scale;
+        Resources["QccFontTiny"] = 10.5d * scale;
+        Resources["QccFontSmall"] = 11d * scale;
+        Resources["QccFontBody"] = 12d * scale;
+        Resources["QccFontStrong"] = 13d * scale;
+        Resources["QccFontTitle"] = 14d * scale;
+        Resources["QccFontHero"] = 16d * scale;
+        Resources["QccFontLarge"] = 18d * scale;
+        Resources["QccLineTitle"] = 17d * scale;
+        Resources["QccLineHero"] = 19d * scale;
+        Resources["StdFontSize-1"] = 11d * scale;
+        Resources["StdFontSize"] = 12d * scale;
+        Resources["StdFontSize1"] = 13d * scale;
+    }
+
     private void OnProgramStarted(object state, bool timeout)
     {
         Application.Current?.Dispatcher.Invoke(() =>
@@ -241,6 +294,7 @@ public partial class MainWindow
     private async void Current_SessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
         _quietUpdateCancellation.Cancel();
+        CancelSubscriptionQuotaRequest();
         StopLiveMetrics();
         Logging.SaveLog("Current_SessionEnding");
         StorageUI();
@@ -250,6 +304,7 @@ public partial class MainWindow
     private void Shutdown(bool obj)
     {
         _quietUpdateCancellation.Cancel();
+        CancelSubscriptionQuotaRequest();
         StopLiveMetrics();
         Application.Current.Shutdown();
     }
@@ -398,12 +453,32 @@ public partial class MainWindow
 
     private void MenuCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
+        PrepareCoreUpdatePopup();
+        pbCoreUpdate.IsPopupOpen = true;
+        AppEvents.HasUpdateNotified.Publish(false);
+    }
+
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Build the core-update view while the application is idle. Opening the
+        // compact popup then only changes visibility; it never builds a dialog
+        // overlay or initializes its binding tree on the click path.
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+            new Action(PrepareCoreUpdatePopup));
+    }
+
+    private void CoreUpdatePopup_Opened(object sender, RoutedEventArgs e)
+    {
+        PrepareCoreUpdatePopup();
+        AppEvents.HasUpdateNotified.Publish(false);
+    }
+
+    private void PrepareCoreUpdatePopup()
+    {
         _checkUpdateView ??= new CheckUpdateView();
         _checkUpdateView.ViewModel = ViewModel?.CheckUpdateViewModel;
         CheckUpdateView.RemoveOfficialGuiUpdate(_checkUpdateView.ViewModel);
-        DialogHost.Show(_checkUpdateView, "RootDialog");
-
-        AppEvents.HasUpdateNotified.Publish(false);
+        contentCoreUpdate.Content ??= _checkUpdateView;
     }
 
     private async void Disconnect_Click(object sender, RoutedEventArgs e)
@@ -467,6 +542,11 @@ public partial class MainWindow
         WriteStartupAcknowledgement();
         _ = RefreshQuietUpdateStatusAsync();
         _quietUpdateLoop ??= RunQuietUpdateLoopAsync();
+        _subscriptionQuotaQaMode = ApplyQaSubscriptionQuotaSampleIfRequested(Environment.GetCommandLineArgs());
+        if (!_subscriptionQuotaQaMode)
+        {
+            ScheduleSubscriptionQuotaRefresh(force: false);
+        }
         _ = CaptureQaFrameIfRequestedAsync();
     }
 
@@ -528,6 +608,7 @@ public partial class MainWindow
             {
                 StorageUI();
                 _quietUpdateCancellation.Cancel();
+                CancelSubscriptionQuotaRequest();
                 StopLiveMetrics();
                 Application.Current.Shutdown();
             }
@@ -588,6 +669,7 @@ public partial class MainWindow
         try
         {
             Width = width; Height = height; WindowState = WindowState.Normal;
+            ApplyResponsiveTypography(width, height);
             UpdateLayout();
             if (args.Contains("--qcc-qa-reload", StringComparer.Ordinal)) await ViewModel.Reload();
             await Task.Delay(8000);
@@ -597,6 +679,12 @@ public partial class MainWindow
             {
                 await RefreshQuietUpdateStatusAsync();
                 pbQuietUpdate.IsPopupOpen = true;
+                await Dispatcher.Yield(DispatcherPriority.Loaded);
+            }
+            if (args.Contains("--qcc-qa-open-core-update", StringComparer.Ordinal))
+            {
+                PrepareCoreUpdatePopup();
+                pbCoreUpdate.IsPopupOpen = true;
                 await Dispatcher.Yield(DispatcherPriority.Loaded);
             }
             UpdateLayout();
@@ -614,9 +702,348 @@ public partial class MainWindow
         finally
         {
             _quietUpdateCancellation.Cancel();
+            CancelSubscriptionQuotaRequest();
             StopLiveMetrics();
             Application.Current.Shutdown();
         }
+    }
+
+    private void SubscriptionQuotaRefresh_Click(object sender, RoutedEventArgs e)
+    {
+        ScheduleSubscriptionQuotaRefresh(force: true);
+    }
+
+    private void UpdateSubscriptionQuotaAgeAndSchedule()
+    {
+        if (_subscriptionQuotaQaMode)
+        {
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            return;
+        }
+
+        var currentProfileId = _config.IndexId ?? string.Empty;
+        if (!string.Equals(currentProfileId, _subscriptionQuotaProfileId, StringComparison.Ordinal))
+        {
+            CancelSubscriptionQuotaRequest();
+            _subscriptionQuotaProfileId = currentProfileId;
+            _subscriptionQuotaSubId = string.Empty;
+            _subscriptionQuotaResult = null;
+            _subscriptionQuotaLastCompletedUtc = null;
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            ScheduleSubscriptionQuotaRefresh(force: true);
+            return;
+        }
+
+        RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+        if (currentProfileId.Length == 0 || !CoreManager.Instance.IsRunning)
+        {
+            if (_subscriptionQuotaRefreshTask is { IsCompleted: false })
+            {
+                CancelSubscriptionQuotaRequest();
+            }
+            return;
+        }
+        if (!_subscriptionQuotaLastCompletedUtc.HasValue
+            || DateTimeOffset.UtcNow - _subscriptionQuotaLastCompletedUtc.Value >= SubscriptionQuotaRefreshInterval)
+        {
+            ScheduleSubscriptionQuotaRefresh(force: false);
+        }
+    }
+
+    private void ScheduleSubscriptionQuotaRefresh(bool force)
+    {
+        if (_subscriptionQuotaQaMode)
+        {
+            return;
+        }
+
+        var currentProfileId = _config.IndexId ?? string.Empty;
+        if (currentProfileId.Length == 0)
+        {
+            _subscriptionQuotaProfileId = string.Empty;
+            _subscriptionQuotaSubId = string.Empty;
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            return;
+        }
+        if (!CoreManager.Instance.IsRunning)
+        {
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            return;
+        }
+        if (!string.Equals(currentProfileId, _subscriptionQuotaProfileId, StringComparison.Ordinal))
+        {
+            CancelSubscriptionQuotaRequest();
+            _subscriptionQuotaProfileId = currentProfileId;
+            _subscriptionQuotaSubId = string.Empty;
+            _subscriptionQuotaResult = null;
+            _subscriptionQuotaLastCompletedUtc = null;
+            force = true;
+        }
+        if (!force && _subscriptionQuotaLastCompletedUtc.HasValue
+            && DateTimeOffset.UtcNow - _subscriptionQuotaLastCompletedUtc.Value < SubscriptionQuotaRefreshInterval)
+        {
+            return;
+        }
+        if (_subscriptionQuotaRefreshTask is { IsCompleted: false })
+        {
+            if (!force)
+            {
+                return;
+            }
+            CancelSubscriptionQuotaRequest();
+        }
+
+        var generation = ++_subscriptionQuotaGeneration;
+        var requestCancellation = new CancellationTokenSource();
+        _subscriptionQuotaRequestCancellation = requestCancellation;
+        _subscriptionQuotaLastCompletedUtc = null;
+        _subscriptionQuotaRefreshTask = RefreshSubscriptionQuotaAsync(
+            currentProfileId,
+            generation,
+            requestCancellation);
+        RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+    }
+
+    private async Task RefreshSubscriptionQuotaAsync(
+        string profileId,
+        long generation,
+        CancellationTokenSource requestCancellation)
+    {
+        var entered = false;
+        var subId = string.Empty;
+        try
+        {
+            await _subscriptionQuotaSingleFlight.WaitAsync(requestCancellation.Token);
+            entered = true;
+            if (generation != _subscriptionQuotaGeneration
+                || !string.Equals(profileId, _config.IndexId, StringComparison.Ordinal)
+                || !CoreManager.Instance.IsRunning)
+            {
+                return;
+            }
+
+            var activeProfile = await AppManager.Instance.GetProfileItem(profileId);
+            if (generation != _subscriptionQuotaGeneration
+                || !string.Equals(profileId, _config.IndexId, StringComparison.Ordinal))
+            {
+                return;
+            }
+            subId = activeProfile?.Subid ?? string.Empty;
+            if (subId.Length == 0)
+            {
+                await ApplySubscriptionQuotaResultAsync(
+                    profileId,
+                    subId,
+                    generation,
+                    new(SubscriptionQuotaStatusCode.InvalidRequest));
+                return;
+            }
+
+            var subscription = await AppManager.Instance.GetSubItem(subId);
+            if (generation != _subscriptionQuotaGeneration
+                || !string.Equals(profileId, _config.IndexId, StringComparison.Ordinal)
+                || !CoreManager.Instance.IsRunning)
+            {
+                return;
+            }
+            if (subscription is null || !subscription.Enabled || string.IsNullOrWhiteSpace(subscription.Url))
+            {
+                await ApplySubscriptionQuotaResultAsync(
+                    profileId,
+                    subId,
+                    generation,
+                    new(SubscriptionQuotaStatusCode.InvalidRequest));
+                return;
+            }
+
+            var result = await _subscriptionQuotaService.FetchAsync(
+                subscription.Url,
+                useLocalSocksProxy: true,
+                AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
+                subscription.UserAgent,
+                requestCancellation.Token);
+            await ApplySubscriptionQuotaResultAsync(profileId, subId, generation, result);
+        }
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            await ApplySubscriptionQuotaResultAsync(
+                profileId,
+                subId,
+                generation,
+                new(SubscriptionQuotaStatusCode.NetworkError));
+        }
+        finally
+        {
+            if (entered)
+            {
+                _subscriptionQuotaSingleFlight.Release();
+            }
+            if (ReferenceEquals(_subscriptionQuotaRequestCancellation, requestCancellation))
+            {
+                _subscriptionQuotaRequestCancellation = null;
+                _subscriptionQuotaRefreshTask = null;
+            }
+            requestCancellation.Dispose();
+        }
+    }
+
+    private async Task ApplySubscriptionQuotaResultAsync(
+        string profileId,
+        string subId,
+        long generation,
+        SubscriptionQuotaResult result)
+    {
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (generation != _subscriptionQuotaGeneration
+                || !string.Equals(profileId, _subscriptionQuotaProfileId, StringComparison.Ordinal)
+                || !string.Equals(profileId, _config.IndexId, StringComparison.Ordinal))
+            {
+                return;
+            }
+            _subscriptionQuotaSubId = subId;
+            _subscriptionQuotaResult = result;
+            _subscriptionQuotaLastCompletedUtc = DateTimeOffset.UtcNow;
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+        });
+    }
+
+    private void CancelSubscriptionQuotaRequest()
+    {
+        _subscriptionQuotaGeneration++;
+        var cancellation = _subscriptionQuotaRequestCancellation;
+        if (cancellation is not null && !cancellation.IsCancellationRequested)
+        {
+            cancellation.Cancel();
+        }
+    }
+
+    private void RenderSubscriptionQuota(DateTimeOffset now)
+    {
+        btnSubscriptionQuotaRefresh.IsEnabled = _subscriptionQuotaRefreshTask is not { IsCompleted: false };
+        if (_subscriptionQuotaQaMode)
+        {
+            if (_subscriptionQuotaResult is not null)
+            {
+                RenderSubscriptionQuotaResult(_subscriptionQuotaResult, SubscriptionQuotaQaRenderTime);
+            }
+            else
+            {
+                txtSubscriptionQuotaPrimary.Text = "QA 样例待加载";
+                txtSubscriptionQuotaSecondary.Text = "不读取配置或网络";
+            }
+            return;
+        }
+        if (string.IsNullOrEmpty(_config.IndexId))
+        {
+            txtSubscriptionQuotaPrimary.Text = "未选择活动节点";
+            txtSubscriptionQuotaSecondary.Text = "连接订阅节点后显示";
+            return;
+        }
+        if (!CoreManager.Instance.IsRunning)
+        {
+            txtSubscriptionQuotaPrimary.Text = "代理未连接";
+            txtSubscriptionQuotaSecondary.Text = "连接后通过本地代理查询";
+            return;
+        }
+        if (_subscriptionQuotaResult is null)
+        {
+            txtSubscriptionQuotaPrimary.Text = _subscriptionQuotaRefreshTask is { IsCompleted: false } ? "正在查询…" : "尚未查询";
+            txtSubscriptionQuotaSecondary.Text = _subscriptionQuotaLastCompletedUtc.HasValue
+                ? $"更新 {FormatSubscriptionQuotaAge(now - _subscriptionQuotaLastCompletedUtc.Value)}"
+                : "等待安全代理查询";
+            return;
+        }
+        RenderSubscriptionQuotaResult(_subscriptionQuotaResult, now);
+    }
+
+    private void RenderSubscriptionQuotaResult(SubscriptionQuotaResult result, DateTimeOffset now)
+    {
+        if (!result.IsSuccess)
+        {
+            txtSubscriptionQuotaPrimary.Text = SubscriptionQuotaService.GetFixedChineseMessage(result.Status);
+            txtSubscriptionQuotaSecondary.Text = _subscriptionQuotaLastCompletedUtc.HasValue
+                ? $"更新 {FormatSubscriptionQuotaAge(now - _subscriptionQuotaLastCompletedUtc.Value)}"
+                : "未保存查询内容";
+            return;
+        }
+
+        var snapshot = result.Snapshot!;
+        var expired = snapshot.ExpiresAtUtc.HasValue && snapshot.ExpiresAtUtc.Value <= now;
+        txtSubscriptionQuotaPrimary.Text = expired ? "订阅已过期" : FormatSubscriptionQuotaBytes(snapshot.RemainingBytes);
+        var age = FormatSubscriptionQuotaAge(now - snapshot.RetrievedAtUtc);
+        if (snapshot.TotalBytes.HasValue)
+        {
+            var used = snapshot.UploadBytes + snapshot.DownloadBytes;
+            txtSubscriptionQuotaSecondary.Text = $"已用 {FormatSubscriptionQuotaBytes(used)} / {FormatSubscriptionQuotaBytes(snapshot.TotalBytes.Value)} · {age}";
+        }
+        else if (snapshot.ExpiresAtUtc.HasValue)
+        {
+            txtSubscriptionQuotaSecondary.Text = $"到期 {snapshot.ExpiresAtUtc.Value.ToLocalTime():yyyy-MM-dd} · {age}";
+        }
+        else
+        {
+            txtSubscriptionQuotaSecondary.Text = $"更新 {age}";
+        }
+    }
+
+    private static string FormatSubscriptionQuotaBytes(ulong bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB", "PB"];
+        var value = (double)bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.##} {units[unit]}";
+    }
+
+    private static string FormatSubscriptionQuotaAge(TimeSpan age)
+    {
+        if (age < TimeSpan.Zero || age < TimeSpan.FromSeconds(5)) return "刚刚";
+        if (age < TimeSpan.FromMinutes(1)) return $"{(int)age.TotalSeconds} 秒前";
+        if (age < TimeSpan.FromHours(1)) return $"{(int)age.TotalMinutes} 分钟前";
+        return $"{(int)age.TotalHours} 小时前";
+    }
+
+    private bool ApplyQaSubscriptionQuotaSampleIfRequested(string[] args)
+    {
+        var index = Array.IndexOf(args, "--qcc-qa-quota-sample");
+        if (index < 0 || index + 1 >= args.Length)
+        {
+            return false;
+        }
+
+        var now = SubscriptionQuotaQaRenderTime;
+        _subscriptionQuotaProfileId = "qa-profile";
+        _subscriptionQuotaSubId = "qa-sample";
+        _subscriptionQuotaLastCompletedUtc = now;
+        _subscriptionQuotaResult = args[index + 1] switch
+        {
+            "success" => new(
+                SubscriptionQuotaStatusCode.Success,
+                new(10UL * 1024 * 1024 * 1024, 20UL * 1024 * 1024 * 1024,
+                    100UL * 1024 * 1024 * 1024, 70UL * 1024 * 1024 * 1024,
+                    new DateTimeOffset(2027, 12, 31, 0, 0, 0, TimeSpan.Zero), now,
+                    SubscriptionQuotaSource.Header)),
+            "unsupported" => new(SubscriptionQuotaStatusCode.Unsupported),
+            "expired" => new(
+                SubscriptionQuotaStatusCode.Success,
+                new(0, 0, null, 0, new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero), now,
+                    SubscriptionQuotaSource.ResponseBody)),
+            _ => null
+        };
+        if (_subscriptionQuotaResult is null)
+        {
+            return false;
+        }
+        RenderSubscriptionQuota(now);
+        return true;
     }
 
     private void ApplyQaQualitySampleIfRequested(string[] args)
@@ -645,6 +1072,7 @@ public partial class MainWindow
     private async void LiveMetricsTimer_Tick(object? sender, EventArgs e)
     {
         var connected = UpdateConnectionStateBadge();
+        UpdateSubscriptionQuotaAgeAndSchedule();
         ViewModel?.StatusBarViewModel.RefreshLiveTrafficState(connected);
         if (!connected)
         {

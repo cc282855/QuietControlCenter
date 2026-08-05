@@ -15,9 +15,9 @@
     Style="{StaticResource ViewGlobal}"
     mc:Ignorable="d">
 
-    <DockPanel Margin="{StaticResource Margin8}">
+    <DockPanel Margin="0" Background="{StaticResource QccSurface}">
         <StackPanel
-            Margin="{StaticResource Margin8}"
+            Margin="4,10,4,0"
             HorizontalAlignment="Right"
             DockPanel.Dock="Bottom"
             Orientation="Horizontal">
@@ -34,26 +34,30 @@
 
             <Button
                 x:Name="btnCheckOnly"
-                Width="100"
-                Margin="{StaticResource Margin8}"
+                Width="104"
+                Height="30"
+                Margin="4"
                 Content="{x:Static resx:ResUI.menuCheckOnly}"
-                Style="{StaticResource DefButton}" />
+                Style="{StaticResource QccSecondaryButton}" />
 
             <Button
                 x:Name="btnCheckUpdate"
-                Width="100"
-                Margin="{StaticResource Margin8}"
+                Width="112"
+                Height="30"
+                Margin="4"
                 Content="更新所选核心"
                 IsDefault="True"
-                Style="{StaticResource DefButton}" />
+                Style="{StaticResource QccPrimaryButton}" />
         </StackPanel>
 
         <StackPanel>
-            <Border Margin="8,0,8,10" Padding="12,9" Background="#FFF0F6FF" CornerRadius="6">
+            <Border Margin="4,0,4,8" Padding="10,7" Background="{StaticResource QccPrimarySoft}" CornerRadius="8">
                 <TextBlock Foreground="#FF315C9B" Text="此处仅更新代理核心与 Geo 数据；Quiet Control Center 界面仅通过定制完整包更新。" TextWrapping="Wrap" />
             </Border>
             <ListView
                 x:Name="lstCheckUpdates"
+                Background="{StaticResource QccSurfaceRaised}"
+                BorderBrush="{StaticResource QccBorder}"
                 BorderThickness="1"
                 ItemContainerStyle="{StaticResource lvItemSelected}">
                 <ListView.ItemsPanel>

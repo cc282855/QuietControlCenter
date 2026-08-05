@@ -70,6 +70,96 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Responsive typography and compact status-bar inspection — 2026-08-04
+
+### Source visual truth
+
+- Right inspector and clipped port-status reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-a3e904dd-2fe4-48fa-8e02-b6e97ddfa4f2.png`, 399x761 pixels.
+- Bottom system-proxy/TUN/routing reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-f7a50cc0-54fb-4088-9ab9-29ffb93eea81.png`, 1149x114 pixels.
+- Exact structural baseline before this iteration: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\QuietControlCenter-v7.24.4.11-modern\visual-qa\modern-1120x720.png`, 1120x720 at 96 DPI.
+
+### Rendered implementation
+
+- Minimum viewport: `.codex/state/runs/qcc-20260804-12/visual/responsive-final-1120x720.png`, 1120x720 at 96 DPI, SHA-256 `CEC2D341E77BEA094EC439FB78E13752E5D2AF66F8F47472D2B84E61918A95A4`.
+- Normal viewport: `.codex/state/runs/qcc-20260804-12/visual/normal-final-1487x1058.png`, 1487x1058 at 96 DPI, SHA-256 `807ADDB49F0620F9D5E3F688DAA7570D26F08C7DE4101419FF1FA92E7E157E2B`.
+- State: isolated empty-profile QA data. No user configuration, subscription, database or log was read or copied. The capture process used a path-specific single-instance key and did not reload a core.
+
+### Density normalization and comparison evidence
+
+- Full-view comparison: `.codex/state/runs/qcc-20260804-12/visual/comparison-full-v11-vs-v12.png`, 2240x720, SHA-256 `73E307A3577D7565176889EA87CB5907F914BA4F79B03DA2C1AE061B54A43DCC`. The 1120x720 v7.24.4.11 baseline is on the left and the exact 1120x720 final frame is on the right; neither frame was rescaled.
+- Inspector comparison: `.codex/state/runs/qcc-20260804-12/visual/comparison-right-source-vs-final.png`, SHA-256 `9A081331A68699A83959C9E62084034DDF1D376F737C8C7C72E23836B4B3936C`. The 399x761 source was normalized to 268x511, followed by the final exact 268x572 crop at x=852, y=148 from the 1120x720 frame.
+- Status comparison: `.codex/state/runs/qcc-20260804-12/visual/comparison-status-source-vs-final.png`, SHA-256 `868D03DB4AD6B3281A05656ED1004E1C42D8A37A532152FB2BA6A39A30643B51`. The 1149x114 source was normalized to 988x98, followed by the final exact 988x72 crop at x=132, y=648.
+
+### Findings
+
+- Fonts and typography: all custom-shell sizes now resolve through dynamic resources. Window width/height produces a clamped 0.92–1.18 scale, quantized to 0.05 steps. The 1120 frame retains the compact baseline; the 1487 frame visibly increases navigation, summary, filter, inspector and status text without clipping.
+- Spacing and layout rhythm: navigation width is reduced from 150 to 132 pixels. Node actions now follow the node details instead of being pinned below a large empty gap. The 72-pixel status region uses one 48-pixel horizontal control row and one 24-pixel live-status row.
+- Colors and visual tokens: the existing surface, border, primary, muted and semantic-state resources are unchanged. The typography/layout change introduces no new color drift.
+- Image quality and asset fidelity: the supplied Mika logo and Material Design icon family remain unchanged and sharp at both native captures. No placeholder, custom SVG, emoji or substitute asset was introduced.
+- Copy and content: all requested Chinese labels remain present. The country filter uses `全部地区` only when no country item is selected; system proxy, TUN, routing and both port lines are visible simultaneously.
+- Responsiveness and accessibility: persistent controls remain inside the 1120x720 viewport. Filter watermark duplication is removed, the country and group controls retain explicit automation names, and no information depends on color alone.
+- Runtime isolation: process PID snapshots before and after capture were identical (`米卡.exe` 77108 and 61748; `sing-box.exe` 83472). No pre-existing application or core process was closed, restarted or replaced.
+
+### Comparison history
+
+- Pass 1 found a P2 overlap at 1487x1058: Material Design floating hints for country/group collided with the enlarged selected text. The redundant hints were removed and the country track was widened.
+- Pass 2 found a P2 empty state: without the floating hint, an unselected country control showed only its arrow. A non-interactive `全部地区` watermark gated by `SelectedIndex == -1` was added, and the track was finalized at 160 pixels.
+- Pass 3 used both native viewport captures plus the three normalized comparison artifacts above. No actionable P0, P1 or P2 issue remains.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: none
+
+final result: passed
+
+## Subscription quota card inspection — 2026-08-04
+
+### Source visual truth
+
+- User reference and requested red-box placement: `C:\Users\Administrator\AppData\Local\Temp\codex-clipboard-111f1fae-e60e-452b-a528-4162ba8cf8c7.png`, 2078x1170 pixels.
+
+### Rendered implementation
+
+- Success state, minimum viewport: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/qcc-subtraffic-1120x720-success.png`, 1120x720 at 96 DPI, SHA-256 `D955BE4FDFDC7A704CE6188571F052634C310A7D416D2A718F2E7BB3A6638AEF`.
+- Success state, normal viewport: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/qcc-subtraffic-1487x1058-success.png`, 1487x1058 at 96 DPI, SHA-256 `FDBF534253D2CD96D402EDCDD95B98156BDC4AF0DB556B15A4EC0DCD962D4724`.
+- Unsupported-provider state: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/qcc-subtraffic-1120x720-unsupported.png`, 1120x720 at 96 DPI, SHA-256 `D0B05936CA1267443CF988D499D451B26639B306C8BBA878EABF51E2AB56E73E`.
+- Expired state: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/qcc-subtraffic-1120x720-expired.png`, 1120x720 at 96 DPI, SHA-256 `091DDB78E86EF85913AAAF71D7BD065F88911D5B11BEFCFC1F553091FB9149BA`.
+- State: isolated QA data, no user subscription persisted; the active-profile quota card shows success, unsupported, and expired outcomes.
+
+### Density normalization and comparison evidence
+
+- Full-view comparison: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/comparison-subtraffic-full-source-vs-1120.png`, 2252x748, SHA-256 `BBF265BECC1F5B97E772AE2B2593EA5C6AF97A228EC7DFFFAEED54A1BF45A9A2`. The 2078x1170 reference was normalized to 1120x631 without stretching and placed beside the exact 1120x720 implementation.
+- Focused top-summary comparison: `.codex/state/runs/qcc-subtraffic-20260804-01/visual/comparison-subtraffic-top-source-vs-1120.png`, 1120x372, SHA-256 `7FFD480EA9A3BCF7FAEBF0165F85921D0F6E7E9300E215AD0F7A85C31D2E8914`. The reference top region (2078x264) was normalized to 1120x142; the implementation top region remains an exact 1120x178 crop.
+
+### Findings
+
+- Fonts and typography: the quota title, amount, usage detail, stale-time label, and error states use the existing Quiet Control Center hierarchy. Long unsupported/expired labels remain readable without truncation at 1120 pixels.
+- Spacing and layout rhythm: the quota card occupies the user-marked gap between current-node status and live traffic cards. It preserves the existing 10-pixel card radius, border, elevation, padding, and summary-row height.
+- Colors and visual tokens: success data uses the established neutral text treatment, stale/error details remain legible, and the neighboring green/yellow/red connection-quality tokens are unchanged.
+- Image quality and asset fidelity: the added card contains no raster imagery or substitute artwork. The refresh action reuses the existing Material Design icon family and remains optically aligned.
+- Copy and content: `订阅余量`, remaining amount, `已用 / 总量`, expiry/unsupported wording, and last-refresh age are concise Chinese UI labels. The source and capture use different fixture versions and node states; those dynamic values are not layout mismatches.
+- Responsiveness: no overlap, clipping, broken wrapping, or hidden persistent control is visible at 1120x720 or 1487x1058. The entire node area, inspector actions, and bottom controls remain available.
+- Interaction and state coverage: startup/manual refresh, success, unsupported and expired UI states are represented; static tests cover activity-profile refresh wiring. Network parsing and privacy behavior are covered in ServiceLib tests.
+- Accessibility: the card remains in the normal keyboard and screen-reader content order, the refresh button has an accessible tooltip, color is not the sole carrier of quota state, and 1120-pixel rendering shows no text collision.
+
+### Comparison history
+
+- Pass 1: the full-window and focused top-summary comparisons found no actionable P0, P1, or P2 difference. No visual remediation loop was required.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: the QA capture displays isolated placeholder node/version data, intentionally different from the user's live screenshot; the final package version is assigned during publishing and real subscription data is loaded only at runtime.
+
+final result: passed
+
 ## Rounded frame and quality-color inspection — 2026-08-03
 
 ### Source visual truth

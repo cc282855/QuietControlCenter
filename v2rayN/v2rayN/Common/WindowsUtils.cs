@@ -54,8 +54,8 @@ internal static partial class WindowsUtils
     {
         var isDark = theme switch
         {
-            nameof(ETheme.Dark) => true,
-            nameof(ETheme.Light) => false,
+            nameof(ETheme.Dark) or nameof(ETheme.Dusk) or nameof(ETheme.NightSky) => true,
+            nameof(ETheme.Light) or nameof(ETheme.Aquatic) or nameof(ETheme.Desert) => false,
             _ => IsDarkTheme(),
         };
 
