@@ -12,6 +12,8 @@ public sealed class SubscriptionUpdateCoordinatorTests
 
         Assert.True(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, false, opaqueId, true, secureUrl));
         Assert.True(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, false, opaqueId, true, "http://subscription.invalid/source"));
+        Assert.True(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, false, opaqueId, true, "HTTPS://subscription.invalid/source"));
+        Assert.True(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, false, opaqueId, true, "HTTP://subscription.invalid/source"));
         Assert.False(FirstSubscriptionUpdatePolicy.ShouldUpdate(false, false, opaqueId, true, secureUrl));
         Assert.False(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, true, opaqueId, true, secureUrl));
         Assert.False(FirstSubscriptionUpdatePolicy.ShouldUpdate(true, false, string.Empty, true, secureUrl));
@@ -22,23 +24,25 @@ public sealed class SubscriptionUpdateCoordinatorTests
     }
 
     [Fact]
-    public async Task SameInitialId_ConcurrentRequestsShareOneExecution()
+    public async Task IdenticalNormalizedRequest_ConcurrentRequestsShareOneExecution()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var invocationCount = 0;
-        var coordinator = new SubscriptionUpdateCoordinator(async _ =>
+        SubscriptionUpdateRequest? observed = null;
+        var coordinator = new SubscriptionUpdateCoordinator(async request =>
         {
+            observed = request;
             Interlocked.Increment(ref invocationCount);
             entered.SetResult();
             await release.Task;
             return new SubscriptionUpdateResult(true, 1, 1);
         });
-        var request = AutomaticRequest("opaque-dedupe-id");
+        var request = AutomaticRequest("  opaque-dedupe-id  ");
 
         var first = coordinator.UpdateAsync(request);
         await entered.Task;
-        var second = coordinator.UpdateAsync(request with { UseProxy = false });
+        var second = coordinator.UpdateAsync(AutomaticRequest("opaque-dedupe-id"));
 
         Assert.Same(first, second);
         Assert.Equal(1, Volatile.Read(ref invocationCount));
@@ -46,6 +50,26 @@ public sealed class SubscriptionUpdateCoordinatorTests
         var results = await Task.WhenAll(first, second);
         Assert.All(results, result => Assert.True(result.Success));
         Assert.Equal(1, invocationCount);
+        Assert.NotNull(observed);
+        Assert.True(observed.UseProxy);
+        Assert.False(observed.AllowDirectFallback);
+        Assert.True(observed.IsAutomatic);
+    }
+
+    [Fact]
+    public async Task ManualThenAutomatic_SameIdUsesSeparateSerializedExecutions()
+    {
+        await AssertCrossPolicyRequestsRemainSeparate(
+            ManualRequest(" opaque-cross-policy-id "),
+            AutomaticRequest("opaque-cross-policy-id"));
+    }
+
+    [Fact]
+    public async Task AutomaticThenManual_SameIdUsesSeparateSerializedExecutions()
+    {
+        await AssertCrossPolicyRequestsRemainSeparate(
+            AutomaticRequest(" opaque-cross-policy-id "),
+            ManualRequest("opaque-cross-policy-id"));
     }
 
     [Fact]
@@ -122,6 +146,66 @@ public sealed class SubscriptionUpdateCoordinatorTests
             UseProxy: true,
             AllowDirectFallback: false,
             IsAutomatic: true);
+    }
+
+    private static SubscriptionUpdateRequest ManualRequest(string opaqueId)
+    {
+        return new SubscriptionUpdateRequest(
+            opaqueId,
+            UseProxy: false,
+            AllowDirectFallback: true,
+            IsAutomatic: false);
+    }
+
+    private static async Task AssertCrossPolicyRequestsRemainSeparate(
+        SubscriptionUpdateRequest firstRequest,
+        SubscriptionUpdateRequest secondRequest)
+    {
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var observed = new List<SubscriptionUpdateRequest>();
+        var coordinator = new SubscriptionUpdateCoordinator(async request =>
+        {
+            int invocation;
+            lock (observed)
+            {
+                observed.Add(request);
+                invocation = observed.Count;
+            }
+
+            if (invocation == 1)
+            {
+                firstEntered.SetResult();
+                await releaseFirst.Task;
+            }
+
+            return new SubscriptionUpdateResult(true, 1, 1);
+        });
+
+        var first = coordinator.UpdateAsync(firstRequest);
+        await firstEntered.Task;
+        var second = coordinator.UpdateAsync(secondRequest);
+
+        Assert.NotSame(first, second);
+        lock (observed)
+        {
+            Assert.Single(observed);
+            Assert.Equal(firstRequest, observed[0]);
+        }
+
+        releaseFirst.SetResult();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, result => Assert.True(result.Success));
+        lock (observed)
+        {
+            Assert.Equal(2, observed.Count);
+            Assert.Equal(firstRequest, observed[0]);
+            Assert.Equal(secondRequest, observed[1]);
+            Assert.NotEqual(observed[0].UseProxy, observed[1].UseProxy);
+            Assert.NotEqual(observed[0].AllowDirectFallback, observed[1].AllowDirectFallback);
+            Assert.NotEqual(observed[0].IsAutomatic, observed[1].IsAutomatic);
+        }
     }
 
     private static class InterlockedExtensions

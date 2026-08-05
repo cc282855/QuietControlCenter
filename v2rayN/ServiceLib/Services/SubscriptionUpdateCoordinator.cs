@@ -4,7 +4,7 @@ public sealed class SubscriptionUpdateCoordinator
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _syncRoot = new();
-    private readonly Dictionary<string, Lazy<Task<SubscriptionUpdateResult>>> _inFlightBySubscriptionId = new(StringComparer.Ordinal);
+    private readonly Dictionary<RequestKey, Lazy<Task<SubscriptionUpdateResult>>> _inFlightByRequest = [];
     private readonly Func<SubscriptionUpdateRequest, Task<SubscriptionUpdateResult>> _updateAsync;
 
     public SubscriptionUpdateCoordinator(Func<SubscriptionUpdateRequest, Task<SubscriptionUpdateResult>> updateAsync)
@@ -16,28 +16,38 @@ public sealed class SubscriptionUpdateCoordinator
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var initialId = request.SubscriptionId?.Trim() ?? string.Empty;
-        if (initialId.Length == 0)
+        var normalizedId = request.SubscriptionId?.Trim() ?? string.Empty;
+        if (normalizedId.Length == 0)
         {
             return ExecuteSerializedAsync(request);
         }
 
+        var key = new RequestKey(
+            normalizedId,
+            request.UseProxy,
+            request.AllowDirectFallback,
+            request.IsAutomatic);
+
         lock (_syncRoot)
         {
-            if (_inFlightBySubscriptionId.TryGetValue(initialId, out var existing))
+            if (_inFlightByRequest.TryGetValue(key, out var existing))
             {
                 return existing.Value;
             }
 
-            var pending = new Lazy<Task<SubscriptionUpdateResult>>(
-                () => ExecuteAndRemoveAsync(initialId, request),
+            Lazy<Task<SubscriptionUpdateResult>> pending = null!;
+            pending = new Lazy<Task<SubscriptionUpdateResult>>(
+                () => ExecuteAndRemoveAsync(key, pending, request),
                 LazyThreadSafetyMode.ExecutionAndPublication);
-            _inFlightBySubscriptionId.Add(initialId, pending);
+            _inFlightByRequest.Add(key, pending);
             return pending.Value;
         }
     }
 
-    private async Task<SubscriptionUpdateResult> ExecuteAndRemoveAsync(string initialId, SubscriptionUpdateRequest request)
+    private async Task<SubscriptionUpdateResult> ExecuteAndRemoveAsync(
+        RequestKey key,
+        Lazy<Task<SubscriptionUpdateResult>> owner,
+        SubscriptionUpdateRequest request)
     {
         try
         {
@@ -47,7 +57,11 @@ public sealed class SubscriptionUpdateCoordinator
         {
             lock (_syncRoot)
             {
-                _inFlightBySubscriptionId.Remove(initialId);
+                if (_inFlightByRequest.TryGetValue(key, out var current)
+                    && ReferenceEquals(current, owner))
+                {
+                    _inFlightByRequest.Remove(key);
+                }
             }
         }
     }
@@ -68,4 +82,10 @@ public sealed class SubscriptionUpdateCoordinator
             _gate.Release();
         }
     }
+
+    private readonly record struct RequestKey(
+        string SubscriptionId,
+        bool UseProxy,
+        bool AllowDirectFallback,
+        bool IsAutomatic);
 }

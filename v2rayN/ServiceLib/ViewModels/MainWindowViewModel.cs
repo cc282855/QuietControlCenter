@@ -384,6 +384,21 @@ public class MainWindowViewModel : MyReactiveObject
         }
     }
 
+    private async Task AutomaticSubscriptionUpdateTaskHandler(bool success, string msg)
+    {
+        NoticeManager.Instance.SendMessageEx(msg);
+        if (!success)
+        {
+            return;
+        }
+
+        await RefreshServersDispatcherAsync();
+        if (_config.UiItem.EnableAutoAdjustMainLvColWidth)
+        {
+            await ProfilesViewModel.AdjustMainLvColWidth();
+        }
+    }
+
     private async Task UpdateStatisticsHandler(ServerSpeedItem update)
     {
         if (!AppManager.Instance.ShowInTaskbar)
@@ -565,12 +580,17 @@ public class MainWindowViewModel : MyReactiveObject
 
     private async Task<SubscriptionUpdateResult> ExecuteSubscriptionUpdateAsync(SubscriptionUpdateRequest request)
     {
+        Func<bool, string, Task> updateCallback = request.IsAutomatic
+            ? AutomaticSubscriptionUpdateTaskHandler
+            : UpdateTaskHandler;
+
         return await Task.Run(async () => await SubscriptionHandler.UpdateProcess(
             _config,
             request.SubscriptionId,
             request.UseProxy,
-            UpdateTaskHandler,
-            request.AllowDirectFallback));
+            updateCallback,
+            request.AllowDirectFallback,
+            preserveActiveSelection: request.IsAutomatic));
     }
 
     #endregion Subscription

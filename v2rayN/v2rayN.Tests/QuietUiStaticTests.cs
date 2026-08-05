@@ -605,12 +605,65 @@ public sealed class QuietUiStaticTests
         Assert.Contains("FirstSubscriptionUpdatePolicy.FailedFeedback", edit, StringComparison.Ordinal);
 
         Assert.Contains("private readonly SemaphoreSlim _gate = new(1, 1)", coordinator, StringComparison.Ordinal);
-        Assert.Contains("_inFlightBySubscriptionId.TryGetValue(initialId", coordinator, StringComparison.Ordinal);
+        Assert.Contains("new RequestKey(", coordinator, StringComparison.Ordinal);
+        Assert.Contains("request.UseProxy", coordinator, StringComparison.Ordinal);
+        Assert.Contains("request.AllowDirectFallback", coordinator, StringComparison.Ordinal);
+        Assert.Contains("request.IsAutomatic", coordinator, StringComparison.Ordinal);
+        Assert.Contains("_inFlightByRequest.TryGetValue(key", coordinator, StringComparison.Ordinal);
+        Assert.Contains("ReferenceEquals(current, owner)", coordinator, StringComparison.Ordinal);
         Assert.Contains("return await _updateAsync(request)", coordinator, StringComparison.Ordinal);
         Assert.Contains("return SubscriptionUpdateResult.Failed", coordinator, StringComparison.Ordinal);
 
         Assert.Contains("allowDirectFallback && blProxy", handler, StringComparison.Ordinal);
         Assert.Contains("requireProxy: blProxy && !allowDirectFallback", handler, StringComparison.Ordinal);
+        Assert.Contains("StartsWith(Global.HttpsProtocol, StringComparison.OrdinalIgnoreCase)", handler, StringComparison.Ordinal);
+        Assert.Contains("StartsWith(Global.HttpProtocol, StringComparison.OrdinalIgnoreCase)", handler, StringComparison.Ordinal);
+        Assert.Contains("item.Id != subId", handler, StringComparison.Ordinal);
+        Assert.Contains("? AutomaticSubscriptionUpdateTaskHandler", main, StringComparison.Ordinal);
+        Assert.Contains(": UpdateTaskHandler", main, StringComparison.Ordinal);
+        Assert.Contains("preserveActiveSelection: request.IsAutomatic", main, StringComparison.Ordinal);
+        Assert.Contains("bool preserveActiveSelection = false", handler, StringComparison.Ordinal);
+        Assert.Contains("preserveActiveSelection))", handler, StringComparison.Ordinal);
+        var processResultStart = handler.IndexOf(
+            "private static async Task<bool> ProcessDownloadResult",
+            StringComparison.Ordinal);
+        Assert.True(processResultStart >= 0);
+        var restoreProfilesStart = handler.IndexOf(
+            "private static async Task RestoreProfilesAsync",
+            processResultStart,
+            StringComparison.Ordinal);
+        Assert.True(restoreProfilesStart > processResultStart);
+        var processResult = handler[processResultStart..restoreProfilesStart];
+        Assert.Contains("else if (preserveActiveSelection && config.IndexId != originalIndexId)", processResult, StringComparison.Ordinal);
+        Assert.Contains("config.IndexId = originalIndexId;", processResult, StringComparison.Ordinal);
+        Assert.Contains("await ConfigHandler.SaveConfig(config);", processResult, StringComparison.Ordinal);
+        var automaticCallbackStart = main.IndexOf(
+            "private async Task AutomaticSubscriptionUpdateTaskHandler",
+            StringComparison.Ordinal);
+        Assert.True(automaticCallbackStart >= 0);
+        var automaticCallbackEnd = main.IndexOf(
+            "private async Task UpdateStatisticsHandler",
+            automaticCallbackStart,
+            StringComparison.Ordinal);
+        Assert.True(automaticCallbackEnd > automaticCallbackStart);
+        var automaticCallback = main[automaticCallbackStart..automaticCallbackEnd];
+        Assert.Contains("await RefreshServersDispatcherAsync()", automaticCallback, StringComparison.Ordinal);
+        Assert.Contains("ProfilesViewModel.AdjustMainLvColWidth()", automaticCallback, StringComparison.Ordinal);
+        Assert.DoesNotContain("Reload(", automaticCallback, StringComparison.Ordinal);
+        Assert.DoesNotContain("CoreManager", automaticCallback, StringComparison.Ordinal);
+        Assert.DoesNotContain("LoadCore", automaticCallback, StringComparison.Ordinal);
+        Assert.DoesNotContain("SysProxy", automaticCallback, StringComparison.Ordinal);
+        Assert.DoesNotContain("IndexId =", automaticCallback, StringComparison.Ordinal);
+        var refreshStart = main.IndexOf("private async Task RefreshServers()", StringComparison.Ordinal);
+        Assert.True(refreshStart >= 0);
+        var refreshEnd = main.IndexOf(
+            "private async Task RefreshServersDispatcherAsync()",
+            refreshStart,
+            StringComparison.Ordinal);
+        Assert.True(refreshEnd > refreshStart);
+        var refresh = main[refreshStart..refreshEnd];
+        Assert.Contains("ProfilesViewModel.RefreshServersBiz()", refresh, StringComparison.Ordinal);
+        Assert.Contains("StatusBarViewModel.RefreshServersBiz()", refresh, StringComparison.Ordinal);
         Assert.Contains("new DownloadService(redactSensitiveErrors: true)", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("result.Length <", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("Logging.SaveLog(result)", handler, StringComparison.Ordinal);

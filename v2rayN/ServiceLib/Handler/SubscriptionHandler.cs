@@ -7,7 +7,8 @@ public static class SubscriptionHandler
         string subId,
         bool blProxy,
         Func<bool, string, Task> updateFunc,
-        bool allowDirectFallback = true)
+        bool allowDirectFallback = true,
+        bool preserveActiveSelection = false)
     {
         await updateFunc?.Invoke(false, ResUI.MsgUpdateSubscriptionStart);
         var subItem = await AppManager.Instance.SubItems();
@@ -42,7 +43,13 @@ public static class SubscriptionHandler
 
                 var result = await DownloadAllSubscriptions(config, item, blProxy, allowDirectFallback, downloadHandle);
 
-                if (await ProcessDownloadResult(config, item.Id, result, hashCode, updateFunc))
+                if (await ProcessDownloadResult(
+                        config,
+                        item.Id,
+                        result,
+                        hashCode,
+                        updateFunc,
+                        preserveActiveSelection))
                 {
                     successCount++;
                 }
@@ -76,7 +83,8 @@ public static class SubscriptionHandler
             return false;
         }
 
-        if (!url.StartsWith(Global.HttpsProtocol) && !url.StartsWith(Global.HttpProtocol))
+        if (!url.StartsWith(Global.HttpsProtocol, StringComparison.OrdinalIgnoreCase)
+            && !url.StartsWith(Global.HttpProtocol, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -205,7 +213,13 @@ public static class SubscriptionHandler
         return result;
     }
 
-    private static async Task<bool> ProcessDownloadResult(Config config, string id, string result, string hashCode, Func<bool, string, Task> updateFunc)
+    private static async Task<bool> ProcessDownloadResult(
+        Config config,
+        string id,
+        string result,
+        string hashCode,
+        Func<bool, string, Task> updateFunc,
+        bool preserveActiveSelection)
     {
         if (result.IsNullOrEmpty())
         {
@@ -236,6 +250,11 @@ public static class SubscriptionHandler
         {
             await RestoreProfilesAsync(config, id, originalProfiles, originalIndexId);
             Logging.SaveLog("Subscription import failed.");
+        }
+        else if (preserveActiveSelection && config.IndexId != originalIndexId)
+        {
+            config.IndexId = originalIndexId;
+            await ConfigHandler.SaveConfig(config);
         }
 
         await updateFunc?.Invoke(false, ret > 0
