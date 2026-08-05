@@ -41,12 +41,33 @@ public sealed class QuietUiStaticTests
         var viewModel = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "ViewModels", "OptionSettingViewModel.cs"));
 
         Assert.Contains("x:Name=\"togEnableAutoCoreSelection\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Content=\"自动匹配合适的内核\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"自动匹配合适的内核\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"tabCoreType\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"txtAutoCoreSelectionTitle\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"自动匹配合适的内核\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"txtAutoCoreSelectionState\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"已开启\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"已关闭\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"自动匹配合适的内核\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.HelpText=", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsThreeState=\"False\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Focusable=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsTabStop=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"自动选择与节点协议、传输方式和加密方式兼容的内核\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"840\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"560\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains(
             "优先使用下方设置；仅在协议、传输或 Shadowsocks 加密方式不兼容时自动切换 Xray / sing-box。关闭后完全按下方手动映射。",
             xaml,
             StringComparison.Ordinal);
         Assert.DoesNotContain("IsEnabled=\"{Binding EnableAutoCoreSelection", xaml, StringComparison.Ordinal);
+        foreach (var combo in new[] { 1, 2, 3, 4, 5, 6, 7, 9 })
+        {
+            Assert.Contains($"x:Name=\"cmbCoreType{combo}\"", xaml, StringComparison.Ordinal);
+        }
         Assert.Contains(
             "vm => vm.EnableAutoCoreSelection, v => v.togEnableAutoCoreSelection.IsChecked",
             codeBehind,
@@ -474,6 +495,48 @@ public sealed class QuietUiStaticTests
         Assert.True(
             captureMethod.IndexOf("pbQuietUpdate.IsPopupOpen = true;", StringComparison.Ordinal)
             < captureMethod.IndexOf("UpdateLayout();", captureMethod.IndexOf("pbQuietUpdate.IsPopupOpen = true;", StringComparison.Ordinal), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void QaCapture_CoreSettingsTargetIsNarrowAndDoesNotSaveOrCreateTray()
+    {
+        var root = FindProjectRoot();
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+        var captureScript = File.ReadAllText(Path.Combine(root, "tools", "capture-qcc-window.ps1"));
+
+        Assert.Contains("--qcc-qa-open-core-settings", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("CaptureCoreSettingsQaFrameAsync", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("settingWindow.tabCoreType.IsSelected = true;", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("ViewModel = new OptionSettingViewModel()", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveCmd", codeBehind[codeBehind.IndexOf("private async Task CaptureCoreSettingsQaFrameAsync", StringComparison.Ordinal)..], StringComparison.Ordinal);
+        Assert.Contains("if (!_coreSettingsQaMode)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("[ValidateSet('Main', 'CoreSettings')]", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$arguments += ' --qcc-qa-open-core-settings'", captureScript, StringComparison.Ordinal);
+        Assert.Contains("ManagedAssembly is restricted to the CoreSettings QA target.", captureScript, StringComparison.Ordinal);
+        Assert.Contains("ManagedAssembly must be an existing absolute DLL path.", captureScript, StringComparison.Ordinal);
+        Assert.Contains("$mikaProcessNames = @(\"$([char]0x7C73)$([char]0x5361)\", 'v2rayN')", captureScript, StringComparison.Ordinal);
+        Assert.Contains("PROTECTED_BEFORE=", captureScript, StringComparison.Ordinal);
+        Assert.Contains("PROTECTED_AFTER=", captureScript, StringComparison.Ordinal);
+
+        var activationStart = codeBehind.IndexOf("this.WhenActivated(disposables =>", StringComparison.Ordinal);
+        var commandBindingsStart = codeBehind.IndexOf("//servers", activationStart, StringComparison.Ordinal);
+        Assert.True(activationStart >= 0 && commandBindingsStart > activationStart);
+        var activationPrelude = codeBehind[activationStart..commandBindingsStart];
+        var runtimeGate = activationPrelude.IndexOf("if (!_coreSettingsQaMode)", StringComparison.Ordinal);
+        var metricsTimer = activationPrelude.IndexOf("new DispatcherTimer", StringComparison.Ordinal);
+        var quotaSchedule = activationPrelude.IndexOf("UpdateSubscriptionQuotaAgeAndSchedule();", StringComparison.Ordinal);
+        Assert.True(runtimeGate >= 0 && runtimeGate < metricsTimer);
+        Assert.True(runtimeGate < quotaSchedule);
+        Assert.DoesNotContain("new DispatcherTimer", activationPrelude[..runtimeGate], StringComparison.Ordinal);
+        Assert.DoesNotContain("UpdateSubscriptionQuotaAgeAndSchedule();", activationPrelude[..runtimeGate], StringComparison.Ordinal);
+
+        var onLoadedStart = codeBehind.IndexOf("protected override void OnLoaded", StringComparison.Ordinal);
+        var updateLoopStart = codeBehind.IndexOf("_ = RefreshQuietUpdateStatusAsync();", onLoadedStart, StringComparison.Ordinal);
+        Assert.True(onLoadedStart >= 0 && updateLoopStart > onLoadedStart);
+        var onLoadedBeforeRuntime = codeBehind[onLoadedStart..updateLoopStart];
+        Assert.Contains("if (_coreSettingsQaMode)", onLoadedBeforeRuntime, StringComparison.Ordinal);
+        Assert.Contains("_ = CaptureQaFrameIfRequestedAsync();", onLoadedBeforeRuntime, StringComparison.Ordinal);
+        Assert.Contains("return;", onLoadedBeforeRuntime, StringComparison.Ordinal);
     }
 
     [Fact]

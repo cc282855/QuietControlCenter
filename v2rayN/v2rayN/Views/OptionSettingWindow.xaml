@@ -12,6 +12,8 @@
     Title="{x:Static resx:ResUI.menuSetting}"
     Width="1000"
     Height="700"
+    MinWidth="840"
+    MinHeight="560"
     x:TypeArguments="vms:OptionSettingViewModel"
     ShowInTaskbar="False"
     Style="{StaticResource WindowGlobal}"
@@ -1385,8 +1387,16 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{x:Static resx:ResUI.TbSettingsCoreType}">
-                <Grid Margin="{StaticResource Margin8}">
+            <TabItem
+                x:Name="tabCoreType"
+                Header="{x:Static resx:ResUI.TbSettingsCoreType}"
+                HorizontalContentAlignment="Stretch">
+                <ScrollViewer
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+                    <Grid
+                        Margin="{StaticResource Margin8}"
+                        HorizontalAlignment="Stretch">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1398,24 +1408,59 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel
-                        Grid.Row="0"
-                        Grid.ColumnSpan="2"
-                        Margin="{StaticResource Margin8}">
-                        <ToggleButton
-                            x:Name="togEnableAutoCoreSelection"
-                            HorizontalAlignment="Left"
-                            Content="自动匹配合适的内核" />
-                        <TextBlock
-                            MaxWidth="760"
-                            Margin="0,8,0,8"
-                            Text="优先使用下方设置；仅在协议、传输或 Shadowsocks 加密方式不兼容时自动切换 Xray / sing-box。关闭后完全按下方手动映射。"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel
+                            Grid.Row="0"
+                            Grid.ColumnSpan="2"
+                            Margin="{StaticResource Margin8}">
+                            <TextBlock
+                                x:Name="txtAutoCoreSelectionTitle"
+                                HorizontalAlignment="Stretch"
+                                Style="{StaticResource ToolbarTextBlock}"
+                                Text="自动匹配合适的内核"
+                                TextWrapping="Wrap" />
+                            <StackPanel
+                                Margin="0,8,0,0"
+                                Orientation="Horizontal">
+                                <ToggleButton
+                                    x:Name="togEnableAutoCoreSelection"
+                                    AutomationProperties.HelpText="开启后会在手动首选内核不兼容时自动切换 Xray 或 sing-box；关闭后完全使用手动映射。"
+                                    AutomationProperties.Name="自动匹配合适的内核"
+                                    Focusable="True"
+                                    HorizontalAlignment="Left"
+                                    IsTabStop="True"
+                                    IsThreeState="False"
+                                    ToolTip="自动选择与节点协议、传输方式和加密方式兼容的内核" />
+                                <TextBlock
+                                    x:Name="txtAutoCoreSelectionState"
+                                    Margin="12,0,0,0"
+                                    AutomationProperties.LiveSetting="Polite"
+                                    VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style
+                                            BasedOn="{StaticResource ToolbarTextBlock}"
+                                            TargetType="TextBlock">
+                                            <Setter Property="Text" Value="已关闭" />
+                                            <Setter Property="Foreground" Value="{StaticResource QccMuted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=togEnableAutoCoreSelection}" Value="True">
+                                                    <Setter Property="Text" Value="已开启" />
+                                                    <Setter Property="Foreground" Value="{StaticResource QccSuccess}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock
+                                Margin="0,8,0,8"
+                                HorizontalAlignment="Stretch"
+                                Text="优先使用下方设置；仅在协议、传输或 Shadowsocks 加密方式不兼容时自动切换 Xray / sing-box。关闭后完全按下方手动映射。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
                     <TextBlock
                         Grid.Row="1"
                         Grid.Column="0"
@@ -1535,7 +1580,8 @@
                         Width="200"
                         Margin="{StaticResource Margin8}"
                         Style="{StaticResource DefComboBox}" />
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
     </DockPanel>

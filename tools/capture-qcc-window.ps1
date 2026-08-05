@@ -1,14 +1,31 @@
-param([Parameter(Mandatory)] [string]$Executable, [Parameter(Mandatory)] [string]$Output, [int]$Width=1487, [int]$Height=1058, [switch]$ReloadCore)
+param(
+    [Parameter(Mandatory)] [string]$Executable,
+    [Parameter(Mandatory)] [string]$Output,
+    [int]$Width=1487,
+    [int]$Height=1058,
+    [ValidateSet('Main', 'CoreSettings')] [string]$Target='Main',
+    [string]$ManagedAssembly,
+    [switch]$ReloadCore)
 $ErrorActionPreference = 'Stop'
 
 if ($ReloadCore) {
     throw 'ReloadCore is forbidden during isolated UI capture.'
 }
+if ($ManagedAssembly) {
+    if ($Target -ne 'CoreSettings') { throw 'ManagedAssembly is restricted to the CoreSettings QA target.' }
+    if (-not [IO.Path]::IsPathRooted($ManagedAssembly) -or
+        $ManagedAssembly -match '^[A-Za-z]:[^\\]' -or
+        [IO.Path]::GetExtension($ManagedAssembly) -ne '.dll' -or
+        -not (Test-Path -LiteralPath $ManagedAssembly -PathType Leaf)) {
+        throw 'ManagedAssembly must be an existing absolute DLL path.'
+    }
+}
 
 $coreProcessNames = @('sing-box', 'mihomo', 'xray')
+$mikaProcessNames = @("$([char]0x7C73)$([char]0x5361)", 'v2rayN')
 function Get-CoreProcessSnapshot {
     @(
-        Get-Process -Name $coreProcessNames -ErrorAction SilentlyContinue |
+        Get-Process -Name ($coreProcessNames + $mikaProcessNames) -ErrorAction SilentlyContinue |
             Sort-Object ProcessName, Id |
             ForEach-Object { "$($_.ProcessName):$($_.Id)" }
     )
@@ -27,6 +44,12 @@ $captureStartUtc = [DateTime]::UtcNow
 $captureFreshnessFloorUtc = $captureStartUtc.AddSeconds(-2)
 $baselineCoreProcesses = @(Get-CoreProcessSnapshot)
 $arguments = "--qcc-qa-capture `"$outputPath`" $Width $Height"
+if ($Target -eq 'CoreSettings') {
+    $arguments += ' --qcc-qa-open-core-settings'
+}
+if ($ManagedAssembly) {
+    $arguments = "`"$([IO.Path]::GetFullPath($ManagedAssembly))`" $arguments"
+}
 $process = Start-Process -FilePath $Executable -WorkingDirectory (Split-Path $Executable) -ArgumentList $arguments -PassThru
 $timedOut = $false
 try {
@@ -54,5 +77,7 @@ try {
         throw "Core process PID drift detected; no core processes were stopped: $($coreProcessDrift -join ', ')"
     }
 
+    "PROTECTED_BEFORE=$($baselineCoreProcesses -join ',')"
+    "PROTECTED_AFTER=$($finalCoreProcesses -join ',')"
     "FIXTURE_PID=$($process.Id) EXIT=$($process.ExitCode)"
 }

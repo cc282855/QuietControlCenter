@@ -35,6 +35,8 @@ public partial class MainWindow
     private double _responsiveFontScale = -1;
     private bool _subscriptionQuotaQaMode = Environment.GetCommandLineArgs()
         .Contains("--qcc-qa-quota-sample", StringComparer.Ordinal);
+    private readonly bool _coreSettingsQaMode = Environment.GetCommandLineArgs()
+        .Contains("--qcc-qa-open-core-settings", StringComparer.Ordinal);
     private static readonly TimeSpan SubscriptionQuotaRefreshInterval = TimeSpan.FromMinutes(5);
     private static readonly DateTimeOffset SubscriptionQuotaQaRenderTime =
         new(2026, 8, 4, 8, 0, 0, TimeSpan.Zero);
@@ -69,24 +71,27 @@ public partial class MainWindow
             // the dashboard's XAML status bindings resolve through DataContext.
             // Keep both surfaces on the same live view model.
             DataContext = ViewModel;
-            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedProxyDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
-                .BindTo(this, v => v.txtHeroProxySpeed.Text)
-                .DisposeWith(disposables);
-            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedDirectDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
-                .BindTo(this, v => v.txtHeroDirectSpeed.Text)
-                .DisposeWith(disposables);
-            var connectionStateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            connectionStateTimer.Tick += LiveMetricsTimer_Tick;
-            connectionStateTimer.Start();
-            UpdateConnectionStateBadge();
-            UpdateSubscriptionQuotaAgeAndSchedule();
-            Disposable.Create(() =>
+            if (!_coreSettingsQaMode)
             {
-                connectionStateTimer.Stop();
-                connectionStateTimer.Tick -= LiveMetricsTimer_Tick;
-            }).DisposeWith(disposables);
+                this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedProxyDisplay)
+                    .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
+                    .BindTo(this, v => v.txtHeroProxySpeed.Text)
+                    .DisposeWith(disposables);
+                this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel.SpeedDirectDisplay)
+                    .Select(value => value.IsNullOrEmpty() ? "↑ 0.0 B/s  ↓ 0.0 B/s" : value)
+                    .BindTo(this, v => v.txtHeroDirectSpeed.Text)
+                    .DisposeWith(disposables);
+                var connectionStateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                connectionStateTimer.Tick += LiveMetricsTimer_Tick;
+                connectionStateTimer.Start();
+                UpdateConnectionStateBadge();
+                UpdateSubscriptionQuotaAgeAndSchedule();
+                Disposable.Create(() =>
+                {
+                    connectionStateTimer.Stop();
+                    connectionStateTimer.Tick -= LiveMetricsTimer_Tick;
+                }).DisposeWith(disposables);
+            }
             //servers
             this.BindCommand(ViewModel, vm => vm.AddVmessServerCmd, v => v.menuAddVmessServer).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddVlessServerCmd, v => v.menuAddVlessServer).DisposeWith(disposables);
@@ -142,9 +147,12 @@ public partial class MainWindow
                 .Subscribe(UpdateLayout)
                 .DisposeWith(disposables);
 
-            this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel)
-                .Subscribe(vm => ViewHost.Show(contentStatusBarView, vm))
-                .DisposeWith(disposables);
+            if (!_coreSettingsQaMode)
+            {
+                this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel)
+                    .Subscribe(vm => ViewHost.Show(contentStatusBarView, vm))
+                    .DisposeWith(disposables);
+            }
 
             ViewModel.ReadTextFromClipboardInteraction.RegisterHandler(interaction =>
             {
@@ -535,6 +543,11 @@ public partial class MainWindow
     protected override void OnLoaded(object? sender, RoutedEventArgs e)
     {
         base.OnLoaded(sender, e);
+        if (_coreSettingsQaMode)
+        {
+            _ = CaptureQaFrameIfRequestedAsync();
+            return;
+        }
         if (_config.UiItem.AutoHideStartup)
         {
             ShowHideWindow(false);
@@ -669,6 +682,11 @@ public partial class MainWindow
             || width is < 900 or > 2000 || height is < 600 or > 1400) return;
         try
         {
+            if (_coreSettingsQaMode)
+            {
+                await CaptureCoreSettingsQaFrameAsync(args[index + 1], width, height);
+                return;
+            }
             Width = width; Height = height; WindowState = WindowState.Normal;
             ApplyResponsiveTypography(width, height);
             UpdateLayout();
@@ -707,6 +725,33 @@ public partial class MainWindow
             StopLiveMetrics();
             Application.Current.Shutdown();
         }
+    }
+
+    private async Task CaptureCoreSettingsQaFrameAsync(string outputPath, int width, int height)
+    {
+        var settingWindow = new OptionSettingWindow
+        {
+            ViewModel = new OptionSettingViewModel(),
+            Width = width,
+            Height = height,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = 0,
+            Top = 0,
+            ShowActivated = false
+        };
+        settingWindow.Show();
+        settingWindow.tabCoreType.IsSelected = true;
+        await Dispatcher.Yield(DispatcherPriority.Loaded);
+        settingWindow.UpdateLayout();
+
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(settingWindow);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        await using var stream = new FileStream(
+            Path.GetFullPath(outputPath), FileMode.Create, FileAccess.Write, FileShare.None);
+        encoder.Save(stream);
+        settingWindow.Close();
     }
 
     private void SubscriptionQuotaRefresh_Click(object sender, RoutedEventArgs e)

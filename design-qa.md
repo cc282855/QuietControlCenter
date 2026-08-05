@@ -70,6 +70,49 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Core automatic-selection control visibility inspection — 2026-08-05
+
+### Source visual truth
+
+- User-reported clipped control: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-b0996567-a9ad-4d7e-9ec0-872e6595f6e2.png`, 1482x1041 pixels. The long label was rendered inside the compact toggle content slot and was unreadable.
+
+### Rendered implementation
+
+- Minimum QA viewport: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/core-settings-900x600.png`, 900x600 at 96 DPI, SHA-256 `0E5D6CCB30739D519791E3F9E45E5B703425163F2B7193F8A0BA4DA3E376C29D`.
+- Default window: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/core-settings-1000x700.png`, 1000x700 at 96 DPI, SHA-256 `2866FD14CAF9A78AECD8094A3BFD069FBAD90F694BDCE93B80466E46FFCA144D`.
+- Standard compact viewport: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/core-settings-1120x720.png`, 1120x720 at 96 DPI, SHA-256 `24E94AC19DB8326CEE9E034012CC09D43C24D12C25A95D4B6B0D8979F9833C49`.
+- Large viewport: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/core-settings-1487x1058.png`, 1487x1058 at 96 DPI, SHA-256 `6CBE6C73835CBA9B69E4E9E59159CAD0CCC07592411B823486E9893F9444B70C`.
+
+### Literal comparison artifacts
+
+- Full source-versus-fixed canvas: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/comparison-core-settings-full-source-vs-fixed.png`, 2974x1058 pixels, SHA-256 `7D59AB7005BFAEB843979FD515702095EF83F9A0ED71E0B96BA8401376467FF7`. The left 1487x1058 panel contains the original 1482x1041 user screenshot centered without resampling; the right panel contains the exact 1487x1058 fixed render. The left input includes the Windows title bar and the user's DPI/manual-mapping state, while the right render intentionally omits operating-system chrome and uses an isolated clean configuration. Those state differences are not treated as UI regressions.
+- Focused bad-toggle-versus-fixed-control canvas: `outputs/QuietControlCenter-v7.24.4.19-core-ui-fix/evidence/comparison-core-settings-toggle-source-vs-fixed.png`, 2200x100 pixels, SHA-256 `9ACC7E1455E1E157C4021307C912F52192EB1F01929AF076C053660BD7726AFF`. The left half is the original unreadable toggle-content region; the right half is the fixed independent title, compact switch, explicit `已开启` state and complete explanation. Both halves are literal crops from the cited inputs.
+
+### Findings
+
+- Typography and content: `自动匹配合适的内核` is now a separate wrapping title. The switch contains no text; the adjacent `已开启` / `已关闭` label reflects its actual checked state. The full compatibility explanation remains visible.
+- Layout and responsiveness: the existing 1000x700 default is preserved, a conservative 840x560 minimum is enforced, and the Core tab uses vertical scrolling with horizontal scrolling disabled. At 900x600 all eight manual mappings and both footer buttons remain visible without clipping or overlap.
+- Interaction and accessibility: the switch remains bound to `EnableAutoCoreSelection`, is two-state, focusable and keyboard reachable, and exposes a Chinese automation name, help text, tooltip and polite live-state announcement. Manual mapping combo boxes remain enabled and editable.
+- Visual consistency: existing font, spacing, color, switch, combo-box, tab and button resources are reused. No global style or unrelated layout was changed.
+- Runtime isolation: final captures ran from a new isolated 7.24.4.19 managed QA directory with no subscriptions. The QA target now bypasses creation of the one-second metrics timer, speed bindings, connection-state polling and subscription-quota scheduling before its `OnLoaded` early return; it also skips update polling and creation of the tray view, never invokes Save, and terminates only its fixture process. Protected processes were unchanged before and after every final capture: `米卡.exe` PID 85116 and `sing-box.exe` PID 51276.
+
+### Comparison history
+
+- Pass 1, user baseline: P1 readability failure—the label was placed inside the compact switch content slot and collapsed into an illegible mark.
+- Pass 2, final full and focused comparisons: the title, switch and state are independently legible; the compatibility description and all manual mappings remain present. No final P0, P1 or P2 issue remains.
+- Pass 3, isolation review: a P2 test-fixture defect was found because ReactiveUI activation still created the one-second metrics timer and called `UpdateSubscriptionQuotaAgeAndSchedule()` before the Core-settings QA `OnLoaded` return. Both operations are now structurally enclosed by `if (!_coreSettingsQaMode)`, with static regression assertions covering timer/quota ordering and the early-return ordering.
+- Pass 4, post-remediation rerender: all four settings screenshots and both literal comparison canvases were regenerated from a fresh isolated directory and are pixel-identical to Pass 2. Fixture PIDs 85996, 82768, 78380 and 2368 exited independently; protected Mika/core PIDs did not change. The P2 is resolved and no final P0, P1 or P2 remains.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: the render-target evidence excludes the operating-system title bar; the complete WPF settings surface is captured at each requested dimension.
+
+final result: passed
+
 ## Active subscription name display verification — 2026-08-05
 
 - The current-node card now resolves the real active profile's subscription and displays only its trimmed remarks as `订阅：名称`. The formatter accepts no URL argument, so domains, paths, query strings and tokens cannot enter this UI text path. Local nodes, removed sources, no active node and unnamed subscriptions use explicit Chinese placeholders.
