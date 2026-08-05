@@ -102,6 +102,7 @@ public class OptionSettingViewModel : MyReactiveObject, ICloseable
 
     #region CoreType
 
+    [Reactive] public bool EnableAutoCoreSelection { get; set; }
     [Reactive] public string CoreType1 { get; set; }
     [Reactive] public string CoreType2 { get; set; }
     [Reactive] public string CoreType3 { get; set; }
@@ -226,6 +227,7 @@ public class OptionSettingViewModel : MyReactiveObject, ICloseable
 
     private async Task InitCoreType()
     {
+        EnableAutoCoreSelection = _config.CoreBasicItem.EnableAutoCoreSelection;
         _config.CoreTypeItem ??= [];
 
         foreach (var it in Enum.GetValues<EConfigType>())
@@ -404,6 +406,7 @@ public class OptionSettingViewModel : MyReactiveObject, ICloseable
 
     private async Task SaveCoreType()
     {
+        _config.CoreBasicItem.EnableAutoCoreSelection = EnableAutoCoreSelection;
         for (var k = 1; k <= _config.CoreTypeItem.Count; k++)
         {
             var item = _config.CoreTypeItem[k - 1];

@@ -22,6 +22,39 @@ public class NodeValidator
     private static readonly HashSet<string> SingboxShadowsocksAllowedTransports =
         [nameof(ETransport.raw), nameof(ETransport.ws)];
 
+    public static bool IsCoreCompatible(ProfileItem item, ECoreType coreType)
+    {
+        if (item.ConfigType is EConfigType.Custom || item.ConfigType.IsGroupType())
+        {
+            return true;
+        }
+
+        var protocolSupported = coreType switch
+        {
+            ECoreType.Xray => Global.XraySupportConfigType.Contains(item.ConfigType),
+            ECoreType.sing_box => Global.SingboxSupportConfigType.Contains(item.ConfigType),
+            _ => false
+        };
+        if (!protocolSupported)
+        {
+            return false;
+        }
+
+        if (coreType == ECoreType.sing_box
+            && ValidateSingboxTransport(item.ConfigType, item.GetNetwork()) != null)
+        {
+            return false;
+        }
+
+        if (item.ConfigType != EConfigType.Shadowsocks)
+        {
+            return true;
+        }
+
+        var method = item.GetProtocolExtra().SsMethod;
+        return !string.IsNullOrEmpty(method) && GetShadowsocksSecurities(coreType).Contains(method);
+    }
+
     public static NodeValidatorResult Validate(ProfileItem item, ECoreType coreType)
     {
         var v = new ValidationContext();
@@ -92,7 +125,7 @@ public class NodeValidator
                 v.Assert(!item.Password.IsNullOrEmpty(), string.Format(ResUI.MsgInvalidProperty, ResUI.TbId3));
                 v.Assert(
                     !string.IsNullOrEmpty(protocolExtra.SsMethod) &&
-                    Global.SsSecuritiesInSingbox.Contains(protocolExtra.SsMethod),
+                    GetShadowsocksSecurities(coreType).Contains(protocolExtra.SsMethod),
                     string.Format(ResUI.MsgInvalidProperty, ResUI.TbSecurity3));
                 break;
         }
@@ -188,6 +221,17 @@ public class NodeValidator
         }
 
         return null;
+    }
+
+    private static IReadOnlyCollection<string> GetShadowsocksSecurities(ECoreType coreType)
+    {
+        return coreType switch
+        {
+            ECoreType.Xray => Global.SsSecuritiesInXray,
+            ECoreType.sing_box => Global.SsSecuritiesInSingbox,
+            ECoreType.v2fly => Global.SsSecurities,
+            _ => Global.SsSecuritiesInSingbox
+        };
     }
 
     private class ValidationContext

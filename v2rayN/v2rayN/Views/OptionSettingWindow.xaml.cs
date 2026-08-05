@@ -129,6 +129,7 @@ public partial class OptionSettingWindow
             this.Bind(ViewModel, vm => vm.TunIPv4Address, v => v.cmbIpv4Address.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.TunIPv6Address, v => v.cmbIpv6Address.Text).DisposeWith(disposables);
 
+            this.Bind(ViewModel, vm => vm.EnableAutoCoreSelection, v => v.togEnableAutoCoreSelection.IsChecked).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.CoreType1, v => v.cmbCoreType1.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.CoreType2, v => v.cmbCoreType2.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.CoreType3, v => v.cmbCoreType3.Text).DisposeWith(disposables);

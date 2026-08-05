@@ -33,6 +33,30 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
+    public void CoreTypeSettings_ExposeAutomaticCompatibilitySelectionWithoutDisablingPreferences()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "OptionSettingWindow.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "OptionSettingWindow.xaml.cs"));
+        var viewModel = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "ViewModels", "OptionSettingViewModel.cs"));
+
+        Assert.Contains("x:Name=\"togEnableAutoCoreSelection\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"自动匹配合适的内核\"", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "优先使用下方设置；仅在协议、传输或 Shadowsocks 加密方式不兼容时自动切换 Xray / sing-box。关闭后完全按下方手动映射。",
+            xaml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("IsEnabled=\"{Binding EnableAutoCoreSelection", xaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "vm => vm.EnableAutoCoreSelection, v => v.togEnableAutoCoreSelection.IsChecked",
+            codeBehind,
+            StringComparison.Ordinal);
+        Assert.Contains("[Reactive] public bool EnableAutoCoreSelection", viewModel, StringComparison.Ordinal);
+        Assert.Contains("EnableAutoCoreSelection = _config.CoreBasicItem.EnableAutoCoreSelection", viewModel, StringComparison.Ordinal);
+        Assert.Contains("_config.CoreBasicItem.EnableAutoCoreSelection = EnableAutoCoreSelection", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProfileColumnEventOnlyAppliesVisibilityWithoutRestoringLayout()
     {
         var root = FindProjectRoot();

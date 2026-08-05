@@ -20,6 +20,8 @@ public class CoreBasicItem
     public bool EnableFinalFragment { get; set; }
 
     public bool EnableCacheFile4Sbox { get; set; } = true;
+
+    public bool EnableAutoCoreSelection { get; set; } = true;
 }
 
 [Serializable]

@@ -1402,6 +1402,20 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <StackPanel
+                        Grid.Row="0"
+                        Grid.ColumnSpan="2"
+                        Margin="{StaticResource Margin8}">
+                        <ToggleButton
+                            x:Name="togEnableAutoCoreSelection"
+                            HorizontalAlignment="Left"
+                            Content="自动匹配合适的内核" />
+                        <TextBlock
+                            MaxWidth="760"
+                            Margin="0,8,0,8"
+                            Text="优先使用下方设置；仅在协议、传输或 Shadowsocks 加密方式不兼容时自动切换 Xray / sing-box。关闭后完全按下方手动映射。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
                     <TextBlock
                         Grid.Row="1"
                         Grid.Column="0"

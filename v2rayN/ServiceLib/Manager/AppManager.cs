@@ -671,7 +671,47 @@ public sealed class AppManager
         }
 
         var item = _config.CoreTypeItem?.FirstOrDefault(it => it.ConfigType == eConfigType);
-        return item?.CoreType ?? ECoreType.Xray;
+        var preferred = item?.CoreType ?? ECoreType.Xray;
+        return SelectCoreType(
+            profileItem,
+            eConfigType,
+            preferred,
+            _config.CoreBasicItem.EnableAutoCoreSelection);
+    }
+
+    public static ECoreType SelectCoreType(
+        ProfileItem? profileItem,
+        EConfigType eConfigType,
+        ECoreType preferred,
+        bool enableAutoCoreSelection)
+    {
+        if (profileItem?.CoreType != null)
+        {
+            return (ECoreType)profileItem.CoreType;
+        }
+
+        if (!enableAutoCoreSelection)
+        {
+            return preferred;
+        }
+
+        if (profileItem == null
+            || eConfigType is EConfigType.Custom
+            || eConfigType.IsGroupType()
+            || profileItem.ConfigType is EConfigType.Custom
+            || profileItem.ConfigType.IsGroupType()
+            || preferred is not (ECoreType.Xray or ECoreType.sing_box))
+        {
+            return preferred;
+        }
+
+        if (NodeValidator.IsCoreCompatible(profileItem, preferred))
+        {
+            return preferred;
+        }
+
+        var alternative = preferred == ECoreType.Xray ? ECoreType.sing_box : ECoreType.Xray;
+        return NodeValidator.IsCoreCompatible(profileItem, alternative) ? alternative : preferred;
     }
 
     #endregion Core Type

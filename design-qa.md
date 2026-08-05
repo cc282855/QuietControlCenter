@@ -323,3 +323,24 @@ final result: passed
 - The task did not launch, stop, restart or signal the active Mika or sing-box processes. The new 7.24.4.16 executable was not launched.
 
 final result: passed
+
+## Automatic compatible-core selection verification — 2026-08-05
+
+- Version `7.24.4.18` selects between Xray and sing-box after a subscription has been parsed into nodes. The decision uses each node's protocol, normalized transport and, for Shadowsocks, encryption method; it does not inspect or classify the subscription URL itself.
+- A node's explicit core remains highest priority. With automatic matching disabled, the existing manual core mapping is used unchanged. With it enabled, the manual mapping remains preferred and only falls back to the other Xray/sing-box core when the preferred core is incompatible. Custom, strategy-group and non-Xray/sing-box mappings retain their prior behavior.
+- TUIC, AnyTLS and Naive select sing-box when the manual preference is incompatible. `kcp` and `xhttp` nodes fall back from sing-box to Xray. Hysteria2 and WireGuard preserve the preferred compatible core. Unknown or mutually unsupported combinations remain on the preferred core so the existing validator can report the actual incompatibility.
+- The Chinese option `自动匹配合适的内核` is enabled by default, including for older configurations that do not contain the new field. Existing manual mapping controls remain available and save normally.
+- Release solution build completed with 0 warnings and 0 errors. `ServiceLib.Tests`: 233/233. `v2rayN.Tests`: 73/73. `git diff --check`: exit 0. Independent review found no P0-P3 issue.
+- Public package marker: product `QuietControlCenter`, platform `win-x64`, version `7.24.4.18`; 35/35 immutable payload hashes matched, with 36 ZIP entries and no forbidden/private runtime entries. ZIP SHA-256: `AF702A61B80D2FC6696434BC4861809AA6DBA78362A86BEEF0080FCE17D0D72C`; size 190,873,187 bytes.
+- The public ZIP contains no `guiConfigs`, database, log, key, subscription or local-continuity data. The separate local continuity build preserves 2 subscription records and 174 profiles through a SQLite backup whose integrity result is `ok`; no subscription values were inspected or printed.
+- Process isolation: the task did not stop, restart, overwrite or signal Mika PID 85116 or its core. The user-controlled Mika process independently replaced sing-box PID 87832 with PID 72228 during final verification; the new `7.24.4.18` executable was not launched.
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: the selected core is resolved at runtime and is not yet shown as a separate per-node table column.
+
+final result: passed
