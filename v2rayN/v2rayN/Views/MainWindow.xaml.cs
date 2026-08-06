@@ -1119,6 +1119,7 @@ public partial class MainWindow
     {
         var connected = UpdateConnectionStateBadge();
         UpdateSubscriptionQuotaAgeAndSchedule();
+        ViewModel?.ProfilesViewModel.RefreshTrafficPeriodDisplay();
         ViewModel?.StatusBarViewModel.RefreshLiveTrafficState(connected);
         if (!connected)
         {

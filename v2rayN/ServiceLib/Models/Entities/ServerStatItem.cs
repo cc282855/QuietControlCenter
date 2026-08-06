@@ -15,4 +15,10 @@ public class ServerStatItem
     public long TodayDown { get; set; }
 
     public long DateNow { get; set; }
+
+    public long MonthUp { get; set; }
+
+    public long MonthDown { get; set; }
+
+    public long MonthNow { get; set; }
 }

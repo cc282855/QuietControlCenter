@@ -276,9 +276,10 @@
                                     Margin="0,4,0,0"
                                     Foreground="{StaticResource QccMuted}"
                                     FontSize="{DynamicResource QccFontSmall}"
-                                    Text="{Binding ProfilesViewModel.ActiveSubscriptionDisplay, FallbackValue=订阅：—}"
-                                    TextTrimming="CharacterEllipsis"
-                                    ToolTip="{Binding ProfilesViewModel.ActiveSubscriptionDisplay}" />
+                                    TextWrapping="Wrap"
+                                    ToolTip="当前活动节点经代理核心产生的实际流量；升级后的首月从零开始统计">
+                                    <Run Text="{Binding ProfilesViewModel.ActiveSubscriptionDisplay, FallbackValue=订阅：—}" /><Run Text="  ·  " /><Run Text="{Binding StatusBarViewModel.ActiveNodeTrafficDisplay, FallbackValue=流量统计未启用}" />
+                                </TextBlock>
                             </StackPanel>
 
                             <Border x:Name="cardSubscriptionQuota" Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource QccCard}">

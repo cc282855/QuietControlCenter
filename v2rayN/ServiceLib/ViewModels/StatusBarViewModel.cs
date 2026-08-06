@@ -97,6 +97,9 @@ public class StatusBarViewModel : MyReactiveObject
     public string SpeedDirectDisplay { get; set; }
 
     [Reactive]
+    public string ActiveNodeTrafficDisplay { get; set; }
+
+    [Reactive]
     public bool EnableTun { get; set; }
 
     [Reactive]
@@ -110,6 +113,7 @@ public class StatusBarViewModel : MyReactiveObject
         SelectedRouting = new();
         SelectedServer = new();
         RunningServerToolTipText = GetRunningServerToolTipText("-");
+        ActiveNodeTrafficDisplay = GetUnavailableTrafficDisplay();
         ResetLiveTrafficDisplay();
         BlSystemProxyPacVisible = Utils.IsWindows();
         BlIsNonWindows = Utils.IsNonWindows();
@@ -282,6 +286,7 @@ public class StatusBarViewModel : MyReactiveObject
             RunningServerDisplay = ResUI.CheckServerSettings;
             RunningServerToolTipText = GetRunningServerToolTipText(RunningServerDisplay);
         }
+        RefreshActiveNodeTrafficDisplay();
     }
 
     private string GetRunningServerToolTipText(string serverInfo)
@@ -543,6 +548,9 @@ public class StatusBarViewModel : MyReactiveObject
             }
             SpeedProxyDisplay = FormatLiveTraffic(update.ProxyUp, update.ProxyDown);
             SpeedDirectDisplay = FormatLiveTraffic(update.DirectUp, update.DirectDown);
+            ActiveNodeTrafficDisplay = _config.GuiItem.EnableStatistics
+                ? FormatPeriodTraffic(update.TodayUp, update.TodayDown, update.MonthUp, update.MonthDown)
+                : GetUnavailableTrafficDisplay();
             _lastStatisticsAtUtc = DateTime.UtcNow;
         }
         catch
@@ -553,6 +561,7 @@ public class StatusBarViewModel : MyReactiveObject
 
     public void RefreshLiveTrafficState(bool connected)
     {
+        RefreshActiveNodeTrafficDisplay();
         if (!connected)
         {
             _lastStatisticsAtUtc = DateTime.MinValue;
@@ -573,6 +582,45 @@ public class StatusBarViewModel : MyReactiveObject
 
     private static string FormatLiveTraffic(long up, long down) =>
         $"↑ {Utils.HumanFy(Math.Max(0, up))}/s  ↓ {Utils.HumanFy(Math.Max(0, down))}/s";
+
+    private void RefreshActiveNodeTrafficDisplay()
+    {
+        if (!_config.GuiItem.EnableStatistics)
+        {
+            ActiveNodeTrafficDisplay = GetUnavailableTrafficDisplay();
+            return;
+        }
+
+        if (_config.IndexId.IsNullOrEmpty())
+        {
+            ActiveNodeTrafficDisplay = "未选择活动节点";
+            return;
+        }
+
+        var stat = StatisticsManager.Instance.ServerStat?.FirstOrDefault(item => item.IndexId == _config.IndexId);
+        if (stat is null)
+        {
+            ActiveNodeTrafficDisplay = FormatPeriodTraffic(0, 0, 0, 0);
+            return;
+        }
+
+        var now = DateTime.Now;
+        var today = ServerTrafficPeriod.GetTodayValues(stat, now);
+        var monthUp = stat.MonthNow == ServerTrafficPeriod.GetMonthKey(now) ? stat.MonthUp : 0;
+        var monthDown = stat.MonthNow == ServerTrafficPeriod.GetMonthKey(now) ? stat.MonthDown : 0;
+        ActiveNodeTrafficDisplay = FormatPeriodTraffic(today.Up, today.Down, monthUp, monthDown);
+    }
+
+    private static string GetUnavailableTrafficDisplay() => "流量统计未启用";
+
+    private static string FormatPeriodTraffic(long todayUp, long todayDown, long monthUp, long monthDown) =>
+        $"今日 ↑ {FormatStoredTraffic(todayUp)}  ↓ {FormatStoredTraffic(todayDown)}  ·  "
+        + $"本月 ↑ {FormatStoredTraffic(monthUp)}  ↓ {FormatStoredTraffic(monthDown)}";
+
+    private static string FormatStoredTraffic(long kilobytes)
+    {
+        return Utils.HumanFy(Math.Max(0, kilobytes));
+    }
 
     #endregion UI
 }

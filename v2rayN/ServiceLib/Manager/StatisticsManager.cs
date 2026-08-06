@@ -125,11 +125,18 @@ public class StatisticsManager
     private async Task InitData()
     {
         await SQLiteHelper.Instance.ExecuteAsync($"delete from ServerStatItem where indexId not in ( select indexId from ProfileItem )");
-
-        var ticks = DateTime.Now.Date.Ticks;
-        await SQLiteHelper.Instance.ExecuteAsync($"update ServerStatItem set todayUp = 0,todayDown=0,dateNow={ticks} where dateNow<>{ticks}");
-
         _lstServerStat = await SQLiteHelper.Instance.TableAsync<ServerStatItem>().ToListAsync();
+
+        var now = DateTime.Now;
+        var changed = false;
+        foreach (var item in _lstServerStat)
+        {
+            changed |= ServerTrafficPeriod.Normalize(item, now);
+        }
+        if (changed)
+        {
+            await SQLiteHelper.Instance.UpdateAllAsync(_lstServerStat);
+        }
     }
 
     private async Task UpdateServerStatHandler(ServerSpeedItem server)
@@ -168,13 +175,17 @@ public class StatisticsManager
                         _historyAccumulators[_config.IndexId] = accumulator;
                     }
                     var transferred = accumulator.Add(server.ProxyUpBytes, server.ProxyDownBytes);
-                    _serverStatItem.TodayUp += transferred.UpKilobytes;
-                    _serverStatItem.TodayDown += transferred.DownKilobytes;
-                    _serverStatItem.TotalUp += transferred.UpKilobytes;
-                    _serverStatItem.TotalDown += transferred.DownKilobytes;
+                    ServerTrafficPeriod.Add(
+                        _serverStatItem,
+                        transferred.UpKilobytes,
+                        transferred.DownKilobytes,
+                        DateTime.Now);
                 }
                 server.TodayUp = _serverStatItem.TodayUp;
                 server.TodayDown = _serverStatItem.TodayDown;
+                server.MonthUp = _serverStatItem.MonthUp;
+                server.MonthDown = _serverStatItem.MonthDown;
+                server.MonthNow = _serverStatItem.MonthNow;
                 server.TotalUp = _serverStatItem.TotalUp;
                 server.TotalDown = _serverStatItem.TotalDown;
             }
@@ -203,7 +214,7 @@ public class StatisticsManager
 
     private async Task GetServerStatItem(string indexId)
     {
-        var ticks = DateTime.Now.Date.Ticks;
+        var now = DateTime.Now;
         if (_serverStatItem != null && _serverStatItem.IndexId != indexId)
         {
             _serverStatItem = null;
@@ -221,18 +232,16 @@ public class StatisticsManager
                     TotalDown = 0,
                     TodayUp = 0,
                     TodayDown = 0,
-                    DateNow = ticks
+                    DateNow = ServerTrafficPeriod.GetDayKey(now),
+                    MonthUp = 0,
+                    MonthDown = 0,
+                    MonthNow = ServerTrafficPeriod.GetMonthKey(now)
                 };
                 await SQLiteHelper.Instance.ReplaceAsync(_serverStatItem);
                 _lstServerStat.Add(_serverStatItem);
             }
         }
 
-        if (_serverStatItem.DateNow != ticks)
-        {
-            _serverStatItem.TodayUp = 0;
-            _serverStatItem.TodayDown = 0;
-            _serverStatItem.DateNow = ticks;
-        }
+        ServerTrafficPeriod.Normalize(_serverStatItem, now);
     }
 }

@@ -497,6 +497,7 @@ public partial class ProfilesView
             }
 
             ApplyProfileColumnVisibility();
+            ApplyStatisticsColumnVisibility();
         }
         catch (Exception ex)
         {
@@ -511,6 +512,15 @@ public partial class ProfilesView
             column.Visibility = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, column.ExName)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+    }
+
+    private void ApplyStatisticsColumnVisibility()
+    {
+        var visibility = _config.GuiItem.EnableStatistics ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var column in new[] { colTodayUp, colTodayDown, colTotalUp, colTotalDown })
+        {
+            column.Visibility = visibility;
         }
     }
 

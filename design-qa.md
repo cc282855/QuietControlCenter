@@ -70,6 +70,35 @@ P3: the fallback inspector scrollbar remains available for unusually long multi-
 
 final result: passed
 
+## Profile traffic columns and active-node period totals — 2026-08-05
+
+### Source visual truth
+
+- User reference: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-3b0b4492-c3ca-45d0-8aa7-c5a3afed67f1.png`, 1290x809 pixels.
+- The reference shows the node table ending at the port column, with the historical traffic columns unreachable.
+
+### Implementation evidence
+
+- The native DataGrid retains virtualization and uses its own automatic horizontal scrollbar plus two-axis touch panning.
+- Four persisted traffic columns now receive explicit 104 DIP widths with 96 DIP minimums and are made visible whenever statistics are enabled, independently of legacy column-width metadata.
+- Header and cell horizontal padding is reduced from 12 to 8 DIP; truncated cell content has a full-value tooltip.
+- The current-node summary wraps the subscription name followed by actual today/month upload and download totals. Stored values are scoped to the active node and reset at local day/month boundaries.
+- Static XAML parsing, all 239 ServiceLib tests, all 77 UI tests, and the WPF win-x64 Release build passed with 0 warnings and 0 errors.
+
+### Blocking visual gate
+
+- A same-state implementation screenshot could not be captured from this Codex session. The main PE intentionally requires administrator elevation, while the capture host cannot accept the Windows elevation boundary. Two isolated capture fixtures were terminated by their exact spawned PIDs after timeout.
+- The pre-existing `玄同` PID 83292 and `sing-box` PID 40536 remained running and were not signaled, restarted, or replaced. No user configuration, database, or subscription URL was read.
+- Because no rendered implementation frame exists in the same populated-table state as the reference, visible clipping, scrollbar reachability, and 1120x720/1487x1058 pixel fidelity cannot be truthfully marked passed here.
+
+P0: none found by static or automated validation
+
+P1: visual comparison unavailable
+
+P2: none found by static or automated validation
+
+final result: blocked
+
 ## Brand icon generation and application-surface verification — 2026-08-05
 
 Source and generation mode:
@@ -435,3 +464,9 @@ P2: none
 P3: the selected core is resolved at runtime and is not yet shown as a separate per-node table column.
 
 final result: passed
+
+## Latest gate — profile traffic layout — 2026-08-05
+
+Automated tests and the Release build pass, but the current administrator-elevation boundary prevents a same-state rendered screenshot. The latest visual gate for the profile-traffic layout therefore remains blocked; no running client or proxy-core process was interrupted for capture.
+
+final result: blocked

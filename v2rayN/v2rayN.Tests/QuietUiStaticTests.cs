@@ -93,6 +93,30 @@ public sealed class QuietUiStaticTests
         Assert.True(restoreStart >= 0 && visibilityMethodStart > restoreStart);
         var restoreMethod = codeBehind[restoreStart..visibilityMethodStart];
         Assert.Contains("ApplyProfileColumnVisibility();", restoreMethod, StringComparison.Ordinal);
+        Assert.Contains("ApplyStatisticsColumnVisibility();", restoreMethod, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProfileTrafficColumns_AreRecoverableCompactAndHorizontallyScrollable()
+    {
+        var root = FindProjectRoot();
+        var xaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml.cs"));
+        var profilesViewModel = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "ViewModels", "ProfilesViewModel.cs"));
+        var mainWindowCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+
+        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.PanningMode=\"Both\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Padding\" Value=\"8,0\" />", xaml, StringComparison.Ordinal);
+        foreach (var column in new[] { "colTodayUp", "colTodayDown", "colTotalUp", "colTotalDown" })
+        {
+            Assert.Contains($"x:Name=\"{column}\" Width=\"104\" MinWidth=\"96\"", xaml, StringComparison.Ordinal);
+        }
+        Assert.Contains("private void ApplyStatisticsColumnVisibility()", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("new[] { colTodayUp, colTodayDown, colTotalUp, colTotalDown }", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("(update.ProxyUp + update.ProxyDown) <= 0", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("ServerTrafficPeriod.GetTodayValues(t22, now)", profilesViewModel, StringComparison.Ordinal);
+        Assert.Contains("ProfilesViewModel.RefreshTrafficPeriodDisplay();", mainWindowCode, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -785,6 +809,9 @@ public sealed class QuietUiStaticTests
         Assert.Contains("ActiveProfileRemarks = activeProfile?.Remarks ?? \"尚未连接\"", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("ProfilesViewModel.ActiveProfileRemarks", mainWindow, StringComparison.Ordinal);
         Assert.Contains("ProfilesViewModel.ActiveSubscriptionDisplay", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("StatusBarViewModel.ActiveNodeTrafficDisplay", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("今日 ↑", File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "StatusBarViewModel.cs")), StringComparison.Ordinal);
+        Assert.Contains("本月 ↑", File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "StatusBarViewModel.cs")), StringComparison.Ordinal);
         Assert.DoesNotContain("ProfilesViewModel.SelectedProfile.Remarks", mainWindow, StringComparison.Ordinal);
 
         Assert.Contains("ActiveNodeMarkerConverter", profilesView, StringComparison.Ordinal);

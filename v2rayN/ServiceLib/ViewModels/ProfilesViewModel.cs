@@ -23,6 +23,7 @@ public class ProfilesViewModel : MyReactiveObject
     private bool _updatingCountrySelection;
     private readonly bool _persistNormalizedCountryAtStartup;
     private readonly Func<string, Task<SubscriptionUpdateResult>>? _firstUpdateAsync;
+    private long _trafficDisplayDayKey = ServerTrafficPeriod.GetDayKey(DateTime.Now);
 
     #endregion private prop
 
@@ -344,8 +345,8 @@ public class ProfilesViewModel : MyReactiveObject
 
     public async Task UpdateStatistics(ServerSpeedItem update)
     {
+        RefreshTrafficPeriodDisplay();
         if (!_config.GuiItem.EnableStatistics
-            || (update.ProxyUp + update.ProxyDown) <= 0
             || DateTime.Now.Second % 3 != 0)
         {
             return;
@@ -366,6 +367,27 @@ public class ProfilesViewModel : MyReactiveObject
         {
         }
         await Task.CompletedTask;
+    }
+
+    public void RefreshTrafficPeriodDisplay()
+    {
+        if (!_config.GuiItem.EnableStatistics)
+        {
+            return;
+        }
+
+        var dayKey = ServerTrafficPeriod.GetDayKey(DateTime.Now);
+        if (_trafficDisplayDayKey == dayKey)
+        {
+            return;
+        }
+
+        _trafficDisplayDayKey = dayKey;
+        foreach (var item in ProfileItems)
+        {
+            item.TodayDown = Utils.HumanFy(0);
+            item.TodayUp = Utils.HumanFy(0);
+        }
     }
 
     #endregion Actions
@@ -525,11 +547,14 @@ public class ProfilesViewModel : MyReactiveObject
 
         var lstServerStat = (_config.GuiItem.EnableStatistics ? StatisticsManager.Instance.ServerStat : null) ?? [];
         var lstProfileExs = await ProfileExManager.Instance.GetProfileExs();
+        var now = DateTime.Now;
+        _trafficDisplayDayKey = ServerTrafficPeriod.GetDayKey(now);
         lstModel = (from t in lstModel
                     join t2 in lstServerStat on t.IndexId equals t2.IndexId into t2b
                     from t22 in t2b.DefaultIfEmpty()
                     join t3 in lstProfileExs on t.IndexId equals t3.IndexId into t3b
                     from t33 in t3b.DefaultIfEmpty()
+                    let today = ServerTrafficPeriod.GetTodayValues(t22, now)
                     select new ProfileItemModel
                     {
                         IndexId = t.IndexId,
@@ -550,8 +575,8 @@ public class ProfilesViewModel : MyReactiveObject
                         DelayVal = t33?.Delay != 0 ? $"{t33?.Delay}" : string.Empty,
                         SpeedVal = t33?.Speed > 0 ? $"{t33?.Speed}" : t33?.Message ?? string.Empty,
                         IpInfo = t33?.IpInfo ?? string.Empty,
-                        TodayDown = t22 == null ? "" : Utils.HumanFy(t22.TodayDown),
-                        TodayUp = t22 == null ? "" : Utils.HumanFy(t22.TodayUp),
+                        TodayDown = t22 == null ? "" : Utils.HumanFy(today.Down),
+                        TodayUp = t22 == null ? "" : Utils.HumanFy(today.Up),
                         TotalDown = t22 == null ? "" : Utils.HumanFy(t22.TotalDown),
                         TotalUp = t22 == null ? "" : Utils.HumanFy(t22.TotalUp)
                     }).OrderBy(t => t.Sort).ToList();

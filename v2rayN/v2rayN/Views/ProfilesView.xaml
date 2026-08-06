@@ -171,6 +171,7 @@
                 IsReadOnly="True"
                 RowHeaderWidth="0"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                ScrollViewer.PanningMode="Both"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 SelectionMode="Extended"
                 SelectionUnit="FullRow"
@@ -182,7 +183,7 @@
                         <Setter Property="Background" Value="{StaticResource QccSurfaceRaised}" />
                         <Setter Property="Foreground" Value="{StaticResource QccMuted}" />
                         <Setter Property="FontWeight" Value="SemiBold" />
-                        <Setter Property="Padding" Value="12,0" />
+                        <Setter Property="Padding" Value="8,0" />
                         <EventSetter Event="Click" Handler="LstProfiles_ColumnHeader_Click" />
                     </Style>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource MaterialDesignDataGridRow}">
@@ -197,9 +198,10 @@
                         </Style.Triggers>
                     </Style>
                     <Style TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
-                        <Setter Property="Padding" Value="12,0" />
+                        <Setter Property="Padding" Value="8,0" />
                         <Setter Property="BorderThickness" Value="0" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
+                        <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Content.Text}" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsActive}" Value="True">
                                 <Setter Property="Foreground" Value="{StaticResource QccPrimary}" />
@@ -285,10 +287,10 @@
                     <base:MyDGTextColumn x:Name="colAddress" Width="1.25*" MinWidth="168" Binding="{Binding Address}" ExName="Address" Header="地址" />
                     <base:MyDGTextColumn x:Name="colPort" Width="70" MinWidth="68" Binding="{Binding Port}" ExName="Port" Header="端口" />
                     <base:MyDGTextColumn x:Name="colSecurity" Width="90" MinWidth="86" Binding="{Binding StreamSecurity}" ExName="StreamSecurity" Header="安全" />
-                    <base:MyDGTextColumn x:Name="colTodayUp" Visibility="Collapsed" Binding="{Binding TodayUp}" ExName="TodayUp" Header="今日上传" />
-                    <base:MyDGTextColumn x:Name="colTodayDown" Visibility="Collapsed" Binding="{Binding TodayDown}" ExName="TodayDown" Header="今日下载" />
-                    <base:MyDGTextColumn x:Name="colTotalUp" Visibility="Collapsed" Binding="{Binding TotalUp}" ExName="TotalUp" Header="累计上传" />
-                    <base:MyDGTextColumn x:Name="colTotalDown" Visibility="Collapsed" Binding="{Binding TotalDown}" ExName="TotalDown" Header="累计下载" />
+                    <base:MyDGTextColumn x:Name="colTodayUp" Width="104" MinWidth="96" Visibility="Collapsed" Binding="{Binding TodayUp}" ExName="TodayUp" Header="今日上传" />
+                    <base:MyDGTextColumn x:Name="colTodayDown" Width="104" MinWidth="96" Visibility="Collapsed" Binding="{Binding TodayDown}" ExName="TodayDown" Header="今日下载" />
+                    <base:MyDGTextColumn x:Name="colTotalUp" Width="104" MinWidth="96" Visibility="Collapsed" Binding="{Binding TotalUp}" ExName="TotalUp" Header="累计上传" />
+                    <base:MyDGTextColumn x:Name="colTotalDown" Width="104" MinWidth="96" Visibility="Collapsed" Binding="{Binding TotalDown}" ExName="TotalDown" Header="累计下载" />
                     <base:MyDGTextColumn x:Name="colIpInfo" Visibility="Collapsed" Binding="{Binding IpInfo}" ExName="IpInfo" Header="IP 信息" />
                 </DataGrid.Columns>
             </DataGrid>
