@@ -797,6 +797,7 @@ public sealed class QuietUiStaticTests
         var serviceRoot = Path.Combine(root, "v2rayN", "ServiceLib");
         var profilesViewModel = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "ProfilesViewModel.cs"));
         var mainWindow = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
+        var mainWindowCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
         var profilesView = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
         var profilesCodeBehind = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml.cs"));
 
@@ -809,9 +810,21 @@ public sealed class QuietUiStaticTests
         Assert.Contains("ActiveProfileRemarks = activeProfile?.Remarks ?? \"尚未连接\"", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("ProfilesViewModel.ActiveProfileRemarks", mainWindow, StringComparison.Ordinal);
         Assert.Contains("ProfilesViewModel.ActiveSubscriptionDisplay", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("StatusBarViewModel.ActiveNodeTrafficDisplay", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("今日 ↑", File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "StatusBarViewModel.cs")), StringComparison.Ordinal);
-        Assert.Contains("本月 ↑", File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "StatusBarViewModel.cs")), StringComparison.Ordinal);
+        var statusBarViewModel = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "StatusBarViewModel.cs"));
+        Assert.Contains("x:Name=\"cardActiveNodeTraffic\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Text=\"当日流量\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Text=\"本月流量\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("StatusBarViewModel.ActiveNodeTodayTrafficDisplay", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("StatusBarViewModel.ActiveNodeMonthTrafficDisplay", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("public string ActiveNodeTodayTrafficDisplay", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("public string ActiveNodeMonthTrafficDisplay", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("FormatTrafficPair(update.TodayUp, update.TodayDown)", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("FormatTrafficPair(update.MonthUp, update.MonthDown)", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("FormatTrafficPair(today.Up, today.Down)", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("FormatTrafficPair(monthUp, monthDown)", statusBarViewModel, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("--qcc-qa-active-node-sample", mainWindowCode, StringComparison.Ordinal);
+        Assert.Contains("ApplyQaActiveNodeSampleIfRequested(args)", mainWindowCode, StringComparison.Ordinal);
         Assert.DoesNotContain("ProfilesViewModel.SelectedProfile.Remarks", mainWindow, StringComparison.Ordinal);
 
         Assert.Contains("ActiveNodeMarkerConverter", profilesView, StringComparison.Ordinal);

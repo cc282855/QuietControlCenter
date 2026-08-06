@@ -100,6 +100,12 @@ public class StatusBarViewModel : MyReactiveObject
     public string ActiveNodeTrafficDisplay { get; set; }
 
     [Reactive]
+    public string ActiveNodeTodayTrafficDisplay { get; set; }
+
+    [Reactive]
+    public string ActiveNodeMonthTrafficDisplay { get; set; }
+
+    [Reactive]
     public bool EnableTun { get; set; }
 
     [Reactive]
@@ -113,7 +119,7 @@ public class StatusBarViewModel : MyReactiveObject
         SelectedRouting = new();
         SelectedServer = new();
         RunningServerToolTipText = GetRunningServerToolTipText("-");
-        ActiveNodeTrafficDisplay = GetUnavailableTrafficDisplay();
+        SetActiveNodeTrafficDisplay(GetUnavailableTrafficDisplay(), GetUnavailableTrafficDisplay());
         ResetLiveTrafficDisplay();
         BlSystemProxyPacVisible = Utils.IsWindows();
         BlIsNonWindows = Utils.IsNonWindows();
@@ -548,9 +554,16 @@ public class StatusBarViewModel : MyReactiveObject
             }
             SpeedProxyDisplay = FormatLiveTraffic(update.ProxyUp, update.ProxyDown);
             SpeedDirectDisplay = FormatLiveTraffic(update.DirectUp, update.DirectDown);
-            ActiveNodeTrafficDisplay = _config.GuiItem.EnableStatistics
-                ? FormatPeriodTraffic(update.TodayUp, update.TodayDown, update.MonthUp, update.MonthDown)
-                : GetUnavailableTrafficDisplay();
+            if (_config.GuiItem.EnableStatistics)
+            {
+                SetActiveNodeTrafficDisplay(
+                    FormatTrafficPair(update.TodayUp, update.TodayDown),
+                    FormatTrafficPair(update.MonthUp, update.MonthDown));
+            }
+            else
+            {
+                SetActiveNodeTrafficDisplay(GetUnavailableTrafficDisplay(), GetUnavailableTrafficDisplay());
+            }
             _lastStatisticsAtUtc = DateTime.UtcNow;
         }
         catch
@@ -587,20 +600,20 @@ public class StatusBarViewModel : MyReactiveObject
     {
         if (!_config.GuiItem.EnableStatistics)
         {
-            ActiveNodeTrafficDisplay = GetUnavailableTrafficDisplay();
+            SetActiveNodeTrafficDisplay(GetUnavailableTrafficDisplay(), GetUnavailableTrafficDisplay());
             return;
         }
 
         if (_config.IndexId.IsNullOrEmpty())
         {
-            ActiveNodeTrafficDisplay = "未选择活动节点";
+            SetActiveNodeTrafficDisplay("未选择活动节点", "未选择活动节点");
             return;
         }
 
         var stat = StatisticsManager.Instance.ServerStat?.FirstOrDefault(item => item.IndexId == _config.IndexId);
         if (stat is null)
         {
-            ActiveNodeTrafficDisplay = FormatPeriodTraffic(0, 0, 0, 0);
+            SetActiveNodeTrafficDisplay(FormatTrafficPair(0, 0), FormatTrafficPair(0, 0));
             return;
         }
 
@@ -608,14 +621,22 @@ public class StatusBarViewModel : MyReactiveObject
         var today = ServerTrafficPeriod.GetTodayValues(stat, now);
         var monthUp = stat.MonthNow == ServerTrafficPeriod.GetMonthKey(now) ? stat.MonthUp : 0;
         var monthDown = stat.MonthNow == ServerTrafficPeriod.GetMonthKey(now) ? stat.MonthDown : 0;
-        ActiveNodeTrafficDisplay = FormatPeriodTraffic(today.Up, today.Down, monthUp, monthDown);
+        SetActiveNodeTrafficDisplay(
+            FormatTrafficPair(today.Up, today.Down),
+            FormatTrafficPair(monthUp, monthDown));
     }
 
     private static string GetUnavailableTrafficDisplay() => "流量统计未启用";
 
-    private static string FormatPeriodTraffic(long todayUp, long todayDown, long monthUp, long monthDown) =>
-        $"今日 ↑ {FormatStoredTraffic(todayUp)}  ↓ {FormatStoredTraffic(todayDown)}  ·  "
-        + $"本月 ↑ {FormatStoredTraffic(monthUp)}  ↓ {FormatStoredTraffic(monthDown)}";
+    private void SetActiveNodeTrafficDisplay(string todayDisplay, string monthDisplay)
+    {
+        ActiveNodeTodayTrafficDisplay = todayDisplay;
+        ActiveNodeMonthTrafficDisplay = monthDisplay;
+        ActiveNodeTrafficDisplay = $"今日 {todayDisplay}  ·  本月 {monthDisplay}";
+    }
+
+    private static string FormatTrafficPair(long up, long down) =>
+        $"↑ {FormatStoredTraffic(up)}  ↓ {FormatStoredTraffic(down)}";
 
     private static string FormatStoredTraffic(long kilobytes)
     {

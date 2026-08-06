@@ -276,10 +276,47 @@
                                     Margin="0,4,0,0"
                                     Foreground="{StaticResource QccMuted}"
                                     FontSize="{DynamicResource QccFontSmall}"
-                                    TextWrapping="Wrap"
+                                    Text="{Binding ProfilesViewModel.ActiveSubscriptionDisplay, FallbackValue=订阅：—}"
+                                    TextTrimming="CharacterEllipsis"
+                                    ToolTip="{Binding ProfilesViewModel.ActiveSubscriptionDisplay}" />
+                                <Border
+                                    x:Name="cardActiveNodeTraffic"
+                                    Margin="0,6,0,0"
+                                    Padding="8,5"
+                                    Background="{StaticResource QccSurfaceRaised}"
+                                    BorderBrush="{StaticResource QccBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
                                     ToolTip="当前活动节点经代理核心产生的实际流量；升级后的首月从零开始统计">
-                                    <Run Text="{Binding ProfilesViewModel.ActiveSubscriptionDisplay, FallbackValue=订阅：—}" /><Run Text="  ·  " /><Run Text="{Binding StatusBarViewModel.ActiveNodeTrafficDisplay, FallbackValue=流量统计未启用}" />
-                                </TextBlock>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="58" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontTiny}" FontWeight="SemiBold" Text="当日流量" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            FontSize="{DynamicResource QccFontSmall}"
+                                            FontWeight="Medium"
+                                            Text="{Binding StatusBarViewModel.ActiveNodeTodayTrafficDisplay, FallbackValue=流量统计未启用}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock Grid.Row="1" Margin="0,3,0,0" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontTiny}" FontWeight="SemiBold" Text="本月流量" />
+                                        <TextBlock
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            Margin="0,3,0,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="{DynamicResource QccFontSmall}"
+                                            FontWeight="Medium"
+                                            Text="{Binding StatusBarViewModel.ActiveNodeMonthTrafficDisplay, FallbackValue=流量统计未启用}"
+                                            TextWrapping="Wrap" />
+                                    </Grid>
+                                </Border>
                             </StackPanel>
 
                             <Border x:Name="cardSubscriptionQuota" Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource QccCard}">

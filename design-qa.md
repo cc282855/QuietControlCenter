@@ -99,6 +99,50 @@ P2: none found by static or automated validation
 
 final result: blocked
 
+## Active-node traffic card — 2026-08-06
+
+### Visual evidence
+
+- Source visual truth: `C:\Users\ADMINI~1\AppData\Local\Temp\codex-clipboard-252f72b1-03b9-4a40-8572-e9b5a92d80ae.png`.
+- Rendered implementation: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\Xuantong-traffic-card-ui\traffic-card-1120x720.png`.
+- Focused implementation crop: `C:\Users\Administrator\Documents\Codex\2026-07-28\weekday-morning-brief-7-30-slack\outputs\Xuantong-traffic-card-ui\traffic-card-focus.png`.
+- Source pixels: 558x157. Implementation pixels and CSS viewport: 1120x720 at 96 DPI and device scale 1. Focus crop: 306x122. No density normalization was required; the focused comparison intentionally preserves the narrower responsive desktop slot.
+- State: deterministic connected-node QA sample with the same node, subscription, 46.0 KB upload and 111.0 KB download values used by the reference. The QA process used an isolated temporary configuration and did not read user subscriptions.
+
+### Comparison
+
+- Full view: the new traffic card stays entirely inside the current-node column at the minimum supported 1120x720 layout. The adjacent quota and connection-quality cards remain aligned, and no persistent controls are clipped or displaced.
+- Focused view: the subscription is separated from traffic data. A bordered, rounded, raised-surface card presents `当日流量` on the first row and `本月流量` on the second row, with upload/download values fully visible. The card remains intentionally more compact than the unboxed reference because the user requested a small UI frame.
+- Fonts and typography: existing responsive Qcc font tokens are retained; row labels use the smaller semibold hierarchy and values use readable medium-weight text. No truncation or half-line rendering is visible.
+- Spacing and layout rhythm: 8x5 inner padding, 9 DIP radius, a 3 DIP row gap and a 58 DIP label column create consistent alignment without increasing the header height excessively.
+- Colors and visual tokens: `QccSurfaceRaised`, `QccBorder` and `QccMuted` keep the component consistent across supported themes; the connected badge retains its semantic success color.
+- Image quality and asset fidelity: the target contains no component imagery or custom icons. Existing application assets remain unchanged and render sharply.
+- Copy and content: `当日流量` and `本月流量` match the requested hierarchy. Both rows display the active node's actual upload/download totals and update through the existing statistics event.
+- Primary interaction: read-only status presentation; no new interaction was required. The isolated capture produced no error file, and the protected `玄同` and `sing-box` PIDs were unchanged before and after capture.
+
+### Findings
+
+P0: none
+
+P1: none
+
+P2: none
+
+P3: none
+
+### Comparison history
+
+- First visual comparison found no actionable P0/P1/P2 mismatch. No post-comparison visual fix was required.
+
+### Validation
+
+- WPF Release build: 0 warnings, 0 errors.
+- ServiceLib tests: 239/239 passed.
+- UI tests: 77/77 passed.
+- XAML XML parse and traffic-card static contract: passed.
+
+final result: passed
+
 ## Brand icon generation and application-surface verification — 2026-08-05
 
 Source and generation mode:
@@ -470,3 +514,9 @@ final result: passed
 Automated tests and the Release build pass, but the current administrator-elevation boundary prevents a same-state rendered screenshot. The latest visual gate for the profile-traffic layout therefore remains blocked; no running client or proxy-core process was interrupted for capture.
 
 final result: blocked
+
+## Latest gate — active-node traffic card — 2026-08-06
+
+The detailed same-state comparison is recorded in `Active-node traffic card — 2026-08-06` above. The isolated 1120x720 WPF capture and focused crop show both traffic rows fully visible in the new rounded card, with no P0/P1/P2 differences. Build and all 316 automated tests passed, and the existing `玄同` and `sing-box` processes were unchanged.
+
+final result: passed

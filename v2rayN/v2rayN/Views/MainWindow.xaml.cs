@@ -693,6 +693,7 @@ public partial class MainWindow
             if (args.Contains("--qcc-qa-reload", StringComparer.Ordinal)) await ViewModel.Reload();
             await Task.Delay(8000);
             UpdateConnectionStateBadge();
+            ApplyQaActiveNodeSampleIfRequested(args);
             ApplyQaQualitySampleIfRequested(args);
             if (args.Contains("--qcc-qa-open-update", StringComparer.Ordinal))
             {
@@ -1113,6 +1114,21 @@ public partial class MainWindow
         txtHeroDelay.Foreground = GetMetricBrush(ConnectionQualitySeverityCalculator.GetDelaySeverity(delayMs));
         txtHeroJitterLoss.Foreground = GetMetricBrush(
             ConnectionQualitySeverityCalculator.GetJitterLossSeverity(jitterMs, lossPercent));
+    }
+
+    private void ApplyQaActiveNodeSampleIfRequested(string[] args)
+    {
+        if (!args.Contains("--qcc-qa-active-node-sample", StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        ViewModel.ProfilesViewModel.ActiveProfileRemarks = "【V5专属】沪港·新加坡02 X2";
+        ViewModel.ProfilesViewModel.ActiveSubscriptionDisplay = "订阅：哆啦A梦";
+        ViewModel.StatusBarViewModel.ActiveNodeTodayTrafficDisplay = "↑ 46.0 KB  ↓ 111.0 KB";
+        ViewModel.StatusBarViewModel.ActiveNodeMonthTrafficDisplay = "↑ 46.0 KB  ↓ 111.0 KB";
+        ViewModel.StatusBarViewModel.ActiveNodeTrafficDisplay =
+            "今日 ↑ 46.0 KB  ↓ 111.0 KB  ·  本月 ↑ 46.0 KB  ↓ 111.0 KB";
     }
 
     private async void LiveMetricsTimer_Tick(object? sender, EventArgs e)
