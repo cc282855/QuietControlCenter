@@ -6,10 +6,11 @@ namespace ServiceLib.Tests.Common;
 public class ProfileColumnVisibilityTests
 {
     [Fact]
-    public void Columns_ContainsExactlyTheEightConfigurableFields()
+    public void Columns_ContainsExactlyTheTwelveConfigurableFields()
     {
         ProfileColumnVisibility.Columns.Should().Equal(
-            "ConfigType", "Remarks", "Address", "Port", "Network", "StreamSecurity", "Delay", "SpeedVal");
+            "ConfigType", "Remarks", "Address", "Port", "Network", "StreamSecurity", "Delay", "SpeedVal",
+            "TodayUp", "TodayDown", "TotalUp", "TotalDown");
     }
 
     [Fact]
@@ -39,12 +40,14 @@ public class ProfileColumnVisibilityTests
         var visibility = ProfileColumnVisibility.Columns.ToDictionary(name => name, _ => true);
         visibility[ProfileColumnVisibility.Address] = false;
         visibility[ProfileColumnVisibility.SpeedVal] = false;
+        visibility[ProfileColumnVisibility.TodayDown] = false;
 
         var saved = ProfileColumnVisibility.GetHiddenColumns(visibility);
 
-        saved.Should().Equal("Address", "SpeedVal");
+        saved.Should().Equal("Address", "SpeedVal", "TodayDown");
         ProfileColumnVisibility.IsVisible(saved, "Address").Should().BeFalse();
         ProfileColumnVisibility.IsVisible(saved, "SpeedVal").Should().BeFalse();
+        ProfileColumnVisibility.IsVisible(saved, "TodayDown").Should().BeFalse();
         ProfileColumnVisibility.IsVisible(saved, "Remarks").Should().BeTrue();
     }
 

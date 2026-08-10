@@ -18,10 +18,6 @@ public partial class StatusBarView
         this.WhenActivated(disposables =>
         {
             DataContext = ViewModel;
-            this.WhenAnyValue(v => v.ViewModel.RunningInfoDisplay)
-                .Select(value => value.IsNullOrEmpty() ? "未连接" : value)
-                .BindTo(this, v => v.txtBottomRunningStatus.Text)
-                .DisposeWith(disposables);
             //system proxy
             this.OneWayBind(ViewModel, vm => vm.BlSystemProxyClear, v => v.menuSystemProxyClear2.Visibility, conversionHint: BooleanToVisibilityHint.UseHidden, vmToViewConverterOverride: new BooleanToVisibilityTypeConverter()).DisposeWith(disposables);
             this.OneWayBind(ViewModel, vm => vm.BlSystemProxySet, v => v.menuSystemProxySet2.Visibility, conversionHint: BooleanToVisibilityHint.UseHidden, vmToViewConverterOverride: new BooleanToVisibilityTypeConverter()).DisposeWith(disposables);

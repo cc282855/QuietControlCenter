@@ -22,33 +22,10 @@
         <local:ActiveNodeMarkerConverter x:Key="ActiveNodeMarkerConverter" />
         <local:DelayDisplayConverter x:Key="DelayDisplayConverter" />
         <local:SpeedDisplayConverter x:Key="SpeedDisplayConverter" />
-        <Style x:Key="QccInspectorLabel" TargetType="TextBlock" BasedOn="{StaticResource QccMutedText}">
-            <Setter Property="FontSize" Value="{DynamicResource QccFontSmall}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="QccInspectorValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="QccCompactSecondaryButton" TargetType="Button" BasedOn="{StaticResource QccSecondaryButton}">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
-        </Style>
-        <Style x:Key="QccCompactPrimaryButton" TargetType="Button" BasedOn="{StaticResource QccPrimaryButton}">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="8,0" />
-            <Setter Property="FontSize" Value="{DynamicResource QccFontBody}" />
-        </Style>
     </UserControl.Resources>
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition x:Name="colProfileInspector" Width="268" />
-        </Grid.ColumnDefinitions>
-
-        <Grid Grid.Column="0">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -61,7 +38,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="1.65*" />
-                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="0.8*" MinWidth="148" MaxWidth="210" />
                         <ColumnDefinition Width="1.05*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -72,6 +49,7 @@
                         Width="36"
                         Height="34"
                         Margin="0,0,8,0"
+                        AutomationProperties.Name="选择节点列表字段"
                         Style="{StaticResource QccIconButton}"
                         ToolTip="显示或隐藏节点字段">
                         <materialDesign:PackIcon Width="19" Height="19" Kind="ViewColumnOutline" />
@@ -87,6 +65,11 @@
                                 <MenuItem x:Name="menuColumnStreamSecurity" Header="安全" IsCheckable="True" StaysOpenOnClick="True" />
                                 <MenuItem x:Name="menuColumnDelay" Header="延迟" IsCheckable="True" StaysOpenOnClick="True" />
                                 <MenuItem x:Name="menuColumnSpeed" Header="速度" IsCheckable="True" StaysOpenOnClick="True" />
+                                <Separator />
+                                <MenuItem x:Name="menuColumnTodayUp" Header="今日上传" IsCheckable="True" StaysOpenOnClick="True" />
+                                <MenuItem x:Name="menuColumnTodayDown" Header="今日下载" IsCheckable="True" StaysOpenOnClick="True" />
+                                <MenuItem x:Name="menuColumnTotalUp" Header="累计上传" IsCheckable="True" StaysOpenOnClick="True" />
+                                <MenuItem x:Name="menuColumnTotalDown" Header="累计下载" IsCheckable="True" StaysOpenOnClick="True" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -100,35 +83,19 @@
                         materialDesign:HintAssist.Hint="搜索节点（名称、备注、地址）"
                         materialDesign:TextFieldAssist.HasClearButton="True"
                         Style="{StaticResource MaterialDesignOutlinedTextBox}" />
-                    <Grid Grid.Column="2" Margin="10,0,0,0">
-                        <ComboBox
-                            x:Name="lstCountry"
-                            MinHeight="34"
-                            Padding="10,4"
-                            AutomationProperties.Name="国家/地区"
-                            DisplayMemberPath="DisplayName"
-                            FontSize="{DynamicResource QccFontBody}"
-                            SelectedValuePath="Code"
-                            Style="{StaticResource MaterialDesignOutlinedComboBox}" />
-                        <TextBlock
-                            Margin="11,0,30,0"
-                            VerticalAlignment="Center"
-                            Foreground="{StaticResource QccMuted}"
-                            FontSize="{DynamicResource QccFontSmall}"
-                            IsHitTestVisible="False"
-                            Text="全部地区">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ElementName=lstCountry, Path=SelectedIndex}" Value="-1">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
+                    <ComboBox
+                        x:Name="lstCountry"
+                        Grid.Column="2"
+                        MinHeight="34"
+                        Margin="10,0,0,0"
+                        Padding="10,4"
+                        AutomationProperties.Name="国家/地区"
+                        DisplayMemberPath="DisplayName"
+                        FontSize="{DynamicResource QccFontBody}"
+                        ItemsSource="{Binding CountryItems}"
+                        SelectedValue="{Binding SelectedCountryCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        SelectedValuePath="Code"
+                        Style="{StaticResource MaterialDesignOutlinedComboBox}" />
                     <ComboBox
                         x:Name="lstGroup"
                         Grid.Column="3"
@@ -139,13 +106,16 @@
                         DisplayMemberPath="Remarks"
                         FontSize="{DynamicResource QccFontBody}"
                         Style="{StaticResource MaterialDesignOutlinedComboBox}" />
-                    <Button x:Name="btnEditSub" Grid.Column="4" Margin="6,0,0,0" Style="{StaticResource QccIconButton}" ToolTip="编辑订阅">
+                    <Button x:Name="btnEditSub" Grid.Column="4" Margin="6,0,0,0" AutomationProperties.Name="编辑当前订阅" Style="{StaticResource QccIconButton}" ToolTip="编辑订阅">
                         <materialDesign:PackIcon Width="19" Height="19" Kind="PlaylistEdit" />
                     </Button>
-                    <Button x:Name="btnAddSub" Grid.Column="5" Style="{StaticResource QccIconButton}" ToolTip="添加订阅">
-                        <materialDesign:PackIcon Width="19" Height="19" Kind="PlaylistPlus" />
+                    <Button x:Name="btnAddSub" Grid.Column="5" Height="34" Margin="6,0,0,0" Padding="10,0" AutomationProperties.Name="添加订阅" Style="{StaticResource QccPrimaryButton}" ToolTip="添加订阅">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,6,0" Kind="PlaylistPlus" />
+                            <TextBlock VerticalAlignment="Center" Text="添加订阅" />
+                        </StackPanel>
                     </Button>
-                    <Button x:Name="btnAutofitColumnWidth" Grid.Column="6" Style="{StaticResource QccIconButton}" ToolTip="自动调整列宽">
+                    <Button x:Name="btnAutofitColumnWidth" Grid.Column="6" AutomationProperties.Name="自动调整节点列表列宽" Style="{StaticResource QccIconButton}" ToolTip="自动调整列宽">
                         <materialDesign:PackIcon Width="19" Height="19" Kind="TableColumnWidth" />
                     </Button>
                 </Grid>
@@ -213,47 +183,50 @@
                 <DataGrid.ContextMenu>
                     <ContextMenu Style="{StaticResource DefContextMenu}">
                         <MenuItem x:Name="menuSetDefaultServer" Header="设为活动节点" />
-                        <MenuItem x:Name="menuEditServer" Header="编辑节点" />
-                        <MenuItem x:Name="menuCopyServer" Header="复制节点" />
-                        <MenuItem x:Name="menuRemoveServer" Header="删除节点" />
                         <Separator />
-                        <MenuItem x:Name="menuMixedTestServer" Header="综合测试" />
-                        <MenuItem x:Name="menuTcpingServer" Header="测试 TCP 延迟" />
-                        <MenuItem x:Name="menuRealPingServer" Header="测试真实延迟" />
-                        <MenuItem x:Name="menuUdpTestServer" Header="测试 UDP" />
-                        <MenuItem x:Name="menuSpeedServer" Header="测试速度" />
-                        <MenuItem x:Name="menuSortServerResult" Header="按测试结果排序" />
-                        <Separator />
-                        <MenuItem x:Name="menuMoveToGroup">
-                            <MenuItem.Header>
-                                <DockPanel>
-                                    <ComboBox x:Name="cmbMoveToGroup" MinWidth="180" DisplayMemberPath="Remarks" materialDesign:HintAssist.Hint="移动到分组" />
-                                </DockPanel>
-                            </MenuItem.Header>
+                        <MenuItem Header="测试节点">
+                            <MenuItem x:Name="menuMixedTestServer" Header="综合测试" />
+                            <MenuItem x:Name="menuTcpingServer" Header="测试 TCP 延迟" />
+                            <MenuItem x:Name="menuRealPingServer" Header="测试真实延迟" />
+                            <MenuItem x:Name="menuUdpTestServer" Header="测试 UDP" />
+                            <MenuItem x:Name="menuSpeedServer" Header="测试速度" />
+                            <Separator />
+                            <MenuItem x:Name="menuSortServerResult" Header="按测试结果排序" />
                         </MenuItem>
-                        <MenuItem Header="调整顺序">
-                            <MenuItem x:Name="menuMoveTop" Header="移到顶部" />
-                            <MenuItem x:Name="menuMoveUp" Header="上移" />
-                            <MenuItem x:Name="menuMoveDown" Header="下移" />
-                            <MenuItem x:Name="menuMoveBottom" Header="移到底部" />
+                        <MenuItem Header="编辑与移动">
+                            <MenuItem x:Name="menuEditServer" Header="编辑节点" />
+                            <MenuItem x:Name="menuCopyServer" Header="复制节点" />
+                            <MenuItem x:Name="menuMoveToGroup">
+                                <MenuItem.Header>
+                                    <DockPanel>
+                                        <ComboBox x:Name="cmbMoveToGroup" MinWidth="180" AutomationProperties.Name="移动节点到分组" DisplayMemberPath="Remarks" materialDesign:HintAssist.Hint="移动到分组" />
+                                    </DockPanel>
+                                </MenuItem.Header>
+                            </MenuItem>
+                            <MenuItem Header="调整顺序">
+                                <MenuItem x:Name="menuMoveTop" Header="移到顶部" />
+                                <MenuItem x:Name="menuMoveUp" Header="上移" />
+                                <MenuItem x:Name="menuMoveDown" Header="下移" />
+                                <MenuItem x:Name="menuMoveBottom" Header="移到底部" />
+                            </MenuItem>
                         </MenuItem>
-                        <MenuItem x:Name="menuSelectAll" Header="全选" />
-                        <Separator />
-                        <MenuItem x:Name="menuShareServer" Header="分享节点" />
-                        <MenuItem Header="导出">
+                        <MenuItem Header="分享与导出">
+                            <MenuItem x:Name="menuShareServer" Header="分享节点" />
                             <MenuItem x:Name="menuExport2ClientConfig" Header="导出客户端配置" />
                             <MenuItem x:Name="menuExport2ClientConfigClipboard" Header="复制客户端配置" />
                             <MenuItem x:Name="menuExport2ShareUrl" Header="复制分享链接" />
                             <MenuItem x:Name="menuExport2ShareUrlBase64" Header="复制 Base64 链接" />
                             <MenuItem x:Name="menuExport2InnerUri" Header="复制内部链接" />
                         </MenuItem>
-                        <Separator />
-                        <MenuItem x:Name="menuRemoveDuplicateServer" Header="删除重复节点" />
-                        <MenuItem x:Name="menuRemoveInvalidServerResult" Header="删除无效节点" />
-                        <MenuItem Header="生成策略组">
+                        <MenuItem Header="批量工具">
+                            <MenuItem x:Name="menuSelectAll" Header="全选" />
                             <MenuItem x:Name="menuGenGroupAllServer" Header="全部节点" />
                             <MenuItem x:Name="menuGenGroupRegionServer" Header="按地区" />
                         </MenuItem>
+                        <Separator />
+                        <MenuItem x:Name="menuRemoveServer" Foreground="{StaticResource QccDanger}" Header="删除节点" />
+                        <MenuItem x:Name="menuRemoveDuplicateServer" Foreground="{StaticResource QccDanger}" Header="删除重复节点" />
+                        <MenuItem x:Name="menuRemoveInvalidServerResult" Foreground="{StaticResource QccDanger}" Header="删除无效节点" />
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
@@ -262,6 +235,7 @@
                         Width="30"
                         MinWidth="30"
                         Binding="{Binding IsActive, Converter={StaticResource ActiveNodeMarkerConverter}}"
+                        CanUserReorder="False"
                         CanUserResize="False"
                         ExName="ActiveMarker"
                         Header="">
@@ -275,7 +249,7 @@
                         </DataGridTextColumn.ElementStyle>
                     </base:MyDGTextColumn>
                     <base:MyDGTextColumn x:Name="colRemarks" Width="1.55*" MinWidth="170" Binding="{Binding Remarks}" ExName="Remarks" Header="节点名称" />
-                    <base:MyDGTextColumn x:Name="colConfigType" Width="0.8*" MinWidth="82" Binding="{Binding ConfigType}" ExName="ConfigType" Header="协议" />
+                    <base:MyDGTextColumn x:Name="colConfigType" Width="0.9*" MinWidth="108" Binding="{Binding ConfigType}" ExName="ConfigType" Header="协议" />
                     <base:MyDGTextColumn x:Name="colSubRemarks" Width="1.1*" MinWidth="120" Binding="{Binding SubRemarks}" ExName="SubRemarks" Header="分组" />
                     <base:MyDGTextColumn x:Name="colNetwork" Width="0.9*" MinWidth="86" Binding="{Binding Network}" ExName="Network" Header="传输" />
                     <base:MyDGTextColumn x:Name="colDelay" Width="0.9*" MinWidth="86" Binding="{Binding Delay, Converter={StaticResource DelayDisplayConverter}}" ExName="DelayVal" Header="延迟" SortMemberPath="Delay">
@@ -310,8 +284,8 @@
                     <Border Width="54" Height="54" HorizontalAlignment="Center" Background="{StaticResource QccPrimarySoft}" CornerRadius="18">
                         <materialDesign:PackIcon Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource QccPrimary}" Kind="ServerNetworkOff" />
                     </Border>
-                    <TextBlock Margin="0,16,0,0" HorizontalAlignment="Center" FontSize="{DynamicResource QccFontLarge}" FontWeight="SemiBold" Text="还没有可用节点" />
-                    <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="{StaticResource QccMuted}" Text="添加订阅后同步节点，或右键列表导入本地配置。" TextAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Margin="0,16,0,0" HorizontalAlignment="Center" FontSize="{DynamicResource QccFontLarge}" FontWeight="SemiBold" Text="当前没有匹配的节点" />
+                    <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Foreground="{StaticResource QccMuted}" Text="可清空搜索、切换地区或订阅分组；尚未添加订阅时可直接添加。" TextAlignment="Center" TextWrapping="Wrap" />
                     <Button x:Name="btnEmptyAddSub" Margin="0,18,0,0" HorizontalAlignment="Center" Style="{StaticResource QccPrimaryButton}" Content="添加订阅" />
                 </StackPanel>
             </Border>
@@ -322,12 +296,12 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="单击查看节点详情；双击切换并使用节点；红色 ★ 表示当前活动节点" TextTrimming="CharacterEllipsis" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="单击选择节点；双击设为活动节点；右键查看更多操作；红色 ★ 表示当前活动节点" TextTrimming="CharacterEllipsis" ToolTip="单击选择节点；双击设为活动节点；右键查看更多操作；红色 ★ 表示当前活动节点" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button x:Name="btnFastRealPing" VerticalAlignment="Center" Style="{StaticResource QccSecondaryButton}">
+                        <Button x:Name="btnFastRealPing" VerticalAlignment="Center" AutomationProperties.Name="测试当前筛选结果中全部节点的延迟" Style="{StaticResource QccSecondaryButton}" ToolTip="测试当前筛选结果中的全部节点">
                             <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="TimerOutline" /><TextBlock VerticalAlignment="Center" Text="测延迟" /></StackPanel>
                         </Button>
-                        <Button x:Name="btnMixedTest" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource QccSecondaryButton}">
+                        <Button x:Name="btnMixedTest" Margin="8,0,0,0" VerticalAlignment="Center" AutomationProperties.Name="测试当前筛选结果中全部节点的延迟和速度" Style="{StaticResource QccSecondaryButton}" ToolTip="测试当前筛选结果中的全部节点；速度测试会产生网络流量">
                             <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="Speedometer" /><TextBlock VerticalAlignment="Center" Text="延迟+速度" /></StackPanel>
                         </Button>
                     </StackPanel>
@@ -335,68 +309,5 @@
             </Border>
         </Grid>
 
-        <!-- Selected node inspector -->
-        <Border Grid.Column="1" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="1,0,0,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Border Padding="12,7" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
-                    <Grid>
-                        <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" FontWeight="SemiBold" Text="节点详情" />
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                            <Button Width="34" Height="34" Style="{StaticResource QccIconButton}" ToolTip="收藏"><materialDesign:PackIcon Width="16" Height="16" Kind="StarOutline" /></Button>
-                            <Button Width="34" Height="34" Style="{StaticResource QccIconButton}" ToolTip="更多"><materialDesign:PackIcon Width="16" Height="16" Kind="DotsVertical" /></Button>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="12,8,12,6">
-                        <TextBlock
-                            x:Name="txtInspectorNodeName"
-                            FontSize="{DynamicResource QccFontTitle}"
-                            LineHeight="{DynamicResource QccLineTitle}"
-                            Style="{StaticResource QccHeading}"
-                            Text="{Binding SelectedProfile.Remarks, FallbackValue=请选择节点}"
-                            TextWrapping="Wrap"
-                            ToolTip="{Binding SelectedProfile.Remarks}" />
-
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="60" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" />
-                                <RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" /><RowDefinition Height="Auto" MinHeight="20" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource QccInspectorLabel}" Text="协议" /><TextBlock Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.ConfigType, FallbackValue=—}" />
-                            <TextBlock Grid.Row="1" Style="{StaticResource QccInspectorLabel}" Text="传输协议" /><TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Network, FallbackValue=—}" />
-                            <TextBlock Grid.Row="2" Style="{StaticResource QccInspectorLabel}" Text="安全" /><TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.StreamSecurity, FallbackValue=—}" />
-                            <TextBlock Grid.Row="3" Style="{StaticResource QccInspectorLabel}" Text="地址" /><TextBlock x:Name="txtInspectorAddress" Grid.Row="3" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Address, FallbackValue=—}" TextWrapping="Wrap" ToolTip="{Binding SelectedProfile.Address}" />
-                            <TextBlock Grid.Row="4" Style="{StaticResource QccInspectorLabel}" Text="端口" /><TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.Port, FallbackValue=—}" />
-                            <TextBlock Grid.Row="5" Style="{StaticResource QccInspectorLabel}" Text="延迟" /><TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Foreground="{Binding SelectedProfile.Delay, Converter={StaticResource DelayColorConverter}}" Text="{Binding SelectedProfile.Delay, Converter={StaticResource DelayDisplayConverter}}" />
-                            <TextBlock Grid.Row="6" Style="{StaticResource QccInspectorLabel}" Text="速度" /><TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.SpeedVal, Converter={StaticResource SpeedDisplayConverter}}" />
-                            <TextBlock Grid.Row="7" Style="{StaticResource QccInspectorLabel}" Text="订阅" /><TextBlock Grid.Row="7" Grid.Column="1" Style="{StaticResource QccInspectorValue}" Text="{Binding SelectedProfile.SubRemarks, FallbackValue=本地节点}" TextWrapping="Wrap" ToolTip="{Binding SelectedProfile.SubRemarks}" />
-                        </Grid>
-
-                    </StackPanel>
-                </ScrollViewer>
-
-                <Border Grid.Row="2" Padding="10,7" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
-                    <StackPanel>
-                        <TextBlock FontSize="{DynamicResource QccFontBody}" FontWeight="SemiBold" Text="节点操作" />
-                        <UniformGrid Margin="0,5,0,0" Columns="2" Rows="3">
-                            <Button x:Name="btnDetailPing" Margin="0,0,4,4" Style="{StaticResource QccCompactSecondaryButton}" Content="测试延迟" />
-                            <Button x:Name="btnDetailSpeed" Margin="4,0,0,4" Style="{StaticResource QccCompactSecondaryButton}" Content="测试速度" />
-                            <Button x:Name="btnDetailCopy" Margin="0,0,4,4" Style="{StaticResource QccCompactSecondaryButton}" Content="复制节点" />
-                            <Button x:Name="btnDetailEdit" Margin="4,0,0,4" Style="{StaticResource QccCompactSecondaryButton}" Content="编辑节点" />
-                            <Button x:Name="btnDetailDelete" Margin="0,0,4,0" Foreground="{StaticResource QccDanger}" Style="{StaticResource QccCompactSecondaryButton}" Content="删除节点" />
-                            <Button x:Name="btnDetailActivate" Margin="4,0,0,0" Style="{StaticResource QccCompactPrimaryButton}" Content="设为活动" />
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
     </Grid>
 </reactiveui:ReactiveUserControl>

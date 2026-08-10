@@ -24,6 +24,7 @@ public class ProfilesViewModel : MyReactiveObject
     private readonly bool _persistNormalizedCountryAtStartup;
     private readonly Func<string, Task<SubscriptionUpdateResult>>? _firstUpdateAsync;
     private long _trafficDisplayDayKey = ServerTrafficPeriod.GetDayKey(DateTime.Now);
+    private long _refreshGeneration;
 
     #endregion private prop
 
@@ -461,8 +462,17 @@ public class ProfilesViewModel : MyReactiveObject
 
     public async Task RefreshServersBiz()
     {
+        var generation = Interlocked.Increment(ref _refreshGeneration);
         var lstModel = await GetProfileItemsEx(_config.SubIndexId, _serverFilter);
+        if (generation != Volatile.Read(ref _refreshGeneration))
+        {
+            return;
+        }
         var activeProfile = await AppManager.Instance.GetProfileItem(_config.IndexId);
+        if (generation != Volatile.Read(ref _refreshGeneration))
+        {
+            return;
+        }
         ActiveProfileRemarks = activeProfile?.Remarks ?? "尚未连接";
         if (activeProfile is null)
         {
@@ -475,6 +485,10 @@ public class ProfilesViewModel : MyReactiveObject
         else
         {
             var activeSubscription = await AppManager.Instance.GetSubItem(activeProfile.Subid);
+            if (generation != Volatile.Read(ref _refreshGeneration))
+            {
+                return;
+            }
             ActiveSubscriptionDisplay = activeSubscription is null
                 ? "订阅：来源已移除"
                 : SubscriptionSourceDisplay.Format(activeSubscription.Remarks);
@@ -494,6 +508,7 @@ public class ProfilesViewModel : MyReactiveObject
         CountryItems.Add(new(CountryClassifier.AllCode, CountryClassifier.GetDisplayName(CountryClassifier.AllCode)));
         CountryItems.AddRange(optionCodes.Select(code => new CountryFilterItem(code, CountryClassifier.GetDisplayName(code))));
         SelectedCountryCode = selectedCode;
+        this.RaisePropertyChanged(nameof(SelectedCountryCode));
         _updatingCountrySelection = false;
 
         lstModel = CountryClassifier.ApplyFilter(lstModel ?? [], item => item.Remarks, item => item.Address, selectedCode).ToList();
@@ -848,13 +863,22 @@ public class ProfilesViewModel : MyReactiveObject
 
     public async Task MoveServerTo(int startIndex, ProfileItemModel targetItem)
     {
-        var targetIndex = ProfileItems.IndexOf(targetItem);
-        if (startIndex >= 0 && targetIndex >= 0 && startIndex != targetIndex)
+        if (startIndex < 0 || startIndex >= ProfileItems.Count)
         {
-            if (await ConfigHandler.MoveServer(_config, _lstProfile, startIndex, EMove.Position, targetIndex) == 0)
-            {
-                await RefreshServers();
-            }
+            return;
+        }
+
+        var sourceItem = ProfileItems[startIndex];
+        var sourceIndex = _lstProfile.FindIndex(item => item.IndexId == sourceItem.IndexId);
+        var targetIndex = _lstProfile.FindIndex(item => item.IndexId == targetItem.IndexId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+        {
+            return;
+        }
+
+        if (await ConfigHandler.MoveServer(_config, _lstProfile, sourceIndex, EMove.Position, targetIndex) == 0)
+        {
+            await RefreshServers();
         }
     }
 

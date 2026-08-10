@@ -33,6 +33,7 @@ public partial class MainWindow
     private string _subscriptionQuotaSubId = string.Empty;
     private long _subscriptionQuotaGeneration;
     private double _responsiveFontScale = -1;
+    private int _liveMetricsTickRunning;
     private bool _subscriptionQuotaQaMode = Environment.GetCommandLineArgs()
         .Contains("--qcc-qa-quota-sample", StringComparer.Ordinal);
     private readonly bool _coreSettingsQaMode = Environment.GetCommandLineArgs()
@@ -45,6 +46,7 @@ public partial class MainWindow
     {
         InitializeComponent();
         ApplyResponsiveTypography(Width, Height);
+        ApplyResponsiveLayout(Width);
 
         txtAppVersion.Text = Utils.GetVersion();
 
@@ -230,6 +232,7 @@ public partial class MainWindow
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         ApplyResponsiveTypography(e.NewSize.Width, e.NewSize.Height);
+        ApplyResponsiveLayout(e.NewSize.Width);
     }
 
     private void ApplyResponsiveTypography(double width, double height)
@@ -240,18 +243,18 @@ public partial class MainWindow
         }
 
         var rawScale = Math.Min(width / 1120d, height / 720d);
-        var scale = Math.Clamp(rawScale, 0.92d, 1.18d);
+        var scale = Math.Clamp(rawScale, 1d, 1.15d);
         scale = Math.Round(scale * 20d, MidpointRounding.AwayFromZero) / 20d;
-        scale = Math.Clamp(scale, 0.92d, 1.18d);
+        scale = Math.Clamp(scale, 1d, 1.15d);
         if (Math.Abs(scale - _responsiveFontScale) < 0.001d)
         {
             return;
         }
 
         _responsiveFontScale = scale;
-        Resources["QccFontTiny"] = 10.5d * scale;
-        Resources["QccFontSmall"] = 11d * scale;
-        Resources["QccFontBody"] = 12d * scale;
+        Resources["QccFontTiny"] = 11d * scale;
+        Resources["QccFontSmall"] = 11.5d * scale;
+        Resources["QccFontBody"] = 12.5d * scale;
         Resources["QccFontStrong"] = 13d * scale;
         Resources["QccFontTitle"] = 14d * scale;
         Resources["QccFontHero"] = 16d * scale;
@@ -261,6 +264,39 @@ public partial class MainWindow
         Resources["StdFontSize-1"] = 11d * scale;
         Resources["StdFontSize"] = 12d * scale;
         Resources["StdFontSize1"] = 13d * scale;
+    }
+
+    private void ApplyResponsiveLayout(double width)
+    {
+        if (!double.IsFinite(width) || width <= 0)
+        {
+            return;
+        }
+
+        if (width < 1120d)
+        {
+            colNavigation.Width = new GridLength(120);
+            colHeroQuota.Width = new GridLength(156);
+            colHeroActions.Width = new GridLength(124);
+            gridConnectionSummary.Margin = new Thickness(10, 6, 10, 6);
+            borderConnectionSummary.MinHeight = 124;
+        }
+        else if (width < 1400d)
+        {
+            colNavigation.Width = new GridLength(124);
+            colHeroQuota.Width = new GridLength(172);
+            colHeroActions.Width = new GridLength(132);
+            gridConnectionSummary.Margin = new Thickness(12, 7, 12, 7);
+            borderConnectionSummary.MinHeight = 108;
+        }
+        else
+        {
+            colNavigation.Width = new GridLength(128);
+            colHeroQuota.Width = new GridLength(184);
+            colHeroActions.Width = new GridLength(140);
+            gridConnectionSummary.Margin = new Thickness(14, 7, 14, 7);
+            borderConnectionSummary.MinHeight = 96;
+        }
     }
 
     private void OnProgramStarted(object state, bool timeout)
@@ -393,7 +429,7 @@ public partial class MainWindow
     {
         tabMain.Visibility = Visibility.Collapsed;
         tabProfiles.Visibility = Visibility.Visible;
-        SetActiveNavigation(sender as Button ?? btnNavHome);
+        SetActiveNavigation(btnNavNodes);
     }
 
     private void ShowLogs_Click(object sender, RoutedEventArgs e)
@@ -412,17 +448,11 @@ public partial class MainWindow
         SetActiveNavigation(btnNavConnections);
     }
 
-    private void ShowSubscription_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavSubscription);
-
-    private void ShowRouting_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavRouting);
-
-    private void ShowSettings_Click(object sender, RoutedEventArgs e) => SetActiveNavigation(btnNavSettings);
-
     private void SetActiveNavigation(Button activeButton)
     {
         var normalStyle = (Style)FindResource("QccNavButton");
         var activeStyle = (Style)FindResource("QccNavButtonActive");
-        foreach (var button in new[] { btnNavHome, btnNavNodes, btnNavSubscription, btnNavRouting, btnNavConnections, btnNavLogs, btnNavSettings })
+        foreach (var button in new[] { btnNavNodes, btnNavConnections, btnNavLogs })
         {
             button.Style = ReferenceEquals(button, activeButton) ? activeStyle : normalStyle;
         }
@@ -695,6 +725,12 @@ public partial class MainWindow
             UpdateConnectionStateBadge();
             ApplyQaActiveNodeSampleIfRequested(args);
             ApplyQaQualitySampleIfRequested(args);
+            if (args.Contains("--qcc-qa-snackbar-sample", StringComparer.Ordinal))
+            {
+                MainSnackbar.MessageQueue?.Enqueue("[Shadowsocks] 【V5专属】广港·新加坡02 X2(thygl5qpkvzesuq***is:33233)");
+                await Task.Delay(400);
+                await Dispatcher.Yield(DispatcherPriority.Render);
+            }
             if (args.Contains("--qcc-qa-open-update", StringComparer.Ordinal))
             {
                 await RefreshQuietUpdateStatusAsync();
@@ -928,12 +964,17 @@ public partial class MainWindow
             {
                 _subscriptionQuotaSingleFlight.Release();
             }
-            if (ReferenceEquals(_subscriptionQuotaRequestCancellation, requestCancellation))
+            var shouldRender = ReferenceEquals(_subscriptionQuotaRequestCancellation, requestCancellation);
+            if (shouldRender)
             {
                 _subscriptionQuotaRequestCancellation = null;
                 _subscriptionQuotaRefreshTask = null;
             }
             requestCancellation.Dispose();
+            if (shouldRender && !Dispatcher.HasShutdownStarted)
+            {
+                await Dispatcher.InvokeAsync(() => RenderSubscriptionQuota(DateTimeOffset.UtcNow));
+            }
         }
     }
 
@@ -998,7 +1039,7 @@ public partial class MainWindow
         }
         if (_subscriptionQuotaResult is null)
         {
-            txtSubscriptionQuotaPrimary.Text = _subscriptionQuotaRefreshTask is { IsCompleted: false } ? "正在查询…" : "尚未查询";
+            txtSubscriptionQuotaPrimary.Text = _subscriptionQuotaRefreshTask is { IsCompleted: false } ? "正在查询（最长 10 秒）…" : "尚未查询";
             txtSubscriptionQuotaSecondary.Text = _subscriptionQuotaLastCompletedUtc.HasValue
                 ? $"更新 {FormatSubscriptionQuotaAge(now - _subscriptionQuotaLastCompletedUtc.Value)}"
                 : "等待安全代理查询";
@@ -1143,6 +1184,14 @@ public partial class MainWindow
             ResetHeroQualityMetrics();
             return;
         }
+        if (!IsVisible || WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+        if (Interlocked.Exchange(ref _liveMetricsTickRunning, 1) != 0)
+        {
+            return;
+        }
 
         try
         {
@@ -1167,6 +1216,10 @@ public partial class MainWindow
         }
         catch (OperationCanceledException) when (_liveMetricsCancellation.IsCancellationRequested)
         {
+        }
+        finally
+        {
+            Volatile.Write(ref _liveMetricsTickRunning, 0);
         }
     }
 

@@ -10,10 +10,15 @@ public static class ProfileColumnVisibility
     public const string StreamSecurity = "StreamSecurity";
     public const string Delay = "Delay";
     public const string SpeedVal = "SpeedVal";
+    public const string TodayUp = "TodayUp";
+    public const string TodayDown = "TodayDown";
+    public const string TotalUp = "TotalUp";
+    public const string TotalDown = "TotalDown";
 
     private static readonly string[] ColumnNames =
     [
-        ConfigType, Remarks, Address, Port, Network, StreamSecurity, Delay, SpeedVal
+        ConfigType, Remarks, Address, Port, Network, StreamSecurity, Delay, SpeedVal,
+        TodayUp, TodayDown, TotalUp, TotalDown
     ];
 
     public static IReadOnlyList<string> Columns => ColumnNames;

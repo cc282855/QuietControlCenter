@@ -70,7 +70,8 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <materialDesign:PopupBox
                             x:Name="pbQuietUpdate"
-                            Width="104"
+                            Width="112"
+                            AutomationProperties.Name="客户端更新"
                             HorizontalAlignment="Center"
                             Opened="QuietUpdatePopup_Opened"
                             PlacementMode="BottomAndAlignRightEdges"
@@ -78,12 +79,12 @@
                             <materialDesign:PopupBox.ToggleContent>
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,7,0" Kind="CloudSyncOutline" />
-                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="软件更新" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="客户端更新" />
                                 </StackPanel>
                             </materialDesign:PopupBox.ToggleContent>
                             <Border Width="380" Padding="18" Background="White" CornerRadius="10">
                                 <StackPanel>
-                                    <TextBlock FontFamily="{StaticResource QccDisplayFont}" FontSize="{DynamicResource QccFontHero}" FontWeight="SemiBold" Text="软件更新" />
+                                    <TextBlock FontFamily="{StaticResource QccDisplayFont}" FontSize="{DynamicResource QccFontHero}" FontWeight="SemiBold" Text="客户端更新" />
                                     <TextBlock Margin="0,4,0,14" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontBody}" Text="官方 GUI 只用于发现版本，不会覆盖定制界面。" TextWrapping="Wrap" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -123,7 +124,8 @@
                         </materialDesign:PopupBox>
                         <materialDesign:PopupBox
                             x:Name="pbCoreUpdate"
-                            Width="128"
+                            Width="104"
+                            AutomationProperties.Name="内核管理"
                             HorizontalAlignment="Center"
                             Opened="CoreUpdatePopup_Opened"
                             PlacementMode="BottomAndAlignRightEdges"
@@ -131,14 +133,14 @@
                             <materialDesign:PopupBox.ToggleContent>
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,7,0" Kind="Update" />
-                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="检查内核更新" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="内核管理" />
                                 </StackPanel>
                             </materialDesign:PopupBox.ToggleContent>
                             <Border Width="560" Padding="12" Background="{StaticResource QccSurface}" BorderBrush="{StaticResource QccBorder}" BorderThickness="1" CornerRadius="12">
                                 <ContentControl x:Name="contentCoreUpdate" />
                             </Border>
                         </materialDesign:PopupBox>
-                        <materialDesign:PopupBox Width="78" HorizontalAlignment="Center" PlacementMode="BottomAndAlignRightEdges">
+                        <materialDesign:PopupBox Width="78" HorizontalAlignment="Center" AutomationProperties.Name="主题设置" PlacementMode="BottomAndAlignRightEdges">
                             <materialDesign:PopupBox.ToggleContent>
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,6,0" Kind="ThemeLightDark" />
@@ -149,13 +151,13 @@
                                 <ContentControl x:Name="pbTheme" />
                             </Border>
                         </materialDesign:PopupBox>
-                        <Button x:Name="btnWindowMinimize" Style="{StaticResource QccIconButton}" Click="WindowMinimize_Click">
+                        <Button x:Name="btnWindowMinimize" AutomationProperties.Name="最小化窗口" Style="{StaticResource QccIconButton}" Click="WindowMinimize_Click">
                             <materialDesign:PackIcon Width="17" Height="17" Kind="WindowMinimize" />
                         </Button>
-                        <Button x:Name="btnWindowMaximize" Style="{StaticResource QccIconButton}" Click="WindowMaximize_Click">
+                        <Button x:Name="btnWindowMaximize" AutomationProperties.Name="最大化或还原窗口" Style="{StaticResource QccIconButton}" Click="WindowMaximize_Click">
                             <materialDesign:PackIcon Width="15" Height="15" Kind="WindowMaximize" />
                         </Button>
-                        <Button x:Name="btnWindowClose" Style="{StaticResource QccIconButton}" Click="WindowClose_Click">
+                        <Button x:Name="btnWindowClose" AutomationProperties.Name="隐藏窗口" Style="{StaticResource QccIconButton}" Click="WindowClose_Click">
                             <materialDesign:PackIcon Width="17" Height="17" Kind="Close" />
                         </Button>
                     </StackPanel>
@@ -164,7 +166,7 @@
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="132" />
+                    <ColumnDefinition x:Name="colNavigation" Width="120" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -177,34 +179,32 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <StackPanel Margin="0,8,0,0">
-                            <Button x:Name="btnNavHome" Style="{StaticResource QccNavButtonActive}" Click="ShowProfiles_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="Home" />
-                                    <TextBlock VerticalAlignment="Center" Text="首页" />
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="btnNavNodes" Style="{StaticResource QccNavButton}" Click="ShowProfiles_Click">
+                            <Button x:Name="btnNavNodes" AutomationProperties.Name="节点工作区" Style="{StaticResource QccNavButtonActive}" Click="ShowProfiles_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="ViewGridOutline" />
                                     <TextBlock VerticalAlignment="Center" Text="节点" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavSubscription" Style="{StaticResource QccNavButton}" Click="ShowSubscription_Click">
+                            <Button x:Name="btnNavSubscription" AutomationProperties.Name="打开订阅节点管理" Style="{StaticResource QccNavButton}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="FileDocumentOutline" />
-                                    <TextBlock VerticalAlignment="Center" Text="订阅" />
+                                    <TextBlock VerticalAlignment="Center" Text="订阅节点" />
                                 </StackPanel>
                             </Button>
                             <Button
                                 x:Name="btnNavSubscriptionUpdate"
+                                Height="34"
+                                Margin="8,0,8,2"
+                                Padding="8,0"
+                                AutomationProperties.Name="更新订阅节点"
                                 Style="{StaticResource QccNavButton}"
-                                ToolTip="通过本地代理更新全部已启用订阅">
+                                ToolTip="通过当前本地代理更新全部已启用订阅节点；失败时按现有策略尝试直连">
                                 <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="CloudDownloadOutline" />
-                                    <TextBlock VerticalAlignment="Center" Text="更新订阅" />
+                                    <materialDesign:PackIcon Width="16" Height="16" Margin="1,0,5,0" Kind="CloudDownloadOutline" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="更新节点" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavRouting" Style="{StaticResource QccNavButton}" Click="ShowRouting_Click">
+                            <Button x:Name="btnNavRouting" AutomationProperties.Name="打开路由设置" Style="{StaticResource QccNavButton}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="SourceBranch" />
                                     <TextBlock VerticalAlignment="Center" Text="路由" />
@@ -222,7 +222,7 @@
                                     <TextBlock VerticalAlignment="Center" Text="日志" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavSettings" Style="{StaticResource QccNavButton}" Click="ShowSettings_Click">
+                            <Button x:Name="btnNavSettings" AutomationProperties.Name="打开设置" Style="{StaticResource QccNavButton}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="CogOutline" />
                                     <TextBlock VerticalAlignment="Center" Text="设置" />
@@ -231,9 +231,9 @@
                         </StackPanel>
 
                         <StackPanel Grid.Row="2" Margin="12,0,10,10">
-                            <TextBlock Style="{StaticResource QccMutedText}" Text="核心与组件" />
+                            <TextBlock Style="{StaticResource QccMutedText}" Text="内核更新" />
                             <TextBlock Margin="0,4,0,0" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontTiny}" LineHeight="{DynamicResource QccFontBody}" Text="Xray / sing-box / mihomo" TextWrapping="Wrap" />
-                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="更新核心组件" Cursor="Hand" ToolTip="玄同界面仅通过签名完整包更新" />
+                            <Button x:Name="btnNewUpdate" Margin="-10,8,0,0" HorizontalAlignment="Left" AutomationProperties.Name="发现内核更新" Foreground="{StaticResource QccPrimary}" Background="Transparent" BorderThickness="0" Content="发现内核更新" Cursor="Hand" ToolTip="打开内核管理" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -247,13 +247,13 @@
                     </Grid.RowDefinitions>
 
                     <!-- Connection summary -->
-                    <Border Grid.Row="0" MinHeight="96" Background="{StaticResource QccCanvas}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
-                        <Grid Margin="14,7,14,7">
+                    <Border x:Name="borderConnectionSummary" Grid.Row="0" MinHeight="96" Background="{StaticResource QccCanvas}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,0,1">
+                        <Grid x:Name="gridConnectionSummary" Margin="14,7,14,7">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.05*" />
-                                <ColumnDefinition Width="194" />
-                                <ColumnDefinition Width="1.25*" />
-                                <ColumnDefinition Width="148" />
+                                <ColumnDefinition x:Name="colHeroNode" Width="1.05*" />
+                                <ColumnDefinition x:Name="colHeroQuota" Width="184" />
+                                <ColumnDefinition x:Name="colHeroMetrics" Width="1.25*" />
+                                <ColumnDefinition x:Name="colHeroActions" Width="140" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock FontSize="{DynamicResource QccFontSmall}" Foreground="{StaticResource QccMuted}" Text="当前节点" />
@@ -358,7 +358,7 @@
                                         Foreground="{StaticResource QccMuted}"
                                         FontSize="{DynamicResource QccFontTiny}"
                                         Text="等待安全代理连接"
-                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="Wrap"
                                         ToolTip="订阅用量、到期时间与更新时间" />
                                 </Grid>
                             </Border>
@@ -376,11 +376,11 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
                                         <StackPanel Margin="8,2" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txtHeroProxySpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="代理实时上传 / 下载" />
+                                            <TextBlock x:Name="txtHeroProxySpeed" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="代理实时上传和下载速度" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="代理实时上传 / 下载" />
                                             <TextBlock Margin="0,1,0,0" FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="代理流量" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Margin="8,2" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txtHeroDirectSpeed" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="直连实时上传 / 下载" />
+                                            <TextBlock x:Name="txtHeroDirectSpeed" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="直连实时上传和下载速度" FontSize="{DynamicResource QccFontBody}" Text="↑ 0.0 B/s  ↓ 0.0 B/s" TextWrapping="Wrap" ToolTip="直连实时上传 / 下载" />
                                             <TextBlock Margin="0,1,0,0" FontSize="{DynamicResource QccFontSmall}" Style="{StaticResource QccMutedText}" Text="直连流量" />
                                         </StackPanel>
                                     </Grid>
@@ -396,10 +396,10 @@
                             </Grid>
 
                             <StackPanel Grid.Column="3" VerticalAlignment="Center">
-                                <Button x:Name="btnHeroSwitch" Height="34" Padding="12,0" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccPrimaryButton}" Click="ShowProfiles_Click">
+                                <Button x:Name="btnHeroSwitch" Height="34" Padding="12,0" AutomationProperties.Name="打开节点工作区" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccPrimaryButton}" Click="ShowProfiles_Click">
                                     <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Kind="SwapHorizontal" /><TextBlock VerticalAlignment="Center" Text="切换节点" /></StackPanel>
                                 </Button>
-                                <Button x:Name="btnDisconnect" Height="34" Margin="0,6,0,0" Padding="12,0" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccSecondaryButton}" Click="Disconnect_Click" ToolTip="停止当前代理核心；重新载入配置可再次连接">
+                                <Button x:Name="btnDisconnect" Height="34" Margin="0,6,0,0" Padding="12,0" AutomationProperties.Name="断开代理连接" FontSize="{DynamicResource QccFontBody}" Style="{StaticResource QccSecondaryButton}" Click="Disconnect_Click" ToolTip="停止当前代理核心；重新载入配置可再次连接">
                                     <StackPanel Orientation="Horizontal"><materialDesign:PackIcon Width="16" Height="16" Margin="0,0,7,0" Foreground="{StaticResource QccDanger}" Kind="Power" /><TextBlock VerticalAlignment="Center" Text="断开连接" /></StackPanel>
                                 </Button>
                             </StackPanel>
@@ -415,11 +415,19 @@
                         </TabControl>
                     </Grid>
 
-                    <ContentControl x:Name="contentStatusBarView" Grid.Row="2" MinHeight="72" />
+                    <ContentControl x:Name="contentStatusBarView" Grid.Row="2" MinHeight="48" />
                 </Grid>
-            </Grid>
 
-            <materialDesign:Snackbar x:Name="MainSnackbar" Grid.Row="1" MessageQueue="{materialDesign:MessageQueue}" />
+                <materialDesign:Snackbar
+                    x:Name="MainSnackbar"
+                    Grid.ColumnSpan="2"
+                    Panel.ZIndex="200"
+                    Width="720"
+                    Margin="8,296,0,0"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    MessageQueue="{materialDesign:MessageQueue}" />
+            </Grid>
 
             <!-- Command surface retained for compatibility with upstream ViewModel bindings. -->
             <Grid Visibility="Collapsed">

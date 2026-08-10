@@ -537,7 +537,7 @@ public class StatusBarViewModel : MyReactiveObject
         }
         else
         {
-            InboundLanDisplay = $"{ResUI.LabLAN}:{Global.None}";
+            InboundLanDisplay = $"{ResUI.LabLAN}:未启用";
         }
         await Task.CompletedTask;
     }

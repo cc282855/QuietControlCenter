@@ -14,18 +14,17 @@
     x:TypeArguments="vms:StatusBarViewModel"
     Style="{StaticResource ViewGlobal}"
     mc:Ignorable="d">
-    <Grid MinHeight="72" Background="{StaticResource QccSurface}">
+    <Grid MinHeight="48" Background="{StaticResource QccSurface}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" MinHeight="48" />
-            <RowDefinition Height="Auto" MinHeight="24" />
         </Grid.RowDefinitions>
         <Border BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
             <Grid Margin="10,4">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.15*" />
+                    <ColumnDefinition Width="0.8*" />
+                    <ColumnDefinition Width="1.45*" />
                     <ColumnDefinition Width="1.2*" />
-                    <ColumnDefinition Width="0.9*" />
-                    <ColumnDefinition Width="1.2*" />
-                    <ColumnDefinition Width="1.55*" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0" Padding="0,0,10,0" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,0,1,0">
@@ -76,7 +75,9 @@
                             AutomationProperties.Name="{x:Static resx:ResUI.menuRouting}"
                             DisplayMemberPath="Remarks"
                             FontSize="{DynamicResource QccFontBody}"
-                            Style="{StaticResource MaterialDesignOutlinedComboBox}" />
+                            Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                            TextSearch.TextPath="Remarks"
+                            ToolTip="{Binding SelectedRouting.Remarks}" />
                     </Grid>
                 </Border>
 
@@ -95,24 +96,6 @@
                     <TextBlock x:Name="txtRunningServerDisplay" />
                     <TextBlock x:Name="txtRunningInfoDisplay" />
                 </StackPanel>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1" Background="{StaticResource QccSurfaceRaised}" BorderBrush="{StaticResource QccBorder}" BorderThickness="0,1,0,0">
-            <Grid Margin="10,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                    <Ellipse Width="7" Height="7" Margin="0,0,6,0" Fill="{StaticResource QccMuted}" />
-                    <TextBlock x:Name="txtBottomRunningStatus" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="未连接" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="{Binding InboundDisplay, StringFormat=本地：{0}, FallbackValue=本地：—}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="{Binding SelectedRouting.Remarks, StringFormat=路由：{0}, FallbackValue=路由：—}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="3" Margin="12,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontSmall}" Text="系统代理与 TUN 实时同步" />
             </Grid>
         </Border>
 

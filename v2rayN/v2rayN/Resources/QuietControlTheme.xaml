@@ -37,9 +37,9 @@
     <!-- MainWindow replaces these local dynamic resources in 0.05 scale steps.
          Quantized changes keep text crisp and avoid a full remeasure for every
          pixel while the user drags the window edge. -->
-    <system:Double x:Key="QccFontTiny">10.5</system:Double>
-    <system:Double x:Key="QccFontSmall">11</system:Double>
-    <system:Double x:Key="QccFontBody">12</system:Double>
+    <system:Double x:Key="QccFontTiny">11</system:Double>
+    <system:Double x:Key="QccFontSmall">11.5</system:Double>
+    <system:Double x:Key="QccFontBody">12.5</system:Double>
     <system:Double x:Key="QccFontStrong">13</system:Double>
     <system:Double x:Key="QccFontTitle">14</system:Double>
     <system:Double x:Key="QccFontHero">16</system:Double>

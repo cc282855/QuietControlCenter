@@ -79,7 +79,11 @@ public partial class ProfilesView
             [ProfileColumnVisibility.Network] = menuColumnNetwork,
             [ProfileColumnVisibility.StreamSecurity] = menuColumnStreamSecurity,
             [ProfileColumnVisibility.Delay] = menuColumnDelay,
-            [ProfileColumnVisibility.SpeedVal] = menuColumnSpeed
+            [ProfileColumnVisibility.SpeedVal] = menuColumnSpeed,
+            [ProfileColumnVisibility.TodayUp] = menuColumnTodayUp,
+            [ProfileColumnVisibility.TodayDown] = menuColumnTodayDown,
+            [ProfileColumnVisibility.TotalUp] = menuColumnTotalUp,
+            [ProfileColumnVisibility.TotalDown] = menuColumnTotalDown
         };
 
         btnAutofitColumnWidth.Click += BtnAutofitColumnWidth_Click;
@@ -113,8 +117,6 @@ public partial class ProfilesView
 
             this.OneWayBind(ViewModel, vm => vm.SubItems, v => v.lstGroup.ItemsSource).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSub, v => v.lstGroup.SelectedItem).DisposeWith(disposables);
-            this.OneWayBind(ViewModel, vm => vm.CountryItems, v => v.lstCountry.ItemsSource).DisposeWith(disposables);
-            this.Bind(ViewModel, vm => vm.SelectedCountryCode, v => v.lstCountry.SelectedValue).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.ServerFilter, v => v.txtServerFilter.Text).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnAddSub).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.AddSubCmd, v => v.btnEmptyAddSub).DisposeWith(disposables);
@@ -149,14 +151,6 @@ public partial class ProfilesView
             this.BindCommand(ViewModel, vm => vm.RemoveInvalidServerResultCmd, v => v.menuRemoveInvalidServerResult).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.FastRealPingCmd, v => v.btnFastRealPing).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.MixedTestServerCmd, v => v.btnMixedTest).DisposeWith(disposables);
-
-            //selected node inspector
-            this.BindCommand(ViewModel, vm => vm.RealPingServerCmd, v => v.btnDetailPing).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SpeedServerCmd, v => v.btnDetailSpeed).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.CopyServerCmd, v => v.btnDetailCopy).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.EditServerCmd, v => v.btnDetailEdit).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.RemoveServerCmd, v => v.btnDetailDelete).DisposeWith(disposables);
-            this.BindCommand(ViewModel, vm => vm.SetDefaultServerCmd, v => v.btnDetailActivate).DisposeWith(disposables);
 
             //servers export
             this.BindCommand(ViewModel, vm => vm.Export2ClientConfigCmd, v => v.menuExport2ClientConfig).DisposeWith(disposables);
@@ -443,6 +437,7 @@ public partial class ProfilesView
             {
                 it.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
             }
+            RestoreResponsiveColumnWidths();
         }
         catch (Exception ex)
         {
@@ -467,15 +462,19 @@ public partial class ProfilesView
         try
         {
             var lvColumnItem = (_config.UiItem.MainColumnItem ?? []).OrderBy(t => t.Index).ToList();
-            var displayIndex = 0;
+            var displayIndex = 1;
             foreach (var item in lvColumnItem)
             {
+                if (item.Name.Equals("ActiveMarker", StringComparison.Ordinal))
+                {
+                    continue;
+                }
                 foreach (var item2 in lstProfiles.Columns.Cast<MyDGTextColumn>())
                 {
                     if (item2.ExName == item.Name)
                     {
                         var configurable = ProfileColumnVisibility.IsSupported(item2.ExName);
-                        if (item.Width > 0)
+                        if (item.Width > 0 && !IsResponsiveProfileColumn(item2.ExName))
                         {
                             item2.Width = item.Width;
                         }
@@ -484,10 +483,6 @@ public partial class ProfilesView
                             item2.Visibility = Visibility.Hidden;
                         }
                         item2.DisplayIndex = displayIndex++;
-                        if (item.Name.StartsWith("to", StringComparison.CurrentCultureIgnoreCase))
-                        {
-                            item2.Visibility = _config.GuiItem.EnableStatistics ? Visibility.Visible : Visibility.Hidden;
-                        }
                         if (item.Name.Equals("IpInfo", StringComparison.CurrentCultureIgnoreCase))
                         {
                             item2.Visibility = _config.SpeedTestItem.IPAPIUrl.IsNotEmpty() && !_config.UiItem.HideColumnIpInfo ? Visibility.Visible : Visibility.Hidden;
@@ -496,8 +491,8 @@ public partial class ProfilesView
                 }
             }
 
+            colActiveMarker.DisplayIndex = 0;
             ApplyProfileColumnVisibility();
-            ApplyStatisticsColumnVisibility();
         }
         catch (Exception ex)
         {
@@ -509,18 +504,15 @@ public partial class ProfilesView
     {
         foreach (var column in lstProfiles.Columns.Cast<MyDGTextColumn>().Where(column => ProfileColumnVisibility.IsSupported(column.ExName)))
         {
-            column.Visibility = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, column.ExName)
+            var isTrafficColumn = column.ExName is ProfileColumnVisibility.TodayUp
+                or ProfileColumnVisibility.TodayDown
+                or ProfileColumnVisibility.TotalUp
+                or ProfileColumnVisibility.TotalDown;
+            var isVisible = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, column.ExName)
+                && (!isTrafficColumn || _config.GuiItem.EnableStatistics);
+            column.Visibility = isVisible
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-        }
-    }
-
-    private void ApplyStatisticsColumnVisibility()
-    {
-        var visibility = _config.GuiItem.EnableStatistics ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var column in new[] { colTodayUp, colTodayDown, colTotalUp, colTotalDown })
-        {
-            column.Visibility = visibility;
         }
     }
 
@@ -529,6 +521,15 @@ public partial class ProfilesView
         foreach (var item in _profileColumnMenuItems)
         {
             item.Value.IsChecked = ProfileColumnVisibility.IsVisible(_config.UiItem.HiddenProfileColumns, item.Key);
+            var isTrafficColumn = item.Key is ProfileColumnVisibility.TodayUp
+                or ProfileColumnVisibility.TodayDown
+                or ProfileColumnVisibility.TotalUp
+                or ProfileColumnVisibility.TotalDown;
+            item.Value.IsEnabled = !isTrafficColumn || _config.GuiItem.EnableStatistics;
+            item.Value.ToolTip = isTrafficColumn && !_config.GuiItem.EnableStatistics
+                ? "请先在设置中启用流量统计"
+                : null;
+            ToolTipService.SetShowOnDisabled(item.Value, isTrafficColumn && !_config.GuiItem.EnableStatistics);
         }
     }
 
@@ -549,6 +550,10 @@ public partial class ProfilesView
                 .ToDictionary(group => group.Key, group => group.First().Width, StringComparer.Ordinal);
             foreach (var item2 in lstProfiles.Columns.Cast<MyDGTextColumn>())
             {
+                if (item2.ExName.Equals("ActiveMarker", StringComparison.Ordinal))
+                {
+                    continue;
+                }
                 var width = item2.ActualWidth >= item2.MinWidth && item2.ActualWidth > 0
                     ? (int)item2.ActualWidth
                     : storedWidths.GetValueOrDefault(item2.ExName, (int)Math.Max(item2.MinWidth, 70));
@@ -565,6 +570,22 @@ public partial class ProfilesView
         {
             Logging.SaveLog(_tag, ex);
         }
+    }
+
+    private static bool IsResponsiveProfileColumn(string name)
+    {
+        return name is "Remarks" or "ConfigType" or "SubRemarks" or "Network" or "DelayVal" or "SpeedVal" or "Address";
+    }
+
+    private void RestoreResponsiveColumnWidths()
+    {
+        colRemarks.Width = new DataGridLength(1.55, DataGridLengthUnitType.Star);
+        colConfigType.Width = new DataGridLength(0.9, DataGridLengthUnitType.Star);
+        colSubRemarks.Width = new DataGridLength(1.1, DataGridLengthUnitType.Star);
+        colNetwork.Width = new DataGridLength(0.9, DataGridLengthUnitType.Star);
+        colDelay.Width = new DataGridLength(0.9, DataGridLengthUnitType.Star);
+        colSpeed.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+        colAddress.Width = new DataGridLength(1.25, DataGridLengthUnitType.Star);
     }
 
     #endregion UI
