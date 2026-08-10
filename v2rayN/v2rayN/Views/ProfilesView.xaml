@@ -37,9 +37,10 @@
                 <Grid Margin="10,9">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="1.65*" />
+                        <ColumnDefinition Width="1.15*" MinWidth="210" MaxWidth="320" />
                         <ColumnDefinition Width="0.8*" MinWidth="148" MaxWidth="210" />
-                        <ColumnDefinition Width="1.05*" />
+                        <ColumnDefinition Width="1.05*" MinWidth="160" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -79,8 +80,11 @@
                         MinHeight="34"
                         Padding="12,8"
                         VerticalContentAlignment="Center"
+                        AutomationProperties.HelpText="支持搜索名称、备注和地址"
+                        AutomationProperties.Name="搜索节点"
                         FontSize="{DynamicResource QccFontBody}"
-                        materialDesign:HintAssist.Hint="搜索节点（名称、备注、地址）"
+                        ToolTip="支持搜索名称、备注和地址"
+                        materialDesign:HintAssist.Hint="搜索节点"
                         materialDesign:TextFieldAssist.HasClearButton="True"
                         Style="{StaticResource MaterialDesignOutlinedTextBox}" />
                     <ComboBox
@@ -115,7 +119,33 @@
                             <TextBlock VerticalAlignment="Center" Text="添加订阅" />
                         </StackPanel>
                     </Button>
-                    <Button x:Name="btnAutofitColumnWidth" Grid.Column="6" AutomationProperties.Name="自动调整节点列表列宽" Style="{StaticResource QccIconButton}" ToolTip="自动调整列宽">
+                    <Button
+                        x:Name="btnRefreshSub"
+                        Grid.Column="6"
+                        Height="34"
+                        Margin="8,0,0,0"
+                        Padding="10,0"
+                        AutomationProperties.Name="刷新订阅节点"
+                        Command="{Binding DataContext.SubUpdateViaProxyCmd, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                        Style="{StaticResource QccPrimaryButton}"
+                        ToolTip="通过当前代理刷新全部已启用订阅的节点；失败时按现有策略尝试直连">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Width="17" Height="17" Margin="0,0,6,0" Kind="Refresh" />
+                            <TextBlock VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="刷新节点" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.IsSubscriptionUpdating, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="True">
+                                                <Setter Property="Text" Value="刷新中…" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="btnAutofitColumnWidth" Grid.Column="7" AutomationProperties.Name="自动调整节点列表列宽" Style="{StaticResource QccIconButton}" ToolTip="自动调整列宽">
                         <materialDesign:PackIcon Width="19" Height="19" Kind="TableColumnWidth" />
                     </Button>
                 </Grid>

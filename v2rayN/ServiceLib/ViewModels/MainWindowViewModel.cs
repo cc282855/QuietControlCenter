@@ -5,6 +5,7 @@ namespace ServiceLib.ViewModels;
 public class MainWindowViewModel : MyReactiveObject
 {
     private readonly SubscriptionUpdateCoordinator _subscriptionUpdateCoordinator;
+    private bool _isSubscriptionUpdating;
 
     public Interaction<Unit, string?> ReadTextFromClipboardInteraction { get; } = new();
     public Interaction<Unit, byte[]?> ScanScreenInteraction { get; } = new();
@@ -48,6 +49,11 @@ public class MainWindowViewModel : MyReactiveObject
 
     public ReactiveCommand<Unit, Unit> SubUpdateCmd { get; }
     public ReactiveCommand<Unit, Unit> SubUpdateViaProxyCmd { get; }
+    public bool IsSubscriptionUpdating
+    {
+        get => _isSubscriptionUpdating;
+        private set => this.RaiseAndSetIfChanged(ref _isSubscriptionUpdating, value);
+    }
     public ReactiveCommand<Unit, Unit> SubGroupUpdateCmd { get; }
     public ReactiveCommand<Unit, Unit> SubGroupUpdateViaProxyCmd { get; }
 
@@ -182,7 +188,15 @@ public class MainWindowViewModel : MyReactiveObject
         });
         SubUpdateViaProxyCmd = ReactiveCommand.CreateFromTask(async () =>
         {
-            await UpdateSubscriptionProcess("", true);
+            IsSubscriptionUpdating = true;
+            try
+            {
+                await UpdateSubscriptionProcess("", true);
+            }
+            finally
+            {
+                IsSubscriptionUpdating = false;
+            }
         });
         SubGroupUpdateCmd = ReactiveCommand.CreateFromTask(async () =>
         {

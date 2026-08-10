@@ -139,7 +139,21 @@ public sealed class QuietUiStaticTests
 
         var pickerIndex = profilesXaml.IndexOf("x:Name=\"btnProfileColumns\"", StringComparison.Ordinal);
         var searchIndex = profilesXaml.IndexOf("x:Name=\"txtServerFilter\"", StringComparison.Ordinal);
-        Assert.True(pickerIndex >= 0 && searchIndex > pickerIndex);
+        var countryIndex = profilesXaml.IndexOf("x:Name=\"lstCountry\"", StringComparison.Ordinal);
+        var groupIndex = profilesXaml.IndexOf("x:Name=\"lstGroup\"", StringComparison.Ordinal);
+        var editSubIndex = profilesXaml.IndexOf("x:Name=\"btnEditSub\"", StringComparison.Ordinal);
+        var addSubIndex = profilesXaml.IndexOf("x:Name=\"btnAddSub\"", StringComparison.Ordinal);
+        var refreshSubIndex = profilesXaml.IndexOf("x:Name=\"btnRefreshSub\"", StringComparison.Ordinal);
+        var autofitIndex = profilesXaml.IndexOf("x:Name=\"btnAutofitColumnWidth\"", StringComparison.Ordinal);
+        Assert.True(
+            pickerIndex >= 0
+            && searchIndex > pickerIndex
+            && countryIndex > searchIndex
+            && groupIndex > countryIndex
+            && editSubIndex > groupIndex
+            && addSubIndex > editSubIndex
+            && refreshSubIndex > addSubIndex
+            && autofitIndex > refreshSubIndex);
         Assert.Contains("Kind=\"ViewColumnOutline\"", profilesXaml, StringComparison.Ordinal);
 
         foreach (var menuName in new[]
@@ -289,9 +303,13 @@ public sealed class QuietUiStaticTests
 
         var profileFilters = profilesXaml[profilesXaml.IndexOf("<!-- Search and filters -->", StringComparison.Ordinal)
             ..profilesXaml.IndexOf("<DataGrid", StringComparison.Ordinal)];
+        Assert.Contains("<ColumnDefinition Width=\"1.15*\" MinWidth=\"210\" MaxWidth=\"320\" />", profileFilters, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"0.8*\" MinWidth=\"148\" MaxWidth=\"210\" />", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"1.05*\" MinWidth=\"160\" />", profileFilters, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"国家/地区\"", profileFilters, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"订阅分组\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("materialDesign:HintAssist.Hint=\"搜索节点\"", profileFilters, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.HelpText=\"支持搜索名称、备注和地址\"", profileFilters, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"全部地区\"", profileFilters, StringComparison.Ordinal);
         Assert.DoesNotContain("Path=SelectedIndex", profileFilters, StringComparison.Ordinal);
         Assert.DoesNotContain("HintAssist.Hint=\"国家/地区\"", profileFilters, StringComparison.Ordinal);
@@ -309,7 +327,7 @@ public sealed class QuietUiStaticTests
         Assert.Contains("EnableRowVirtualization=\"True\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"colSpeed\" Width=\"1*\" MinWidth=\"108\"", profilesXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"colConfigType\" Width=\"0.9*\" MinWidth=\"108\"", profilesXaml, StringComparison.Ordinal);
-        foreach (var automationName in new[] { "选择节点列表字段", "编辑当前订阅", "添加订阅", "自动调整节点列表列宽" })
+        foreach (var automationName in new[] { "选择节点列表字段", "编辑当前订阅", "添加订阅", "刷新订阅节点", "自动调整节点列表列宽" })
         {
             Assert.Contains($"AutomationProperties.Name=\"{automationName}\"", profilesXaml, StringComparison.Ordinal);
         }
@@ -348,28 +366,33 @@ public sealed class QuietUiStaticTests
     }
 
     [Fact]
-    public void SubscriptionNavigation_ExposesAProxiedUpdateButton()
+    public void SubscriptionNavigation_UsesToolbarForProxiedRefresh()
     {
         var root = FindProjectRoot();
         var mainXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml"));
         var mainCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+        var profilesXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "ProfilesView.xaml"));
+        var mainViewModel = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "ViewModels", "MainWindowViewModel.cs"));
 
         var subscriptionIndex = mainXaml.IndexOf("x:Name=\"btnNavSubscription\"", StringComparison.Ordinal);
-        var updateIndex = mainXaml.IndexOf("x:Name=\"btnNavSubscriptionUpdate\"", StringComparison.Ordinal);
         var routingIndex = mainXaml.IndexOf("x:Name=\"btnNavRouting\"", StringComparison.Ordinal);
-        Assert.True(subscriptionIndex >= 0 && updateIndex > subscriptionIndex && routingIndex > updateIndex);
-        Assert.Contains("Text=\"订阅节点\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"打开订阅节点管理\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"更新节点\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"{DynamicResource QccFontStrong}\" Text=\"更新节点\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"更新订阅节点\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"8,0,8,2\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Padding=\"8,0\"", mainXaml, StringComparison.Ordinal);
+        Assert.True(subscriptionIndex >= 0 && routingIndex > subscriptionIndex);
+        Assert.Contains("Text=\"订阅\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"打开订阅管理\"", mainXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("btnNavSubscriptionUpdate", mainXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("btnNavSubscriptionUpdate", mainCode, StringComparison.Ordinal);
         Assert.Contains("colNavigation.Width = new GridLength(120)", mainCode, StringComparison.Ordinal);
         Assert.Contains("colNavigation.Width = new GridLength(124)", mainCode, StringComparison.Ordinal);
         Assert.Contains("colNavigation.Width = new GridLength(128)", mainCode, StringComparison.Ordinal);
-        Assert.Contains("ToolTip=\"通过当前本地代理更新全部已启用订阅节点；失败时按现有策略尝试直连\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("vm => vm.SubUpdateViaProxyCmd, v => v.btnNavSubscriptionUpdate", mainCode, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"btnRefreshSub\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("Text\" Value=\"刷新节点\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("Text\" Value=\"刷新中…\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource QccPrimaryButton}\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("DataContext.SubUpdateViaProxyCmd", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"通过当前代理刷新全部已启用订阅的节点；失败时按现有策略尝试直连\"", profilesXaml, StringComparison.Ordinal);
+        Assert.Contains("public bool IsSubscriptionUpdating", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsSubscriptionUpdating = true", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsSubscriptionUpdating = false", mainViewModel, StringComparison.Ordinal);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(mainXaml, "x:Name=\"MainSnackbar\"").Cast<System.Text.RegularExpressions.Match>());
         Assert.Contains("Grid.ColumnSpan=\"2\"", mainXaml, StringComparison.Ordinal);
         Assert.Contains("Panel.ZIndex=\"200\"", mainXaml, StringComparison.Ordinal);

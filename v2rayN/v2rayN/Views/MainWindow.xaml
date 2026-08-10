@@ -185,23 +185,10 @@
                                     <TextBlock VerticalAlignment="Center" Text="节点" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btnNavSubscription" AutomationProperties.Name="打开订阅节点管理" Style="{StaticResource QccNavButton}">
+                            <Button x:Name="btnNavSubscription" AutomationProperties.Name="打开订阅管理" Style="{StaticResource QccNavButton}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Width="18" Height="18" Margin="1,0,10,0" Kind="FileDocumentOutline" />
-                                    <TextBlock VerticalAlignment="Center" Text="订阅节点" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                x:Name="btnNavSubscriptionUpdate"
-                                Height="34"
-                                Margin="8,0,8,2"
-                                Padding="8,0"
-                                AutomationProperties.Name="更新订阅节点"
-                                Style="{StaticResource QccNavButton}"
-                                ToolTip="通过当前本地代理更新全部已启用订阅节点；失败时按现有策略尝试直连">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Width="16" Height="16" Margin="1,0,5,0" Kind="CloudDownloadOutline" />
-                                    <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontStrong}" Text="更新节点" />
+                                    <TextBlock VerticalAlignment="Center" Text="订阅" />
                                 </StackPanel>
                             </Button>
                             <Button x:Name="btnNavRouting" AutomationProperties.Name="打开路由设置" Style="{StaticResource QccNavButton}">
