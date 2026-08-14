@@ -1,4 +1,6 @@
 using System.Reactive.Disposables;
+using System.Text.RegularExpressions;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -34,6 +36,7 @@ public partial class MainWindow
     private long _subscriptionQuotaGeneration;
     private double _responsiveFontScale = -1;
     private int _liveMetricsTickRunning;
+    private readonly DispatcherTimer _sidebarNoticeTimer = new();
     private bool _subscriptionQuotaQaMode = Environment.GetCommandLineArgs()
         .Contains("--qcc-qa-quota-sample", StringComparer.Ordinal);
     private readonly bool _coreSettingsQaMode = Environment.GetCommandLineArgs()
@@ -45,6 +48,7 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
+        _sidebarNoticeTimer.Tick += SidebarNoticeTimer_Tick;
         ApplyResponsiveTypography(Width, Height);
         ApplyResponsiveLayout(Width);
 
@@ -306,10 +310,105 @@ public partial class MainWindow
         });
     }
 
-    private async Task DelegateSnackMsg(string content)
+    private Task DelegateSnackMsg(string content)
     {
-        MainSnackbar.MessageQueue?.Enqueue(content);
-        await Task.CompletedTask;
+        if (content.IsNullOrEmpty())
+        {
+            return Task.CompletedTask;
+        }
+
+        var isError = ContainsAny(content, "失败", "错误", "异常", "无法", "超时");
+        var isDisconnected = ContainsAny(content, "断开", "未连接", "已停止");
+        var isWarning = !isError && ContainsAny(content, "警告", "取消", "跳过");
+        var isUpdate = ContainsAny(content, "更新", "升级", "版本");
+        var isSuccess = ContainsAny(content, "成功", "完成", "已连接", "切换", "活动节点");
+
+        var (body, meta) = FormatSidebarNotice(content);
+        txtSidebarNoticeTitle.Text = isError ? "操作失败"
+            : isDisconnected ? "已断开"
+            : isWarning ? "请注意"
+            : isUpdate ? "更新提示"
+            : isSuccess || meta.IsNotEmpty() ? "已切换"
+            : "操作提示";
+        txtSidebarNoticeBody.Text = body;
+        txtSidebarNoticeMeta.Text = meta;
+        txtSidebarNoticeMeta.Visibility = meta.IsNotEmpty() ? Visibility.Visible : Visibility.Collapsed;
+
+        var resourceKey = isError ? "QccDanger" : isWarning || isDisconnected ? "QccWarning" : isUpdate ? "QccPrimary" : "QccSuccess";
+        var statusBrush = (Brush)FindResource(resourceKey);
+        SidebarNoticeAccent.Background = statusBrush;
+        SidebarNoticeIcon.Foreground = statusBrush;
+        SidebarNoticeIcon.Kind = isError ? PackIconKind.AlertCircleOutline
+            : isDisconnected ? PackIconKind.Power
+            : isWarning ? PackIconKind.AlertOutline
+            : isUpdate ? PackIconKind.Update
+            : PackIconKind.CheckCircleOutline;
+
+        var safeTooltip = meta.IsNotEmpty() ? $"{txtSidebarNoticeTitle.Text}\n{body}\n{meta}" : $"{txtSidebarNoticeTitle.Text}\n{body}";
+        SidebarNoticeCard.ToolTip = safeTooltip;
+        AutomationProperties.SetName(SidebarNoticeCard, safeTooltip.Replace('\n', ' '));
+        SidebarNoticeCard.Visibility = Visibility.Visible;
+
+        _sidebarNoticeTimer.Stop();
+        if (!isError)
+        {
+            _sidebarNoticeTimer.Interval = isWarning ? TimeSpan.FromSeconds(6)
+                : isDisconnected ? TimeSpan.FromSeconds(4)
+                : TimeSpan.FromSeconds(3);
+            _sidebarNoticeTimer.Start();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static bool ContainsAny(string content, params string[] values)
+        => values.Any(content.Contains);
+
+    private static (string Body, string Meta) FormatSidebarNotice(string content)
+    {
+        var text = Regex.Replace(content, @"https?://\S+", "链接详情", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"\[[^\]]+\]\s*", string.Empty);
+
+        var metaMatch = Regex.Match(text, @"【([^】]+)】");
+        var meta = metaMatch.Success ? metaMatch.Groups[1].Value.Trim() : string.Empty;
+        meta = Regex.Replace(meta, @"(?<=\S)专属$", " 专属");
+
+        text = Regex.Replace(text, @"【[^】]+】", string.Empty);
+        text = Regex.Replace(text, @"\([^)]*\)|（[^）]*）", string.Empty);
+        text = Regex.Replace(text, @"\s+", " ").Trim(' ', '-', ':', '：');
+
+        var separatorIndex = text.LastIndexOf('·');
+        if (separatorIndex >= 0 && separatorIndex < text.Length - 1)
+        {
+            text = text[(separatorIndex + 1)..].Trim();
+        }
+
+        return (text.IsNotEmpty() ? text : "操作已完成", meta);
+    }
+
+    private void SidebarNoticeTimer_Tick(object? sender, EventArgs e)
+    {
+        HideSidebarNotice();
+    }
+
+    private void SidebarNoticeCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        HideSidebarNotice();
+    }
+
+    private void SidebarNoticeCard_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Space or Key.Escape)
+        {
+            HideSidebarNotice();
+            e.Handled = true;
+        }
+    }
+
+    private void HideSidebarNotice()
+    {
+        _sidebarNoticeTimer.Stop();
+        SidebarNoticeCard.Visibility = Visibility.Collapsed;
     }
 
     private void OnHotkeyHandler(EGlobalHotkey e)
@@ -726,7 +825,7 @@ public partial class MainWindow
             ApplyQaQualitySampleIfRequested(args);
             if (args.Contains("--qcc-qa-snackbar-sample", StringComparer.Ordinal))
             {
-                MainSnackbar.MessageQueue?.Enqueue("[Shadowsocks] 【V5专属】广港·新加坡02 X2(thygl5qpkvzesuq***is:33233)");
+                await DelegateSnackMsg("[Shadowsocks] 【V5专属】广港·新加坡02 X2(thygl5qpkvzesuq***is:33233)");
                 await Task.Delay(400);
                 await Dispatcher.Yield(DispatcherPriority.Render);
             }
@@ -792,7 +891,7 @@ public partial class MainWindow
 
     private void SubscriptionQuotaRefresh_Click(object sender, RoutedEventArgs e)
     {
-        ScheduleSubscriptionQuotaRefresh(force: true);
+        ScheduleSubscriptionQuotaRefresh(force: true, showMissingOfficialWebsiteGuidance: true);
     }
 
     private void UpdateSubscriptionQuotaAgeAndSchedule()
@@ -832,7 +931,9 @@ public partial class MainWindow
         }
     }
 
-    private void ScheduleSubscriptionQuotaRefresh(bool force)
+    private void ScheduleSubscriptionQuotaRefresh(
+        bool force,
+        bool showMissingOfficialWebsiteGuidance = false)
     {
         if (_subscriptionQuotaQaMode)
         {
@@ -882,14 +983,16 @@ public partial class MainWindow
         _subscriptionQuotaRefreshTask = RefreshSubscriptionQuotaAsync(
             currentProfileId,
             generation,
-            requestCancellation);
+            requestCancellation,
+            showMissingOfficialWebsiteGuidance);
         RenderSubscriptionQuota(DateTimeOffset.UtcNow);
     }
 
     private async Task RefreshSubscriptionQuotaAsync(
         string profileId,
         long generation,
-        CancellationTokenSource requestCancellation)
+        CancellationTokenSource requestCancellation,
+        bool showMissingOfficialWebsiteGuidance)
     {
         var entered = false;
         var subId = string.Empty;
@@ -938,12 +1041,20 @@ public partial class MainWindow
                 return;
             }
 
-            var result = await _subscriptionQuotaService.FetchAsync(
+            var result = await _subscriptionQuotaService.FetchWithOfficialFallbackAsync(
                 subscription.Url,
+                subscription.OfficialUrl,
                 useLocalSocksProxy: true,
                 AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
                 subscription.UserAgent,
                 requestCancellation.Token);
+            if (showMissingOfficialWebsiteGuidance
+                && result.Status == SubscriptionQuotaStatusCode.Unsupported
+                && string.IsNullOrWhiteSpace(subscription.OfficialUrl))
+            {
+                result = new(SubscriptionQuotaStatusCode.OfficialWebsiteRequired);
+                NoticeManager.Instance.Enqueue("请在订阅设置中添加官方网址并登录账号");
+            }
             await ApplySubscriptionQuotaResultAsync(profileId, subId, generation, result);
         }
         catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
@@ -1011,6 +1122,8 @@ public partial class MainWindow
     private void RenderSubscriptionQuota(DateTimeOffset now)
     {
         btnSubscriptionQuotaRefresh.IsEnabled = _subscriptionQuotaRefreshTask is not { IsCompleted: false };
+        borderSubscriptionQuotaSource.Visibility = Visibility.Collapsed;
+        txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
         if (_subscriptionQuotaQaMode)
         {
             if (_subscriptionQuotaResult is not null)
@@ -1049,20 +1162,45 @@ public partial class MainWindow
 
     private void RenderSubscriptionQuotaResult(SubscriptionQuotaResult result, DateTimeOffset now)
     {
+        var usesOfficialWebsite = result.IsSuccess
+            && result.Snapshot!.Source == SubscriptionQuotaSource.OfficialWebsite;
+        borderSubscriptionQuotaSource.Visibility = usesOfficialWebsite ? Visibility.Visible : Visibility.Collapsed;
         if (!result.IsSuccess)
         {
-            txtSubscriptionQuotaPrimary.Text = SubscriptionQuotaService.GetFixedChineseMessage(result.Status);
-            txtSubscriptionQuotaSecondary.Text = _subscriptionQuotaLastCompletedUtc.HasValue
-                ? $"更新 {FormatSubscriptionQuotaAge(now - _subscriptionQuotaLastCompletedUtc.Value)}"
-                : "未保存查询内容";
+            txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
+            if (result.Status == SubscriptionQuotaStatusCode.OfficialWebsiteRequired)
+            {
+                txtSubscriptionQuotaPrimary.Text = "请添加官方网址";
+                txtSubscriptionQuotaSecondary.Text = "订阅设置中添加网页并登录账号";
+            }
+            else
+            {
+                txtSubscriptionQuotaPrimary.Text = SubscriptionQuotaService.GetFixedChineseMessage(result.Status);
+                txtSubscriptionQuotaSecondary.Text = _subscriptionQuotaLastCompletedUtc.HasValue
+                    ? $"更新 {FormatSubscriptionQuotaAge(now - _subscriptionQuotaLastCompletedUtc.Value)}"
+                    : "未保存查询内容";
+            }
             return;
         }
 
         var snapshot = result.Snapshot!;
         var expired = snapshot.ExpiresAtUtc.HasValue && snapshot.ExpiresAtUtc.Value <= now;
-        txtSubscriptionQuotaPrimary.Text = expired ? "订阅已过期" : FormatSubscriptionQuotaBytes(snapshot.RemainingBytes);
+        txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource(expired ? "QccDanger" : usesOfficialWebsite ? "QccSuccess" : "QccText");
+        txtSubscriptionQuotaPrimary.Text = expired
+            ? "订阅已过期"
+            : usesOfficialWebsite
+                ? $"剩余 {FormatSubscriptionQuotaBytes(snapshot.RemainingBytes)}"
+                : FormatSubscriptionQuotaBytes(snapshot.RemainingBytes);
         var age = FormatSubscriptionQuotaAge(now - snapshot.RetrievedAtUtc);
-        if (snapshot.TotalBytes.HasValue)
+        if (usesOfficialWebsite && snapshot.ExpiresAtUtc.HasValue)
+        {
+            txtSubscriptionQuotaSecondary.Text = $"到期 {snapshot.ExpiresAtUtc.Value.ToLocalTime():yyyy-MM-dd} · 官网查询 · {age}";
+        }
+        else if (usesOfficialWebsite)
+        {
+            txtSubscriptionQuotaSecondary.Text = $"官网查询 · 更新于{age}";
+        }
+        else if (snapshot.TotalBytes.HasValue)
         {
             var used = snapshot.UploadBytes + snapshot.DownloadBytes;
             txtSubscriptionQuotaSecondary.Text = $"已用 {FormatSubscriptionQuotaBytes(used)} / {FormatSubscriptionQuotaBytes(snapshot.TotalBytes.Value)} · {age}";

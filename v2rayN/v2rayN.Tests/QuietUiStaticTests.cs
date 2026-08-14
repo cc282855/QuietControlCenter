@@ -394,11 +394,22 @@ public sealed class QuietUiStaticTests
         Assert.Contains("IsSubscriptionUpdating = true", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("IsSubscriptionUpdating = false", mainViewModel, StringComparison.Ordinal);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(mainXaml, "x:Name=\"MainSnackbar\"").Cast<System.Text.RegularExpressions.Match>());
-        Assert.Contains("Grid.ColumnSpan=\"2\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Panel.ZIndex=\"200\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Width=\"720\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"8,296,0,0\"", mainXaml, StringComparison.Ordinal);
-        Assert.Contains("VerticalAlignment=\"Top\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SidebarNoticeCard\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("Grid.Row=\"1\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"8,12,8,12\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"10\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"Collapsed\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"156\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"70\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("TextTrimming=\"None\"", mainXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("text.Length > 28", mainCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("meta.Length > 12", mainCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("Grid.ColumnSpan=\"2\"\n                    Panel.ZIndex=\"200\"", mainXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Width=\"720\"", mainXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin=\"8,296,0,0\"", mainXaml, StringComparison.Ordinal);
+        Assert.Contains("FormatSidebarNotice", mainCode, StringComparison.Ordinal);
+        Assert.Contains("_sidebarNoticeTimer", mainCode, StringComparison.Ordinal);
+        Assert.Contains("SidebarNoticeCard.Visibility = Visibility.Collapsed", mainCode, StringComparison.Ordinal);
         Assert.Contains("--qcc-qa-snackbar-sample", mainCode, StringComparison.Ordinal);
     }
 
@@ -466,6 +477,16 @@ public sealed class QuietUiStaticTests
         Assert.Contains("SubscriptionQuotaQaRenderTime", codeBehind, StringComparison.Ordinal);
         Assert.Contains("new(2026, 8, 4, 8, 0, 0, TimeSpan.Zero)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("RenderSubscriptionQuotaResult(_subscriptionQuotaResult, SubscriptionQuotaQaRenderTime)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("FetchWithOfficialFallbackAsync", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("subscription.OfficialUrl", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("showMissingOfficialWebsiteGuidance: true", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.OfficialWebsiteRequired", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("请在订阅设置中添加官方网址并登录账号", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("订阅设置中添加网页并登录账号", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"borderSubscriptionQuotaSource\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"官网\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaSource.OfficialWebsite", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("官网查询", codeBehind, StringComparison.Ordinal);
         var qaMethodStart = codeBehind.IndexOf("private bool ApplyQaSubscriptionQuotaSampleIfRequested", StringComparison.Ordinal);
         var qaMethodEnd = codeBehind.IndexOf("private void ApplyQaQualitySampleIfRequested", qaMethodStart, StringComparison.Ordinal);
         var qaMethod = codeBehind[qaMethodStart..qaMethodEnd];
@@ -560,7 +581,7 @@ public sealed class QuietUiStaticTests
         Assert.Contains("version=$version", workflow, StringComparison.Ordinal);
         Assert.Contains("-p:Version=$version", workflow, StringComparison.Ordinal);
         Assert.Contains("quiet-${{ steps.prepare.outputs.version }}", workflow, StringComparison.Ordinal);
-        Assert.Contains("QuietControlCenter-$version-win-x64.zip", workflow, StringComparison.Ordinal);
+        Assert.Contains("玄同-$version-win-x64.zip", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -578,7 +599,7 @@ public sealed class QuietUiStaticTests
         Assert.Contains("Join-Path $smokeRoot '玄同.exe'", workflow, StringComparison.Ordinal);
         Assert.Contains("Join-Path $qaRoot '玄同.exe'", workflow, StringComparison.Ordinal);
         Assert.Contains("product = 'QuietControlCenter'", workflow, StringComparison.Ordinal);
-        Assert.Contains("QuietControlCenter-$version-win-x64.zip", workflow, StringComparison.Ordinal);
+        Assert.Contains("玄同-$version-win-x64.zip", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -942,6 +963,7 @@ public sealed class QuietUiStaticTests
         Assert.Contains("e.Handled = true", doubleClickHandler, StringComparison.Ordinal);
         Assert.DoesNotContain("DoubleClick2Activate", doubleClickHandler, StringComparison.Ordinal);
         Assert.DoesNotContain("EditServerAsync", doubleClickHandler, StringComparison.Ordinal);
+        Assert.Contains("indexId == _config.IndexId && CoreManager.Instance.IsRunning", profilesViewModel, StringComparison.Ordinal);
         Assert.Contains("colActiveMarker.DisplayIndex = 0", profilesCodeBehind, StringComparison.Ordinal);
         Assert.Contains("item.Name.Equals(\"ActiveMarker\", StringComparison.Ordinal)", profilesCodeBehind, StringComparison.Ordinal);
         Assert.Contains("item2.ExName.Equals(\"ActiveMarker\", StringComparison.Ordinal)", profilesCodeBehind, StringComparison.Ordinal);
@@ -972,8 +994,12 @@ public sealed class QuietUiStaticTests
         var settings = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "SubSettingViewModel.cs"));
         var edit = File.ReadAllText(Path.Combine(serviceRoot, "ViewModels", "SubEditViewModel.cs"));
         var handler = File.ReadAllText(Path.Combine(serviceRoot, "Handler", "SubscriptionHandler.cs"));
+        var configHandler = File.ReadAllText(Path.Combine(serviceRoot, "Handler", "ConfigHandler.cs"));
         var download = File.ReadAllText(Path.Combine(serviceRoot, "Services", "DownloadService.cs"));
         var coordinator = File.ReadAllText(Path.Combine(serviceRoot, "Services", "SubscriptionUpdateCoordinator.cs"));
+        var subItem = File.ReadAllText(Path.Combine(serviceRoot, "Models", "Entities", "SubItem.cs"));
+        var subEditXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "SubEditWindow.xaml"));
+        var subEditCode = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "SubEditWindow.xaml.cs"));
 
         Assert.Contains("new SubscriptionUpdateCoordinator(ExecuteSubscriptionUpdateAsync)", main, StringComparison.Ordinal);
         Assert.Contains("new ProfilesViewModel(UpdateNewSubscriptionAsync)", main, StringComparison.Ordinal);
@@ -1013,6 +1039,16 @@ public sealed class QuietUiStaticTests
         Assert.Contains("preserveActiveSelection: request.IsAutomatic", main, StringComparison.Ordinal);
         Assert.Contains("bool preserveActiveSelection = false", handler, StringComparison.Ordinal);
         Assert.Contains("preserveActiveSelection))", handler, StringComparison.Ordinal);
+        Assert.Contains("public string OfficialUrl", subItem, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"txtOfficialUrl\"", subEditXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"官方网页\"", subEditXaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"打开网页\"", subEditXaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedSource.OfficialUrl", subEditCode, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrl = subItem.OfficialUrl;", configHandler, StringComparison.Ordinal);
+        Assert.Contains("Profile-Web-Page-Url", download, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionOfficialUrlParser.Detect", download, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrl.IsNullOrEmpty()", handler, StringComparison.Ordinal);
+        Assert.Contains("SQLiteHelper.Instance.ReplaceAsync(item)", handler, StringComparison.Ordinal);
         var processResultStart = handler.IndexOf(
             "private static async Task<bool> ProcessDownloadResult",
             StringComparison.Ordinal);

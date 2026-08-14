@@ -75,6 +75,18 @@ public class SubEditViewModel : MyReactiveObject, ICloseable
             }
         }
 
+        var officialUrl = SelectedSource.OfficialUrl?.Trim();
+        if (officialUrl.IsNotEmpty())
+        {
+            var normalizedOfficialUrl = SubscriptionOfficialUrlParser.Normalize(officialUrl);
+            if (normalizedOfficialUrl is null)
+            {
+                NoticeManager.Instance.Enqueue("官方网页地址必须是有效的 HTTP 或 HTTPS 链接");
+                return;
+            }
+            SelectedSource.OfficialUrl = normalizedOfficialUrl;
+        }
+
         if (await ConfigHandler.AddSubItem(_config, SelectedSource) == 0)
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationSuccess);

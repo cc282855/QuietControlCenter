@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace ServiceLib.Services;
 
@@ -19,6 +20,12 @@ public static partial class SubscriptionQuotaParser
 
     [GeneratedRegex(@"^(?:到期时间|过期时间|有效期至|Expiry|Expiration\s+Date|Expires)\s*[:：]\s*(?<date>[0-9]{4}-[0-9]{2}-[0-9]{2}(?:[ T][0-9]{2}:[0-9]{2}:[0-9]{2})?)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
     private static partial Regex ExpiryMarkerRegex();
+
+    [GeneratedRegex(@"(?is)(?:剩余流量|Remaining\s+(?:Traffic|Flow))[^0-9]{0,120}(?<value>[0-9]+(?:\.[0-9]{1,3})?)\s*(?<unit>B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
+    private static partial Regex OfficialRemainingRegex();
+
+    [GeneratedRegex(@"(?is)(?:到期时间|过期时间|有效期至|Expiry|Expiration\s+Date|Expires)[^0-9]{0,120}(?<date>[0-9]{4}-[0-9]{2}-[0-9]{2}(?:[ T][0-9]{2}:[0-9]{2}:[0-9]{2})?)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
+    private static partial Regex OfficialExpiryRegex();
 
     public static SubscriptionQuotaResult ParseHeader(string? header, DateTimeOffset retrievedAtUtc)
     {
@@ -145,6 +152,150 @@ public static partial class SubscriptionQuotaParser
             SubscriptionQuotaStatusCode.Success,
             new(0, 0, null, remaining.Value, expiry, retrievedAtUtc, SubscriptionQuotaSource.ResponseBody));
     }
+
+    public static SubscriptionQuotaResult ParseOfficialBody(ReadOnlyMemory<byte> body, DateTimeOffset retrievedAtUtc)
+    {
+        var markerResult = ParseBody(body, retrievedAtUtc);
+        if (markerResult.IsSuccess || body.IsEmpty || body.Length > MaxBodyBytes)
+        {
+            return RelabelOfficial(markerResult);
+        }
+
+        string text;
+        try
+        {
+            text = StrictUtf8.GetString(body.Span);
+        }
+        catch (DecoderFallbackException)
+        {
+            return new(SubscriptionQuotaStatusCode.Malformed);
+        }
+
+        if (TryParseOfficialJson(text, retrievedAtUtc, out var jsonResult))
+        {
+            return jsonResult;
+        }
+
+        ulong? remaining = null;
+        DateTimeOffset? expiry = null;
+        var remainingMatch = OfficialRemainingRegex().Match(text);
+        if (remainingMatch.Success
+            && TryTrafficBytes(remainingMatch.Groups["value"].Value, remainingMatch.Groups["unit"].Value, out var bytes))
+        {
+            remaining = bytes;
+        }
+        var expiryMatch = OfficialExpiryRegex().Match(text);
+        if (expiryMatch.Success && TryExpiry(expiryMatch.Groups["date"].Value, out var parsedExpiry))
+        {
+            expiry = parsedExpiry;
+        }
+
+        return remaining.HasValue
+            ? new(SubscriptionQuotaStatusCode.Success,
+                new(0, 0, null, remaining.Value, expiry, retrievedAtUtc, SubscriptionQuotaSource.OfficialWebsite))
+            : new(SubscriptionQuotaStatusCode.Unsupported);
+    }
+
+    private static bool TryParseOfficialJson(
+        string text,
+        DateTimeOffset retrievedAtUtc,
+        out SubscriptionQuotaResult result)
+    {
+        result = new(SubscriptionQuotaStatusCode.Unsupported);
+        try
+        {
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 32 });
+            var values = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
+            CollectOfficialJsonNumbers(document.RootElement, values, 0);
+
+            if (!TryGetFirst(values, out var total, "transfer_enable", "total", "total_bytes")
+                || !TryGetFirst(values, out var upload, "u", "upload", "upload_bytes")
+                || !TryGetFirst(values, out var download, "d", "download", "download_bytes")
+                || total == 0
+                || upload > total
+                || download > total - upload)
+            {
+                return false;
+            }
+
+            DateTimeOffset? expiry = null;
+            if (TryGetFirst(values, out var expires, "expired_at", "expire", "expires_at")
+                && expires > 0
+                && expires <= (ulong)MaximumExpiry.ToUnixTimeSeconds())
+            {
+                var parsed = DateTimeOffset.FromUnixTimeSeconds((long)expires);
+                if (parsed >= MinimumExpiry)
+                {
+                    expiry = parsed;
+                }
+            }
+
+            result = new(
+                SubscriptionQuotaStatusCode.Success,
+                new(upload, download, total, total - upload - download, expiry, retrievedAtUtc,
+                    SubscriptionQuotaSource.OfficialWebsite));
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static void CollectOfficialJsonNumbers(
+        JsonElement element,
+        IDictionary<string, ulong> values,
+        int depth)
+    {
+        if (depth > 16)
+        {
+            return;
+        }
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Number
+                    && property.Value.TryGetUInt64(out var number)
+                    && !values.ContainsKey(property.Name))
+                {
+                    values[property.Name] = number;
+                }
+                else if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    CollectOfficialJsonNumbers(property.Value, values, depth + 1);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray().Take(64))
+            {
+                CollectOfficialJsonNumbers(item, values, depth + 1);
+            }
+        }
+    }
+
+    private static bool TryGetFirst(
+        IReadOnlyDictionary<string, ulong> values,
+        out ulong value,
+        params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (values.TryGetValue(key, out value))
+            {
+                return true;
+            }
+        }
+        value = 0;
+        return false;
+    }
+
+    private static SubscriptionQuotaResult RelabelOfficial(SubscriptionQuotaResult result)
+        => result.IsSuccess
+            ? result with { Snapshot = result.Snapshot! with { Source = SubscriptionQuotaSource.OfficialWebsite } }
+            : result;
 
     private static void ReadMarkers(string text, ref ulong? remaining, ref DateTimeOffset? expiry)
     {

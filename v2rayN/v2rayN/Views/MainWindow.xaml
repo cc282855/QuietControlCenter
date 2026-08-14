@@ -217,6 +217,71 @@
                             </Button>
                         </StackPanel>
 
+                        <Border
+                            x:Name="SidebarNoticeCard"
+                            Grid.Row="1"
+                            MinHeight="68"
+                            MaxHeight="156"
+                            Margin="8,12,8,12"
+                            Padding="0"
+                            VerticalAlignment="Top"
+                            AutomationProperties.LiveSetting="Polite"
+                            AutomationProperties.Name="操作提示"
+                            Background="{StaticResource QccSurfaceRaised}"
+                            BorderBrush="{StaticResource QccBorder}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Cursor="Hand"
+                            Focusable="True"
+                            KeyDown="SidebarNoticeCard_KeyDown"
+                            MouseLeftButtonUp="SidebarNoticeCard_MouseLeftButtonUp"
+                            Visibility="Collapsed">
+                            <Grid ClipToBounds="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="SidebarNoticeAccent" Background="{StaticResource QccSuccess}" CornerRadius="10,0,0,10" />
+                                <StackPanel Grid.Column="1" Margin="8,8,7,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon
+                                            x:Name="SidebarNoticeIcon"
+                                            Width="15"
+                                            Height="15"
+                                            Margin="0,0,5,0"
+                                            VerticalAlignment="Center"
+                                            Foreground="{StaticResource QccSuccess}"
+                                            Kind="CheckCircleOutline" />
+                                        <TextBlock
+                                            x:Name="txtSidebarNoticeTitle"
+                                            VerticalAlignment="Center"
+                                            FontSize="11.5"
+                                            FontWeight="SemiBold"
+                                            Text="已切换"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <TextBlock
+                                        x:Name="txtSidebarNoticeBody"
+                                        Margin="0,4,0,0"
+                                        FontSize="11"
+                                        FontWeight="Medium"
+                                        LineHeight="14"
+                                        MaxHeight="70"
+                                        Text="新加坡04 X2"
+                                        TextTrimming="None"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        x:Name="txtSidebarNoticeMeta"
+                                        Margin="0,2,0,0"
+                                        Foreground="{StaticResource QccMuted}"
+                                        FontSize="10.5"
+                                        Text="V5 专属"
+                                        TextTrimming="None"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
                         <StackPanel Grid.Row="2" Margin="12,0,10,10">
                             <TextBlock Style="{StaticResource QccMutedText}" Text="内核更新" />
                             <TextBlock Margin="0,4,0,0" Foreground="{StaticResource QccMuted}" FontSize="{DynamicResource QccFontTiny}" LineHeight="{DynamicResource QccFontBody}" Text="Xray / sing-box / mihomo" TextWrapping="Wrap" />
@@ -314,11 +379,22 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <TextBlock VerticalAlignment="Center" FontSize="{DynamicResource QccFontSmall}" Foreground="{StaticResource QccMuted}" Text="订阅余量" />
+                                        <Border
+                                            x:Name="borderSubscriptionQuotaSource"
+                                            Grid.Column="1"
+                                            Margin="3,0,1,0"
+                                            Padding="5,1"
+                                            VerticalAlignment="Center"
+                                            Background="{StaticResource QccPrimarySoft}"
+                                            CornerRadius="7"
+                                            Visibility="Collapsed">
+                                            <TextBlock x:Name="txtSubscriptionQuotaSource" Foreground="{StaticResource QccPrimary}" FontSize="{DynamicResource QccFontTiny}" Text="官网" />
+                                        </Border>
                                         <Button
                                             x:Name="btnSubscriptionQuotaRefresh"
-                                            Grid.Column="1"
+                                            Grid.Column="2"
                                             Width="24"
                                             Height="22"
                                             Padding="3"
@@ -407,12 +483,9 @@
 
                 <materialDesign:Snackbar
                     x:Name="MainSnackbar"
-                    Grid.ColumnSpan="2"
-                    Panel.ZIndex="200"
-                    Width="720"
-                    Margin="8,296,0,0"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Top"
+                    Width="0"
+                    Height="0"
+                    Visibility="Collapsed"
                     MessageQueue="{materialDesign:MessageQueue}" />
             </Grid>
 

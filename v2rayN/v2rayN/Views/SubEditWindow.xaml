@@ -145,10 +145,36 @@
                     Margin="{StaticResource Margin4}"
                     VerticalAlignment="Center"
                     Style="{StaticResource ToolbarTextBlock}"
+                    Text="官方网页" />
+                <TextBox
+                    x:Name="txtOfficialUrl"
+                    Grid.Row="3"
+                    Grid.Column="1"
+                    Margin="{StaticResource Margin4}"
+                    VerticalAlignment="Center"
+                    materialDesign:HintAssist.Hint="订阅支持时自动识别，也可手动填写"
+                    Style="{StaticResource MyOutlinedTextBox}"
+                    TextWrapping="NoWrap" />
+                <Button
+                    x:Name="btnOpenOfficialUrl"
+                    Grid.Row="3"
+                    Grid.Column="2"
+                    Margin="{StaticResource Margin4}"
+                    VerticalAlignment="Center"
+                    Click="OpenOfficialUrl_Click"
+                    Content="打开网页"
+                    Style="{StaticResource DefButton}" />
+
+                <TextBlock
+                    Grid.Row="4"
+                    Grid.Column="0"
+                    Margin="{StaticResource Margin4}"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource ToolbarTextBlock}"
                     Text="{x:Static resx:ResUI.LvEnabled}" />
 
                 <DockPanel
-                    Grid.Row="3"
+                    Grid.Row="4"
                     Grid.Column="1"
                     Margin="{StaticResource Margin4}">
                     <ToggleButton

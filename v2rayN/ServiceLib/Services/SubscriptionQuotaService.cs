@@ -102,6 +102,119 @@ public sealed class SubscriptionQuotaService
         }
     }
 
+    public async Task<SubscriptionQuotaResult> FetchWithOfficialFallbackAsync(
+        string? subscriptionUrl,
+        string? officialUrl,
+        bool useLocalSocksProxy,
+        int localSocksPort,
+        string? userAgent,
+        CancellationToken cancellationToken = default)
+    {
+        var primary = await FetchAsync(
+            subscriptionUrl,
+            useLocalSocksProxy,
+            localSocksPort,
+            userAgent,
+            cancellationToken).ConfigureAwait(false);
+        if (primary.IsSuccess
+            || primary.Status is SubscriptionQuotaStatusCode.Cancelled or SubscriptionQuotaStatusCode.ProxyUnavailable
+            || !TryValidateUrl(officialUrl, out _))
+        {
+            return primary;
+        }
+
+        var official = await FetchOfficialAsync(
+            officialUrl,
+            useLocalSocksProxy,
+            localSocksPort,
+            userAgent,
+            cancellationToken).ConfigureAwait(false);
+        if (official.IsSuccess
+            || official.Status is SubscriptionQuotaStatusCode.Cancelled or SubscriptionQuotaStatusCode.ProxyUnavailable)
+        {
+            return official;
+        }
+        return new(SubscriptionQuotaStatusCode.OfficialWebsiteUnavailable);
+    }
+
+    private async Task<SubscriptionQuotaResult> FetchOfficialAsync(
+        string? url,
+        bool useLocalSocksProxy,
+        int localSocksPort,
+        string? userAgent,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateUrl(url, out var uri))
+        {
+            return new(SubscriptionQuotaStatusCode.InvalidRequest);
+        }
+        if (useLocalSocksProxy && localSocksPort is <= 0 or > 65535)
+        {
+            return new(SubscriptionQuotaStatusCode.ProxyUnavailable);
+        }
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linked.CancelAfter(RequestTimeout);
+        try
+        {
+            if (useLocalSocksProxy
+                && !await _proxyAvailability(localSocksPort, linked.Token).ConfigureAwait(false))
+            {
+                return new(SubscriptionQuotaStatusCode.ProxyUnavailable);
+            }
+            using var handler = _handlerFactory(useLocalSocksProxy ? localSocksPort : null);
+            using var client = new HttpClient(handler, false) { Timeout = Timeout.InfiniteTimeSpan };
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            ApplyRequestHeaders(request, userAgent);
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                linked.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new(SubscriptionQuotaStatusCode.HttpError);
+            }
+
+            var retrievedAt = _timeProvider.GetUtcNow();
+            if (response.Headers.TryGetValues("Subscription-Userinfo", out var headerValues))
+            {
+                var values = headerValues.Take(2).ToArray();
+                if (values.Length == 1)
+                {
+                    var headerResult = SubscriptionQuotaParser.ParseHeader(values[0], retrievedAt);
+                    if (headerResult.IsSuccess)
+                    {
+                        return headerResult with
+                        {
+                            Snapshot = headerResult.Snapshot! with { Source = SubscriptionQuotaSource.OfficialWebsite }
+                        };
+                    }
+                }
+            }
+
+            if (response.Content.Headers.ContentLength > SubscriptionQuotaParser.MaxBodyBytes)
+            {
+                return new(SubscriptionQuotaStatusCode.BodyTooLarge);
+            }
+            var body = await ReadBodyBoundedAsync(response.Content, linked.Token).ConfigureAwait(false);
+            return body is null
+                ? new(SubscriptionQuotaStatusCode.BodyTooLarge)
+                : SubscriptionQuotaParser.ParseOfficialBody(body, retrievedAt);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new(SubscriptionQuotaStatusCode.Cancelled);
+        }
+        catch (OperationCanceledException)
+        {
+            return new(SubscriptionQuotaStatusCode.NetworkError);
+        }
+        catch
+        {
+            return new(SubscriptionQuotaStatusCode.NetworkError);
+        }
+    }
+
     public static string GetFixedChineseMessage(SubscriptionQuotaStatusCode status) => status switch
     {
         SubscriptionQuotaStatusCode.Unsupported => "订阅未提供余量",
@@ -111,6 +224,8 @@ public sealed class SubscriptionQuotaService
         SubscriptionQuotaStatusCode.ProxyUnavailable => "代理不可用",
         SubscriptionQuotaStatusCode.NetworkError => "余量查询失败",
         SubscriptionQuotaStatusCode.HttpError => "订阅服务响应异常",
+        SubscriptionQuotaStatusCode.OfficialWebsiteRequired => "请添加官方网址并登录账号",
+        SubscriptionQuotaStatusCode.OfficialWebsiteUnavailable => "官网需要登录或暂不支持",
         SubscriptionQuotaStatusCode.Cancelled => "余量查询已取消",
         _ => "订阅余量可用"
     };

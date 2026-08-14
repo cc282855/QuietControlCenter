@@ -10,13 +10,16 @@ public enum SubscriptionQuotaStatusCode
     ProxyUnavailable,
     NetworkError,
     HttpError,
+    OfficialWebsiteRequired,
+    OfficialWebsiteUnavailable,
     Cancelled
 }
 
 public enum SubscriptionQuotaSource
 {
     Header,
-    ResponseBody
+    ResponseBody,
+    OfficialWebsite
 }
 
 public sealed record SubscriptionQuotaSnapshot(

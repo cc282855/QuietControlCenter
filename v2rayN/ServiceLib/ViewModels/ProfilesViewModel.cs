@@ -735,7 +735,7 @@ public class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
-        if (indexId == _config.IndexId)
+        if (indexId == _config.IndexId && CoreManager.Instance.IsRunning)
         {
             return;
         }

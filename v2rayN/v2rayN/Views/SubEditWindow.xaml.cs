@@ -1,3 +1,5 @@
+using ServiceLib.Services;
+
 namespace v2rayN.Views;
 
 public partial class SubEditWindow
@@ -15,6 +17,7 @@ public partial class SubEditWindow
             this.Bind(ViewModel, vm => vm.SelectedSource.Remarks, v => v.txtRemarks.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSource.Url, v => v.txtUrl.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSource.MoreUrl, v => v.txtMoreUrl.Text).DisposeWith(disposables);
+            this.Bind(ViewModel, vm => vm.SelectedSource.OfficialUrl, v => v.txtOfficialUrl.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSource.Enabled, v => v.togEnable.IsChecked).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSource.AutoUpdateInterval, v => v.txtAutoUpdateInterval.Text).DisposeWith(disposables);
             this.Bind(ViewModel, vm => vm.SelectedSource.UserAgent, v => v.txtUserAgent.Text).DisposeWith(disposables);
@@ -36,5 +39,17 @@ public partial class SubEditWindow
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         txtRemarks.Focus();
+    }
+
+    private void OpenOfficialUrl_Click(object sender, RoutedEventArgs e)
+    {
+        var officialUrl = SubscriptionOfficialUrlParser.Normalize(txtOfficialUrl.Text);
+        if (officialUrl is null)
+        {
+            NoticeManager.Instance.Enqueue("尚未识别到有效的官方网页地址");
+            return;
+        }
+
+        ProcUtils.ProcessStart(officialUrl);
     }
 }

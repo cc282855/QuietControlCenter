@@ -12,6 +12,8 @@ public class SubItem
 
     public string MoreUrl { get; set; }
 
+    public string OfficialUrl { get; set; } = string.Empty;
+
     public bool Enabled { get; set; } = true;
 
     public string UserAgent { get; set; } = string.Empty;

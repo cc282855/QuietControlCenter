@@ -14,6 +14,8 @@ public class DownloadService
     private static readonly string _tag = "DownloadService";
     private readonly bool _redactSensitiveErrors;
 
+    public string? LastResponseOfficialUrl { get; private set; }
+
     public DownloadService(bool redactSensitiveErrors = false)
     {
         _redactSensitiveErrors = redactSensitiveErrors;
@@ -131,6 +133,7 @@ public class DownloadService
     /// </summary>
     public async Task<string?> TryDownloadString(string url, IWebProxy? webProxy, string userAgent)
     {
+        LastResponseOfficialUrl = null;
         var timeout = 15;
         try
         {
@@ -203,7 +206,20 @@ public class DownloadService
             using var cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
-            return await client.GetStringAsync(url, cts.Token);
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (client.DefaultRequestHeaders.Authorization is not null)
+            {
+                request.Headers.Authorization = client.DefaultRequestHeaders.Authorization;
+            }
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseContentRead,
+                cts.Token);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadAsStringAsync(cts.Token);
+            response.Headers.TryGetValues("Profile-Web-Page-Url", out var officialUrlHeaders);
+            LastResponseOfficialUrl = SubscriptionOfficialUrlParser.Detect(officialUrlHeaders, result);
+            return result;
         }
         catch (Exception ex)
         {
@@ -225,6 +241,7 @@ public class DownloadService
                 userAgent = Utils.GetVersion(false);
             }
             var result = await DownloaderHelper.Instance.DownloadStringAsync(webProxy, url, userAgent, timeout);
+            LastResponseOfficialUrl = SubscriptionOfficialUrlParser.Detect(null, result);
             return result;
         }
         catch (Exception ex)

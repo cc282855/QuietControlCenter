@@ -210,6 +210,62 @@ public sealed class SubscriptionQuotaServiceTests
         Assert.Null(result.Snapshot);
     }
 
+    [Fact]
+    public async Task FetchWithOfficialFallback_UsesOfficialJsonWhenSubscriptionHasNoQuota()
+    {
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/sub")
+            {
+                return new(HttpStatusCode.OK) { Content = new StringContent("vmess://sample") };
+            }
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                    {"data":{"transfer_enable":107374182400,"u":10737418240,"d":21474836480,"expired_at":1830297600}}
+                    """)
+            };
+        });
+        var service = CreateService(handler);
+
+        var result = await service.FetchWithOfficialFallbackAsync(
+            "https://example.invalid/sub",
+            "https://example.invalid/account",
+            false,
+            0,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubscriptionQuotaSource.OfficialWebsite, result.Snapshot!.Source);
+        Assert.Equal(75161927680UL, result.Snapshot.RemainingBytes);
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task FetchWithOfficialFallback_DoesNotRequestWebsiteWhenPrimarySucceeds()
+    {
+        var handler = new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK);
+            response.Headers.TryAddWithoutValidation("Subscription-Userinfo", "upload=1; download=2; total=10");
+            return response;
+        });
+        var service = CreateService(handler);
+
+        var result = await service.FetchWithOfficialFallbackAsync(
+            "https://example.invalid/sub",
+            "https://example.invalid/account",
+            false,
+            0,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SubscriptionQuotaSource.Header, result.Snapshot!.Source);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
     private static SubscriptionQuotaService CreateService(HttpMessageHandler handler) => new(
         (_, _) => Task.FromResult(true),
         _ => handler,

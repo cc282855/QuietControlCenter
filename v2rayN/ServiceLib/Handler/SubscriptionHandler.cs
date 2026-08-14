@@ -160,8 +160,16 @@ public static class SubscriptionHandler
             }
         }
 
-        // Download and return result directly
-        return await DownloadSubscriptionContent(downloadHandle, url, blProxy, allowDirectFallback, item.UserAgent);
+        var result = await DownloadSubscriptionContent(downloadHandle, url, blProxy, allowDirectFallback, item.UserAgent);
+        if (item.ConvertTarget.IsNullOrEmpty()
+            && item.OfficialUrl.IsNullOrEmpty()
+            && downloadHandle.LastResponseOfficialUrl.IsNotEmpty())
+        {
+            item.OfficialUrl = downloadHandle.LastResponseOfficialUrl!;
+            await SQLiteHelper.Instance.ReplaceAsync(item);
+        }
+
+        return result;
     }
 
     private static async Task<string> DownloadAdditionalSubscriptions(
