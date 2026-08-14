@@ -7,6 +7,9 @@ namespace Xuantong.AuthHost;
 
 internal static class AuthenticatedQuotaParser
 {
+    private const ulong MinimumExpiryUnixSeconds = 946684800;
+    private const ulong MaximumExpiryUnixSeconds = 4133980799;
+
     public static bool TryParseHeader(string? value, out AuthResponse response)
     {
         response = null!;
@@ -24,7 +27,12 @@ internal static class AuthenticatedQuotaParser
         }
         if (!values.TryGetValue("upload", out var upload) || !values.TryGetValue("download", out var download)
             || !values.TryGetValue("total", out var total) || total == 0 || upload > total || download > total - upload) return false;
-        long? expires = values.TryGetValue("expire", out var expiry) && expiry <= long.MaxValue ? (long)expiry : null;
+        long? expires = null;
+        if (values.TryGetValue("expire", out var expiry) && expiry != 0)
+        {
+            if (expiry < MinimumExpiryUnixSeconds || expiry > MaximumExpiryUnixSeconds) return false;
+            expires = (long)expiry;
+        }
         response = new("Success", upload, download, total, total - upload - download, expires);
         return true;
     }
@@ -49,9 +57,8 @@ internal static class AuthenticatedQuotaQuery
             request.Headers.TryAddWithoutValidation("Cookie", cookies);
             request.Headers.AcceptEncoding.ParseAdd("identity");
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
-                || (int)response.StatusCode is >= 300 and < 400) return new("LoginRequired");
-            if (!response.IsSuccessStatusCode) return new("NetworkError");
+            var status = ClassifyHttpStatus(response.StatusCode);
+            if (status != "Success") return new(status);
             if (response.Headers.TryGetValues("Subscription-Userinfo", out var headers))
             {
                 var values = headers.Take(2).ToArray();
@@ -61,6 +68,14 @@ internal static class AuthenticatedQuotaQuery
         }
         catch { return new("NetworkError"); }
     }
+
+    internal static string ClassifyHttpStatus(HttpStatusCode status)
+        => status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+           || (int)status is >= 300 and < 400
+            ? "LoginRequired"
+            : (int)status is >= 200 and < 300
+                ? "Success"
+                : "HttpError";
 
     private sealed class SocksProxy(int port) : IWebProxy
     {

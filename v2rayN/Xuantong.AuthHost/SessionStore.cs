@@ -32,6 +32,8 @@ internal static class CookiePolicy
 internal static class SessionStore
 {
     private const int MaxStoreBytes = 64 * 1024;
+    private const string RollbackSuffix = ".rollback";
+    private const string CompleteSuffix = ".complete";
     private static readonly string Root = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Xuantong", "AuthSessions");
 
@@ -113,11 +115,38 @@ internal static class SessionStore
         try
         {
             if (!Directory.Exists(Root)) return true;
+            if (!RecoverRollbackJournals(Root)) return false;
             foreach (var path in Directory.EnumerateFiles(Root, "*.pending", SearchOption.TopDirectoryOnly)
-                         .Concat(Directory.EnumerateFiles(Root, "*.tmp", SearchOption.TopDirectoryOnly)))
+                         .Concat(Directory.EnumerateFiles(Root, "*.tmp", SearchOption.TopDirectoryOnly))
+                         .Concat(Directory.EnumerateFiles(Root, "*" + CompleteSuffix, SearchOption.TopDirectoryOnly))
+                         .Concat(Directory.EnumerateFiles(Root, "*.lock", SearchOption.TopDirectoryOnly)))
                 File.Delete(path);
             return !Directory.EnumerateFiles(Root, "*.pending", SearchOption.TopDirectoryOnly).Any()
-                   && !Directory.EnumerateFiles(Root, "*.tmp", SearchOption.TopDirectoryOnly).Any();
+                   && !Directory.EnumerateFiles(Root, "*.tmp", SearchOption.TopDirectoryOnly).Any()
+                   && !Directory.EnumerateFiles(Root, "*" + RollbackSuffix, SearchOption.TopDirectoryOnly).Any()
+                   && !Directory.EnumerateFiles(Root, "*" + CompleteSuffix, SearchOption.TopDirectoryOnly).Any();
+        }
+        catch { return false; }
+    }
+
+    internal static bool RecoverRollbackJournals(string root)
+    {
+        try
+        {
+            if (!Directory.Exists(root)) return true;
+            var journals = Directory.EnumerateFiles(root, "*" + RollbackSuffix, SearchOption.TopDirectoryOnly).ToArray();
+            var success = true;
+            foreach (var journal in journals)
+            {
+                var path = journal[..^RollbackSuffix.Length];
+                try
+                {
+                    using var sessionLock = AcquireSessionLock(path);
+                    if (!RestoreFromJournal(path, journal)) success = false;
+                }
+                catch { success = false; }
+            }
+            return success && !Directory.EnumerateFiles(root, "*" + RollbackSuffix, SearchOption.TopDirectoryOnly).Any();
         }
         catch { return false; }
     }
@@ -149,8 +178,10 @@ internal static class SessionStore
             var path = GetPath(AuthContext.Create(ticket.SubId, ticket.Origin)!);
             if (!Directory.Exists(Root)) return true;
             if (File.Exists(path)) File.Delete(path);
-            foreach (var temp in Directory.EnumerateFiles(Root, Path.GetFileName(path) + ".*.pending")) File.Delete(temp);
-            return !File.Exists(path) && !Directory.EnumerateFiles(Root, Path.GetFileName(path) + ".*.pending").Any();
+            foreach (var suffix in new[] { ".*.pending", RollbackSuffix, CompleteSuffix, ".lock" })
+                foreach (var extra in Directory.EnumerateFiles(Root, Path.GetFileName(path) + suffix)) File.Delete(extra);
+            return !File.Exists(path)
+                   && !Directory.EnumerateFiles(Root, Path.GetFileName(path) + ".*").Any();
         }
         catch { return false; }
     }
@@ -166,27 +197,73 @@ internal static class SessionStore
                 var name = Path.GetFileName(path);
                 if (name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
                     || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
-                    || name.EndsWith(".pending", StringComparison.OrdinalIgnoreCase)) File.Delete(path);
+                    || name.EndsWith(".pending", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith(RollbackSuffix, StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith(CompleteSuffix, StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith(".lock", StringComparison.OrdinalIgnoreCase)) File.Delete(path);
             }
             return !Directory.EnumerateFiles(root, prefix + "*", SearchOption.TopDirectoryOnly)
                 .Any(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
                              || path.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
-                             || path.EndsWith(".pending", StringComparison.OrdinalIgnoreCase));
+                             || path.EndsWith(".pending", StringComparison.OrdinalIgnoreCase)
+                             || path.EndsWith(RollbackSuffix, StringComparison.OrdinalIgnoreCase)
+                             || path.EndsWith(CompleteSuffix, StringComparison.OrdinalIgnoreCase)
+                             || path.EndsWith(".lock", StringComparison.OrdinalIgnoreCase));
         }
         catch { return false; }
+    }
+
+    private static FileStream AcquireSessionLock(string path)
+        => new(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None,
+            1, FileOptions.DeleteOnClose | FileOptions.WriteThrough);
+
+    private static bool RestoreFromJournal(string path, string journal)
+    {
+        try
+        {
+            var info = new FileInfo(journal);
+            if (info.Length < 0 || info.Length > MaxStoreBytes) return false;
+            if (info.Length == 0)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                if (File.Exists(path)) return false;
+            }
+            else
+            {
+                var previous = File.ReadAllBytes(journal);
+                var restore = path + "." + Guid.NewGuid().ToString("N") + ".pending";
+                WriteThrough(restore, previous);
+                File.Move(restore, path, true);
+                if (!File.Exists(path)
+                    || !CryptographicOperations.FixedTimeEquals(File.ReadAllBytes(path), previous)) return false;
+            }
+            File.Delete(journal);
+            return !File.Exists(journal);
+        }
+        catch { return false; }
+    }
+
+    private static void WriteThrough(string path, ReadOnlySpan<byte> bytes)
+    {
+        using var stream = new FileStream(
+            path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough);
+        stream.Write(bytes);
+        stream.Flush(true);
     }
 
     internal sealed class PendingSession
     {
         private readonly string _path;
+        private readonly string _journalPath;
         private byte[]? _bytes;
         private byte[]? _previous;
-        private bool _committed;
+        private FileStream? _sessionLock;
         private bool _finished;
 
         internal PendingSession(string path, byte[] bytes, byte[]? previous)
         {
             _path = path;
+            _journalPath = path + RollbackSuffix;
             _bytes = bytes;
             _previous = previous;
         }
@@ -198,6 +275,21 @@ internal static class SessionStore
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+                _sessionLock = AcquireSessionLock(_path);
+                if (File.Exists(_journalPath)) return false;
+                if (_previous is null)
+                {
+                    using var marker = new FileStream(
+                        _journalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                        1, FileOptions.WriteThrough);
+                    marker.Flush(true);
+                }
+                else
+                {
+                    var journalTemporary = _journalPath + "." + Guid.NewGuid().ToString("N") + ".pending";
+                    WriteThrough(journalTemporary, _previous);
+                    File.Move(journalTemporary, _journalPath, true);
+                }
                 await using (var stream = new FileStream(
                                  temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                                  4096, FileOptions.WriteThrough))
@@ -206,7 +298,6 @@ internal static class SessionStore
                     await stream.FlushAsync();
                 }
                 File.Move(temporary, _path, true);
-                _committed = true;
                 return File.Exists(_path) && !File.Exists(temporary);
             }
             catch
@@ -219,32 +310,30 @@ internal static class SessionStore
         public bool Rollback()
         {
             if (_finished) return false;
+            var success = true;
             try
             {
-                if (_committed)
-                {
-                    if (_previous is null)
-                    {
-                        if (File.Exists(_path)) File.Delete(_path);
-                    }
-                    else
-                    {
-                        var restore = _path + "." + Guid.NewGuid().ToString("N") + ".pending";
-                        File.WriteAllBytes(restore, _previous);
-                        File.Move(restore, _path, true);
-                    }
-                }
-                return !_committed
-                       || (_previous is null
-                           ? !File.Exists(_path)
-                           : File.Exists(_path)
-                             && CryptographicOperations.FixedTimeEquals(File.ReadAllBytes(_path), _previous));
+                if (File.Exists(_journalPath))
+                    success = _sessionLock is not null && RestoreFromJournal(_path, _journalPath);
+                return success;
             }
             catch { return false; }
             finally { Finish(); }
         }
 
-        public void FinalizeCommit() => Finish();
+        public bool FinalizeCommit()
+        {
+            if (_finished) return false;
+            var acknowledged = _path + CompleteSuffix;
+            try
+            {
+                if (File.Exists(_journalPath)) File.Move(_journalPath, acknowledged, true);
+                try { File.Delete(acknowledged); } catch { }
+                return !File.Exists(_journalPath);
+            }
+            catch { return false; }
+            finally { Finish(); }
+        }
 
         private void Finish()
         {
@@ -252,6 +341,8 @@ internal static class SessionStore
             if (_previous is not null) CryptographicOperations.ZeroMemory(_previous);
             _bytes = null;
             _previous = null;
+            _sessionLock?.Dispose();
+            _sessionLock = null;
             _finished = true;
         }
     }

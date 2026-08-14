@@ -50,33 +50,34 @@ internal sealed class AuthHostClient
         if (!helper.StartsWith(Path.GetFullPath(AppContext.BaseDirectory), StringComparison.OrdinalIgnoreCase)
             || !File.Exists(helper))
         {
-            return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+            return new(SubscriptionQuotaStatusCode.AuthHostHelperMissing);
         }
 
-        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var pipeName = "xuantong-auth-" + Guid.NewGuid().ToString("N");
-        var ticketRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Xuantong", "AuthTickets");
-        Directory.CreateDirectory(ticketRoot);
-        var ticketPath = Path.Combine(ticketRoot, "ticket-" + Guid.NewGuid().ToString("N") + ".bin");
-        var context = AuthContext.Create(subId, origin)!;
-        string helperHash;
-        using (var helperStream = File.OpenRead(helper))
-            helperHash = Convert.ToHexString(SHA256.HashData(helperStream)).ToLowerInvariant();
-        var ticket = new AuthTicket(
-            Protocol, nonce, Environment.ProcessId, Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks,
-            DateTimeOffset.UtcNow.AddMinutes(2).ToUnixTimeSeconds(),
-            operation, subId, normalized, origin, socksPort, pipeName, helperHash);
-
+        var failureStatus = SubscriptionQuotaStatusCode.AuthHostStartFailed;
+        string? ticketPath = null;
         OwnedProcess? owned = null;
         try
         {
+            var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            var pipeName = "xuantong-auth-" + Guid.NewGuid().ToString("N");
+            var ticketRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Xuantong", "AuthTickets");
+            Directory.CreateDirectory(ticketRoot);
+            ticketPath = Path.Combine(ticketRoot, "ticket-" + Guid.NewGuid().ToString("N") + ".bin");
+            var context = AuthContext.Create(subId, origin)!;
+            string helperHash;
+            using (var helperStream = File.OpenRead(helper))
+                helperHash = Convert.ToHexString(SHA256.HashData(helperStream)).ToLowerInvariant();
+            var ticket = new AuthTicket(
+                Protocol, nonce, Environment.ProcessId, Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks,
+                DateTimeOffset.UtcNow.AddMinutes(2).ToUnixTimeSeconds(),
+                operation, subId, normalized, origin, socksPort, pipeName, helperHash);
             var ciphertext = ContextProtection.Protect(ticket, context);
             var ticketBytes = JsonSerializer.SerializeToUtf8Bytes(
                 new ProtectedEnvelope(context.Version, context.SubscriptionHash, context.Origin, ciphertext));
             if (ticketBytes.Length > 32 * 1024)
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed);
             await using (var ticketFile = new FileStream(
                 ticketPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 4096, FileOptions.WriteThrough))
@@ -92,18 +93,19 @@ internal sealed class AuthHostClient
                 4096, MaxMessageBytes);
             owned = SecureProcessLauncher.TryLaunchMedium(helper, ticketPath, pipeName);
             if (owned is null)
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed);
+            failureStatus = SubscriptionQuotaStatusCode.AuthHostCommunicationFailed;
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             linked.CancelAfter(InteractionTimeout);
             var connectTask = pipe.WaitForConnectionAsync(linked.Token);
             var exitTask = owned.Process.WaitForExitAsync(CancellationToken.None);
             if (await Task.WhenAny(connectTask, exitTask) != connectTask)
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
             await connectTask;
             if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var actualClientPid)
                 || !AuthBounds.IsExpectedPeer(actualClientPid, owned.Pid))
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
 
             var envelope = await ReadFrameAsync<AuthEnvelope>(pipe, linked.Token);
             if (envelope is null
@@ -113,7 +115,7 @@ internal sealed class AuthHostClient
                 || !CryptographicOperations.FixedTimeEquals(
                     Encoding.UTF8.GetBytes(envelope.Nonce ?? string.Empty), Encoding.UTF8.GetBytes(nonce))
                 || !TryMapResponse(envelope.Response, out var mapped))
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
             await WriteFrameAsync(pipe,
                 new AuthAck(Protocol, nonce, operation, envelope.Response.Status), linked.Token);
             var commit = await ReadFrameAsync<AuthCommitEnvelope>(pipe, linked.Token);
@@ -125,7 +127,7 @@ internal sealed class AuthHostClient
                 || (commit.Status == "Committed"
                     && (operation != "login-query"
                         || envelope.Response.Status is not ("Success" or "AuthenticatedUnsupported"))))
-                return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
             return mapped;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -134,13 +136,14 @@ internal sealed class AuthHostClient
         }
         catch
         {
-            return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+            return new(failureStatus);
         }
         finally
         {
             owned?.TerminateIfOwned();
             owned?.Dispose();
-            try { File.Delete(ticketPath); } catch { }
+            if (ticketPath is not null)
+                try { File.Delete(ticketPath); } catch { }
         }
     }
 
@@ -196,7 +199,7 @@ internal sealed class AuthHostClient
             "Cancelled" => SubscriptionQuotaStatusCode.Cancelled,
             "Cleared" => SubscriptionQuotaStatusCode.SessionCleared,
             "ClearFailed" => SubscriptionQuotaStatusCode.SessionClearFailed,
-            _ => SubscriptionQuotaStatusCode.AuthHostUnavailable
+            _ => SubscriptionQuotaStatusCode.AuthHostCommunicationFailed
         });
     }
 

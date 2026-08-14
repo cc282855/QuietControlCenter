@@ -1309,8 +1309,29 @@ public partial class MainWindow
             else if (result.Status == SubscriptionQuotaStatusCode.AuthHostUnavailable)
             {
                 txtSubscriptionQuotaPrimary.Text = "安全登录组件不可用";
-                txtSubscriptionQuotaSecondary.Text = "请确认登录组件与 WebView2 Runtime 已安装";
+                txtSubscriptionQuotaSecondary.Text = "请重新解压完整安装包后重试";
                 btnSubscriptionQuotaAction.Content = "重试登录";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.AuthHostHelperMissing)
+            {
+                txtSubscriptionQuotaPrimary.Text = "安全登录组件缺失";
+                txtSubscriptionQuotaSecondary.Text = "请重新下载完整安装包，并解压全部文件后重试";
+                btnSubscriptionQuotaAction.Content = "重新检查";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.AuthHostStartFailed)
+            {
+                txtSubscriptionQuotaPrimary.Text = "安全登录组件无法启动";
+                txtSubscriptionQuotaSecondary.Text = "请重新解压完整安装包，关闭可能的拦截后重试";
+                btnSubscriptionQuotaAction.Content = "重试登录";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.AuthHostCommunicationFailed)
+            {
+                txtSubscriptionQuotaPrimary.Text = "安全登录连接失败";
+                txtSubscriptionQuotaSecondary.Text = "请关闭残留的登录窗口或冲突程序后重试";
+                btnSubscriptionQuotaAction.Content = "重新连接";
                 btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
             }
             else if (result.Status == SubscriptionQuotaStatusCode.WebView2RuntimeMissing)
@@ -1394,14 +1415,12 @@ public partial class MainWindow
            && SubscriptionOfficialUrlParser.GetCanonicalOrigin(subscription.OfficialUrl) is { } origin
            && string.Equals(origin, subscription.OfficialUrlTrustedOrigin, StringComparison.Ordinal);
 
-    private void RestoreSubscriptionQuotaFocus(FrameworkElement? preferred)
+    private void RestoreSubscriptionQuotaFocus(FrameworkElement preferred)
     {
         FrameworkElement[] candidates =
         [
-            preferred ?? btnSubscriptionQuotaAction,
-            btnSubscriptionQuotaAction,
+            preferred,
             btnSubscriptionQuotaClear,
-            btnSubscriptionQuotaRefresh,
             cardSubscriptionQuota
         ];
         foreach (var candidate in candidates.Distinct())

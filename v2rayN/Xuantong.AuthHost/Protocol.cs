@@ -131,7 +131,17 @@ internal sealed class AuthPipeConnection : IAsyncDisposable
 {
     private readonly NamedPipeClientStream _pipe;
     private readonly AuthTicket _ticket;
-    private AuthPipeConnection(NamedPipeClientStream pipe, AuthTicket ticket) { _pipe = pipe; _ticket = ticket; }
+    private readonly Func<bool>? _expectedServerAliveOverride;
+    private AuthPipeConnection(
+        NamedPipeClientStream pipe, AuthTicket ticket, Func<bool>? expectedServerAliveOverride = null)
+    {
+        _pipe = pipe;
+        _ticket = ticket;
+        _expectedServerAliveOverride = expectedServerAliveOverride;
+    }
+
+    internal static AuthPipeConnection CreateForTests(NamedPipeClientStream pipe, AuthTicket ticket)
+        => new(pipe, ticket, () => pipe.IsConnected);
 
     public static async Task<AuthPipeConnection?> ConnectAsync(AuthTicket ticket, CancellationToken cancellationToken)
     {
@@ -150,9 +160,10 @@ internal sealed class AuthPipeConnection : IAsyncDisposable
     }
 
     public bool IsExpectedServerAlive()
-        => _pipe.IsConnected && GetNamedPipeServerProcessId(_pipe.SafePipeHandle, out var serverPid)
+        => _expectedServerAliveOverride?.Invoke()
+           ?? (_pipe.IsConnected && GetNamedPipeServerProcessId(_pipe.SafePipeHandle, out var serverPid)
            && AuthBounds.IsExpectedPeer(serverPid, _ticket.ParentPid)
-           && HostSecurity.IsExpectedParent(_ticket.ParentPid, _ticket.ParentStartTicks);
+           && HostSecurity.IsExpectedParent(_ticket.ParentPid, _ticket.ParentStartTicks));
 
     public async Task<bool> SendAndAwaitAckAsync(AuthResponse response, CancellationToken cancellationToken)
     {

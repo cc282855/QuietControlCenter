@@ -210,6 +210,14 @@ public sealed class SubscriptionQuotaServiceTests
         Assert.Null(result.Snapshot);
     }
 
+    [Theory]
+    [InlineData(SubscriptionQuotaStatusCode.AuthHostHelperMissing, "安全登录组件缺失")]
+    [InlineData(SubscriptionQuotaStatusCode.AuthHostStartFailed, "安全登录组件无法启动")]
+    [InlineData(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, "安全登录连接失败")]
+    public void AuthHostRecoveryStatuses_AreDistinctAndNonTechnical(
+        SubscriptionQuotaStatusCode status, string expected)
+        => Assert.Equal(expected, SubscriptionQuotaService.GetFixedChineseMessage(status));
+
     [Fact]
     public async Task FetchWithOfficialFallback_NeverAutoFetchesOfficialWebsite()
     {

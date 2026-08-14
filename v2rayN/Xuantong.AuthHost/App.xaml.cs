@@ -27,7 +27,7 @@ public partial class App : Application
         using var monitorCancellation = new CancellationTokenSource();
         try
         {
-            var startupCleanupSucceeded = OwnedUdfStore.CleanupAllOwned() && SessionStore.CleanupPending();
+            var startupCleanupSucceeded = SessionStore.CleanupPending() && OwnedUdfStore.CleanupAllOwned();
             var workTask = !startupCleanupSucceeded
                 ? Task.FromResult(new AuthResponse("CleanupFailed"))
                 : ticket.Operation switch
