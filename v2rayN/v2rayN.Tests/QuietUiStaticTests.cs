@@ -427,11 +427,12 @@ public sealed class QuietUiStaticTests
         Assert.Contains("x:Name=\"rowConnectionSummary\" Height=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"borderConnectionSummary\" Grid.Row=\"0\" MinHeight=\"96\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"colHeroActions\" Width=\"140\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"colHeroQuota\" Width=\"184\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"colHeroQuota\" Width=\"220\"", xaml, StringComparison.Ordinal);
         foreach (var name in new[]
                  {
                      "cardSubscriptionQuota", "txtSubscriptionQuotaPrimary",
-                     "txtSubscriptionQuotaSecondary", "btnSubscriptionQuotaRefresh"
+                     "txtSubscriptionQuotaSecondary", "btnSubscriptionQuotaRefresh",
+                     "btnSubscriptionQuotaAction", "btnSubscriptionQuotaClear"
                  })
         {
             Assert.Contains($"x:Name=\"{name}\"", xaml, StringComparison.Ordinal);
@@ -477,12 +478,23 @@ public sealed class QuietUiStaticTests
         Assert.Contains("SubscriptionQuotaQaRenderTime", codeBehind, StringComparison.Ordinal);
         Assert.Contains("new(2026, 8, 4, 8, 0, 0, TimeSpan.Zero)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("RenderSubscriptionQuotaResult(_subscriptionQuotaResult, SubscriptionQuotaQaRenderTime)", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("FetchWithOfficialFallbackAsync", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("_subscriptionQuotaService.FetchAsync", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("FetchWithOfficialFallbackAsync", quotaCode, StringComparison.Ordinal);
         Assert.Contains("subscription.OfficialUrl", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("showMissingOfficialWebsiteGuidance: true", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("SubscriptionQuotaStatusCode.OfficialWebsiteRequired", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("请在订阅设置中添加官方网址并登录账号", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("订阅设置中添加网页并登录账号", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.MissingOfficialUrl", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.LoginRequired", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.AuthenticatedUnsupported", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.WebView2RuntimeMissing", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaStatusCode.AuthHostUnavailable", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("focusOfficialUrlOnOpen: true", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("if (saved == true) ScheduleSubscriptionQuotaRefresh", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("IsTrustedOfficialOrigin", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("RestoreSubscriptionQuotaFocus", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("RaiseSubscriptionQuotaLiveRegionChanged", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("var capturedSubId = _subscriptionQuotaSubId", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("TextTrimming=\"None\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"borderSubscriptionQuotaSource\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"官网\"", xaml, StringComparison.Ordinal);
         Assert.Contains("SubscriptionQuotaSource.OfficialWebsite", codeBehind, StringComparison.Ordinal);
@@ -747,6 +759,13 @@ public sealed class QuietUiStaticTests
         {
             Assert.Contains($"'{sensitiveName}'", packageScript, StringComparison.Ordinal);
         }
+        foreach (var authStateName in new[] { "AuthSessions", "AuthUdf", "AuthTickets", "Cookies", "Network" })
+        {
+            Assert.Contains($"'{authStateName}'", packageScript, StringComparison.Ordinal);
+        }
+        Assert.Contains("Xuantong.AuthHost.exe", packageScript, StringComparison.Ordinal);
+        Assert.Contains("WebView2Loader.dll", packageScript, StringComparison.Ordinal);
+        Assert.Contains("Authenticated browser/session state is forbidden", packageScript, StringComparison.Ordinal);
         foreach (var sensitiveExtension in new[] { ".db", ".sqlite", ".sqlite3", ".log", ".wal", ".shm", ".journal", ".db-wal", ".db-shm", ".db-journal", ".key", ".pem", ".pfx", ".p12", ".pk8", ".pkcs8", ".ppk", ".snk" })
         {
             Assert.Contains($"'{sensitiveExtension}'", packageScript, StringComparison.Ordinal);
@@ -1047,8 +1066,10 @@ public sealed class QuietUiStaticTests
         Assert.Contains("item.OfficialUrl = subItem.OfficialUrl;", configHandler, StringComparison.Ordinal);
         Assert.Contains("Profile-Web-Page-Url", download, StringComparison.Ordinal);
         Assert.Contains("SubscriptionOfficialUrlParser.Detect", download, StringComparison.Ordinal);
-        Assert.Contains("item.OfficialUrl.IsNullOrEmpty()", handler, StringComparison.Ordinal);
-        Assert.Contains("SQLiteHelper.Instance.ReplaceAsync(item)", handler, StringComparison.Ordinal);
+        Assert.Contains("untrusted discovery hint", handler, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrl = downloadHandle.LastResponseOfficialUrl", handler, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrlTrustedOrigin = string.Empty", handler, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrlTrustVersion = 0", handler, StringComparison.Ordinal);
         var processResultStart = handler.IndexOf(
             "private static async Task<bool> ProcessDownloadResult",
             StringComparison.Ordinal);
@@ -1097,6 +1118,85 @@ public sealed class QuietUiStaticTests
         Assert.DoesNotContain("Logging.SaveLog(\"UpdateSubscription\", ex)", handler, StringComparison.Ordinal);
         Assert.Contains("if (blProxy && requireProxy && webProxy is null)", download, StringComparison.Ordinal);
         Assert.Contains("Logging.SaveLog(\"Subscription request failed.\")", download, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AuthHost_IsolatedBoundedAndFailClosed()
+    {
+        var root = FindProjectRoot();
+        var project = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "Xuantong.AuthHost.csproj"));
+        var manifest = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "app.manifest"));
+        var hostProtocol = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "Protocol.cs"));
+        var hostApp = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "App.xaml.cs"));
+        var hostSecurity = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "HostSecurity.cs"));
+        var browser = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "LoginWindow.xaml.cs"));
+        var browserXaml = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "LoginWindow.xaml"));
+        var authenticatedQuery = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "AuthenticatedQuotaQuery.cs"));
+        var sessions = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "SessionStore.cs"));
+        var primitives = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "AuthSecurityPrimitives.cs"));
+        var uriPolicy = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "ProtocolUriPolicy.cs"));
+        var udf = File.ReadAllText(Path.Combine(root, "v2rayN", "Xuantong.AuthHost", "OwnedUdfStore.cs"));
+        var client = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Services", "AuthHostClient.cs"));
+        var mainProject = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "v2rayN.csproj"));
+        var subItem = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "Models", "Entities", "SubItem.cs"));
+        var configHandler = File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "Handler", "ConfigHandler.cs"));
+
+        Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Web.WebView2", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("Microsoft.Web.WebView2", mainProject, StringComparison.Ordinal);
+        Assert.Contains("requestedExecutionLevel level=\"asInvoker\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("IsMediumIntegrityInteractiveUser", hostSecurity, StringComparison.Ordinal);
+        Assert.Contains("PipeOptions.CurrentUserOnly", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("PipeOptions.CurrentUserOnly", client, StringComparison.Ordinal);
+        Assert.Contains("SendAndAwaitAckAsync", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("CommitAckValidator", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("SendCommitResultAsync", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("WriteFrameAsync(pipe", client, StringComparison.Ordinal);
+        Assert.Contains("ReadFrameAsync<AuthCommitEnvelope>", client, StringComparison.Ordinal);
+        Assert.Contains("ProtectedData.Protect", primitives, StringComparison.Ordinal);
+        Assert.Contains("context.Entropy", primitives, StringComparison.Ordinal);
+        Assert.Contains("FileOptions.DeleteOnClose", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("FixedTimeEquals", client, StringComparison.Ordinal);
+        Assert.Contains("GetNamedPipeClientProcessId", client, StringComparison.Ordinal);
+        Assert.Contains("GetNamedPipeServerProcessId", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("envelope.HelperPid != owned.Pid", client, StringComparison.Ordinal);
+        Assert.Contains("CreateProcessWithTokenW", client, StringComparison.Ordinal);
+        Assert.Contains("return null;", client, StringComparison.Ordinal);
+        Assert.Contains("--proxy-server=", uriPolicy, StringComparison.Ordinal);
+        Assert.Contains("socks5://127.0.0.1", uriPolicy, StringComparison.Ordinal);
+        Assert.Contains("--proxy-bypass-list=", uriPolicy, StringComparison.Ordinal);
+        Assert.Contains("disable_non_proxied_udp", uriPolicy, StringComparison.Ordinal);
+        Assert.Contains("CoreWebView2PermissionState.Deny", browser, StringComparison.Ordinal);
+        Assert.Contains("CoreWebView2WebResourceContext.All", browser, StringComparison.Ordinal);
+        Assert.Contains("CreateWebResourceResponse", browser, StringComparison.Ordinal);
+        Assert.Contains("IsWebMessageEnabled = false", browser, StringComparison.Ordinal);
+        Assert.Contains("AreHostObjectsAllowed = false", browser, StringComparison.Ordinal);
+        Assert.Contains("e.Cancel = true", browser, StringComparison.Ordinal);
+        Assert.Contains("AuthenticatedUnsupported", browser, StringComparison.Ordinal);
+        Assert.Contains("SessionStore.PrepareAsync", browser, StringComparison.Ordinal);
+        Assert.DoesNotContain("SessionStore.SaveAsync", browser, StringComparison.Ordinal);
+        Assert.Contains("CommitPendingSessionAsync", hostApp, StringComparison.Ordinal);
+        Assert.Contains("RollbackPendingSession", hostApp, StringComparison.Ordinal);
+        Assert.Contains("CleanupPending", hostApp, StringComparison.Ordinal);
+        Assert.True(hostApp.IndexOf("ConnectAsync(ticket", StringComparison.Ordinal)
+                    < hostApp.IndexOf("CleanupAllOwned", StringComparison.Ordinal));
+        Assert.Contains("\"query-session\"", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("AuthenticatedQuotaQuery.QueryAsync", hostApp, StringComparison.Ordinal);
+        Assert.Contains("Subscription-Userinfo", authenticatedQuery, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ReadAsString", authenticatedQuery, StringComparison.Ordinal);
+        Assert.Contains("*.pending", sessions, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"False\"", browserXaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", browserXaml, StringComparison.Ordinal);
+        Assert.Contains("WebView2RuntimeNotFoundException", browser, StringComparison.Ordinal);
+        Assert.DoesNotContain("OfficialRemainingRegex", browser, StringComparison.Ordinal);
+        Assert.Contains("DataProtectionScope.CurrentUser", primitives, StringComparison.Ordinal);
+        Assert.Contains("IsApplicableDomain", sessions, StringComparison.Ordinal);
+        Assert.Contains("session-", udf, StringComparison.Ordinal);
+        Assert.Contains("OfficialUrlTrustedOrigin", subItem, StringComparison.Ordinal);
+        Assert.Contains("OfficialUrlTrustVersion", subItem, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrlTrustedOrigin = subItem.OfficialUrlTrustedOrigin", configHandler, StringComparison.Ordinal);
+        Assert.Contains("item.OfficialUrlTrustVersion = subItem.OfficialUrlTrustVersion", configHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("SQLite", sessions, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FindProjectRoot()

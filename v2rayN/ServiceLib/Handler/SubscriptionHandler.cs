@@ -161,11 +161,15 @@ public static class SubscriptionHandler
         }
 
         var result = await DownloadSubscriptionContent(downloadHandle, url, blProxy, allowDirectFallback, item.UserAgent);
+        // Provider metadata is an untrusted discovery hint. It must never become
+        // an authenticated origin until the user explicitly reviews and saves it.
         if (item.ConvertTarget.IsNullOrEmpty()
             && item.OfficialUrl.IsNullOrEmpty()
             && downloadHandle.LastResponseOfficialUrl.IsNotEmpty())
         {
             item.OfficialUrl = downloadHandle.LastResponseOfficialUrl!;
+            item.OfficialUrlTrustedOrigin = string.Empty;
+            item.OfficialUrlTrustVersion = 0;
             await SQLiteHelper.Instance.ReplaceAsync(item);
         }
 

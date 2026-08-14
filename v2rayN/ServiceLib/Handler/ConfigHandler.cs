@@ -2028,6 +2028,8 @@ public static class ConfigHandler
             item.Url = subItem.Url;
             item.MoreUrl = subItem.MoreUrl;
             item.OfficialUrl = subItem.OfficialUrl;
+            item.OfficialUrlTrustedOrigin = subItem.OfficialUrlTrustedOrigin;
+            item.OfficialUrlTrustVersion = subItem.OfficialUrlTrustVersion;
             item.Enabled = subItem.Enabled;
             item.AutoUpdateInterval = subItem.AutoUpdateInterval;
             item.UserAgent = subItem.UserAgent;

@@ -1,6 +1,7 @@
 param(
     [string]$Artifact = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts/qcc-win-x64'),
     [string]$Helper = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts/qcc-helper/AmazTool.exe'),
+    [string]$AuthHost = (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts/qcc-auth-host'),
     [string]$Version = '7.24.3'
 )
 $ErrorActionPreference = 'Stop'
@@ -9,7 +10,10 @@ $artifactRootResolved = (Resolve-Path $Artifact).Path.TrimEnd('\')
 $expectedArtifact = (Join-Path $repoRoot 'artifacts\qcc-win-x64').TrimEnd('\')
 if (-not $artifactRootResolved.Equals($expectedArtifact, [StringComparison]::OrdinalIgnoreCase)) { throw 'Refusing to clean an unexpected artifact path.' }
 
-$runtimeNames = @('guiConfigs', 'guiLogs', 'logs', 'binConfigs', 'guiTemps')
+$runtimeNames = @(
+    'guiConfigs', 'guiLogs', 'logs', 'binConfigs', 'guiTemps',
+    'AuthSessions', 'AuthUdf', 'AuthTickets', 'EBWebView'
+)
 $sensitiveExtensions = @(
     '.db', '.sqlite', '.sqlite3', '.log',
     '.wal', '.shm', '.journal',
@@ -127,11 +131,28 @@ Get-ChildItem -LiteralPath $artifactRootResolved -File | ForEach-Object {
     if ($_.Name -ne 'qcc-package.json' -and $_.Extension -notin @('.exe', '.dll')) { Remove-Item -LiteralPath $_.FullName -Force }
 }
 Copy-Item -LiteralPath $Helper -Destination (Join-Path $Artifact 'AmazTool.exe') -Force
+if (-not (Test-Path -LiteralPath $AuthHost -PathType Container)) { throw 'Authenticated login helper publish output is missing.' }
+Get-ChildItem -LiteralPath $AuthHost -File -Force |
+    Where-Object { $_.Extension -in @('.exe', '.dll') } |
+    ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination $Artifact -Recurse -Force
+}
+$requiredAuthFiles = @('Xuantong.AuthHost.exe', 'WebView2Loader.dll')
+foreach ($relative in $requiredAuthFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Artifact $relative) -PathType Leaf)) {
+        throw "Required authenticated login helper payload is missing: $relative"
+    }
+}
 $requiredRuntimeFiles = @('bin/xray/xray.exe', 'bin/sing_box/sing-box.exe', 'bin/mihomo/mihomo.exe')
 foreach ($relative in $requiredRuntimeFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $Artifact $relative))) { throw "Required runtime payload is missing: $relative" }
 }
 Assert-NoUnexpectedTextPayloads $artifactRootResolved
+$forbiddenAuthState = @(
+    Get-ChildItem -LiteralPath $artifactRootResolved -Recurse -Force |
+        Where-Object { $_.Name -in @('AuthSessions', 'AuthUdf', 'AuthTickets', 'Cookies', 'Network') }
+)
+if ($forbiddenAuthState.Count -ne 0) { throw 'Authenticated browser/session state is forbidden in the immutable package.' }
 $files = [ordered]@{}
 $artifactRoot = (Resolve-Path $Artifact).Path.TrimEnd('\') + '\'
 Get-ChildItem -LiteralPath $Artifact -File -Recurse |

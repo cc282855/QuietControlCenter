@@ -10,8 +10,14 @@ public enum SubscriptionQuotaStatusCode
     ProxyUnavailable,
     NetworkError,
     HttpError,
-    OfficialWebsiteRequired,
-    OfficialWebsiteUnavailable,
+    MissingOfficialUrl,
+    OfficialUrlConfirmationRequired,
+    LoginRequired,
+    AuthenticatedUnsupported,
+    WebView2RuntimeMissing,
+    AuthHostUnavailable,
+    SessionCleared,
+    SessionClearFailed,
     Cancelled
 }
 

@@ -1,0 +1,26 @@
+<Window x:Class="Xuantong.AuthHost.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="玄同 · 安全登录" Width="980" Height="720" MinWidth="320" MinHeight="360"
+        WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Margin="14,8">
+      <TextBlock Text="登录信息仅保存在此安全窗口中，不会传回主程序。" TextWrapping="Wrap"/>
+      <TextBlock x:Name="OriginText" Margin="0,4,0,0" IsHitTestVisible="False" AutomationProperties.Name="受信任官方网址" />
+      <WrapPanel Margin="0,6,0,0">
+        <Button x:Name="BackButton" MinWidth="44" Height="32" IsEnabled="False" Click="Back_Click" AutomationProperties.Name="后退">后退</Button>
+        <Button x:Name="ReloadButton" MinWidth="44" Height="32" Margin="6,0,0,0" IsEnabled="False" Click="Reload_Click" AutomationProperties.Name="重新加载">刷新</Button>
+        <Button x:Name="HomeButton" MinWidth="44" Height="32" Margin="6,0,0,0" IsEnabled="False" Click="Home_Click" AutomationProperties.Name="返回官网">主页</Button>
+        <Button x:Name="ClearButton" MinWidth="72" Height="32" Margin="6,0,0,0" IsEnabled="False" Click="Clear_Click" AutomationProperties.Name="清除登录信息">清除登录</Button>
+      </WrapPanel>
+      <TextBlock x:Name="StatusText" Margin="0,6,0,0" Text="正在初始化安全浏览器…" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="安全登录状态" />
+    </StackPanel>
+    <wv2:WebView2 x:Name="Browser" Grid.Row="1" />
+    <WrapPanel Grid.Row="2" Margin="12" HorizontalAlignment="Right">
+      <Button Width="90" Height="32" Margin="0,0,8,0" Click="Cancel_Click" AutomationProperties.Name="取消登录">取消</Button>
+      <Button x:Name="QueryButton" Width="150" Height="32" IsEnabled="False" Click="Query_Click" AutomationProperties.Name="登录后重新查询">登录后重新查询</Button>
+    </WrapPanel>
+  </Grid>
+</Window>

@@ -7,6 +7,7 @@ public class SubEditViewModel : MyReactiveObject, ICloseable
     private int _firstUpdateConsumed;
 
     public event EventHandler? RequestClose;
+    public bool FocusOfficialUrlOnOpen { get; }
 
     [Reactive]
     public SubItem SelectedSource { get; set; }
@@ -17,11 +18,13 @@ public class SubEditViewModel : MyReactiveObject, ICloseable
 
     public SubEditViewModel(
         SubItem subItem,
-        Func<string, Task<SubscriptionUpdateResult>>? firstUpdateAsync = null)
+        Func<string, Task<SubscriptionUpdateResult>>? firstUpdateAsync = null,
+        bool focusOfficialUrlOnOpen = false)
     {
         _config = AppManager.Instance.Config;
         _wasNew = subItem.Id.IsNullOrEmpty();
         _firstUpdateAsync = firstUpdateAsync;
+        FocusOfficialUrlOnOpen = focusOfficialUrlOnOpen;
 
         SelectPrevProfileCmd = ReactiveCommand.CreateFromTask(async () =>
         {
@@ -81,10 +84,17 @@ public class SubEditViewModel : MyReactiveObject, ICloseable
             var normalizedOfficialUrl = SubscriptionOfficialUrlParser.Normalize(officialUrl);
             if (normalizedOfficialUrl is null)
             {
-                NoticeManager.Instance.Enqueue("官方网页地址必须是有效的 HTTP 或 HTTPS 链接");
+                NoticeManager.Instance.Enqueue("官方网页地址必须是有效的 HTTPS 公网链接");
                 return;
             }
             SelectedSource.OfficialUrl = normalizedOfficialUrl;
+            SelectedSource.OfficialUrlTrustedOrigin = SubscriptionOfficialUrlParser.GetCanonicalOrigin(normalizedOfficialUrl)!;
+            SelectedSource.OfficialUrlTrustVersion = 1;
+        }
+        else
+        {
+            SelectedSource.OfficialUrlTrustedOrigin = string.Empty;
+            SelectedSource.OfficialUrlTrustVersion = 0;
         }
 
         if (await ConfigHandler.AddSubItem(_config, SelectedSource) == 0)

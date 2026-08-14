@@ -144,6 +144,30 @@ public sealed class SubscriptionQuotaParserTests
         Assert.Equal(7UL, result.Snapshot!.RemainingBytes);
     }
 
+    [Fact]
+    public void OfficialBody_RejectsJsonAndHtmlWithoutGuessing()
+    {
+        var exact = Encoding.UTF8.GetBytes("""
+            {"data":{"transfer_enable":1000,"u":100,"d":200,"expired_at":1800000000}}
+            """);
+        var nestedDecoy = Encoding.UTF8.GetBytes("""
+            {"unrelated":{"data":{"transfer_enable":1000,"u":100,"d":200}}}
+            """);
+        var html = Encoding.UTF8.GetBytes("<html>Remaining Traffic: 700 B</html>");
+
+        var result = SubscriptionQuotaParser.ParseOfficialBody(exact, RetrievedAt);
+
+        Assert.Equal(SubscriptionQuotaStatusCode.Unsupported, result.Status);
+        Assert.Null(result.Snapshot);
+        Assert.Equal(SubscriptionQuotaStatusCode.Unsupported,
+            SubscriptionQuotaParser.ParseOfficialBody(nestedDecoy, RetrievedAt).Status);
+        Assert.Equal(SubscriptionQuotaStatusCode.Unsupported,
+            SubscriptionQuotaParser.ParseOfficialBody(html, RetrievedAt).Status);
+        Assert.Equal(SubscriptionQuotaStatusCode.BodyTooLarge,
+            SubscriptionQuotaParser.ParseOfficialBody(
+                new byte[SubscriptionQuotaParser.MaxBodyBytes + 1], RetrievedAt).Status);
+    }
+
     private sealed class CultureScope : IDisposable
     {
         private readonly CultureInfo _original = CultureInfo.CurrentCulture;

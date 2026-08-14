@@ -211,7 +211,7 @@ public sealed class SubscriptionQuotaServiceTests
     }
 
     [Fact]
-    public async Task FetchWithOfficialFallback_UsesOfficialJsonWhenSubscriptionHasNoQuota()
+    public async Task FetchWithOfficialFallback_NeverAutoFetchesOfficialWebsite()
     {
         var handler = new StubHandler(request =>
         {
@@ -236,10 +236,39 @@ public sealed class SubscriptionQuotaServiceTests
             null,
             TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(SubscriptionQuotaSource.OfficialWebsite, result.Snapshot!.Source);
-        Assert.Equal(75161927680UL, result.Snapshot.RemainingBytes);
-        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal(SubscriptionQuotaStatusCode.LoginRequired, result.Status);
+        Assert.Null(result.Snapshot);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task Fetch_MapsAuthenticationFailuresConservatively(HttpStatusCode status)
+    {
+        var service = CreateService(new StubHandler(_ => new(status)));
+
+        var result = await service.FetchAsync(
+            "https://example.invalid/sub", false, 0, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SubscriptionQuotaStatusCode.LoginRequired, result.Status);
+        Assert.Null(result.Snapshot);
+    }
+
+    [Fact]
+    public async Task Fetch_MapsLoginRedirectConservatively()
+    {
+        var service = CreateService(new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Found);
+            response.Headers.Location = new Uri("https://example.invalid/login");
+            return response;
+        }));
+
+        var result = await service.FetchAsync(
+            "https://example.invalid/sub", false, 0, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SubscriptionQuotaStatusCode.LoginRequired, result.Status);
     }
 
     [Fact]

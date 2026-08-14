@@ -303,7 +303,7 @@
                         <Grid x:Name="gridConnectionSummary" Margin="14,7,14,7">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition x:Name="colHeroNode" Width="1.05*" />
-                                <ColumnDefinition x:Name="colHeroQuota" Width="184" />
+                                <ColumnDefinition x:Name="colHeroQuota" Width="220" />
                                 <ColumnDefinition x:Name="colHeroMetrics" Width="1.25*" />
                                 <ColumnDefinition x:Name="colHeroActions" Width="140" />
                             </Grid.ColumnDefinitions>
@@ -371,11 +371,12 @@
                                 </Border>
                             </StackPanel>
 
-                            <Border x:Name="cardSubscriptionQuota" Grid.Column="1" Margin="8,0,0,0" Style="{StaticResource QccCard}">
+                            <Border x:Name="cardSubscriptionQuota" Grid.Column="1" Margin="8,0,0,0" Focusable="True" AutomationProperties.Name="订阅余量卡片" Style="{StaticResource QccCard}">
                                 <Grid Margin="9,4">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <Grid>
@@ -395,8 +396,8 @@
                                         <Button
                                             x:Name="btnSubscriptionQuotaRefresh"
                                             Grid.Column="2"
-                                            Width="24"
-                                            Height="22"
+                                            Width="32"
+                                            Height="32"
                                             Padding="3"
                                             AutomationProperties.Name="刷新订阅余量"
                                             Background="Transparent"
@@ -408,12 +409,15 @@
                                     </Grid>
                                     <TextBlock
                                         x:Name="txtSubscriptionQuotaPrimary"
+                                        AutomationProperties.LiveSetting="Polite"
+                                        AutomationProperties.Name="订阅余量状态"
                                         Grid.Row="1"
                                         VerticalAlignment="Center"
                                         FontSize="{DynamicResource QccFontTitle}"
                                         FontWeight="SemiBold"
                                         Text="尚未查询"
-                                        TextTrimming="CharacterEllipsis"
+                                        TextTrimming="None"
+                                        TextWrapping="Wrap"
                                         ToolTip="订阅余量状态" />
                                     <TextBlock
                                         x:Name="txtSubscriptionQuotaSecondary"
@@ -423,6 +427,28 @@
                                         Text="等待安全代理连接"
                                         TextWrapping="Wrap"
                                         ToolTip="订阅用量、到期时间与更新时间" />
+                                    <StackPanel Grid.Row="3" Margin="0,4,0,0" Orientation="Horizontal">
+                                        <Button
+                                            x:Name="btnSubscriptionQuotaAction"
+                                            MinWidth="70"
+                                            Height="32"
+                                            Padding="7,0"
+                                            FontSize="11"
+                                            Click="SubscriptionQuotaAction_Click"
+                                            AutomationProperties.Name="订阅余量上下文操作"
+                                            Content="打开并登录"
+                                            Visibility="Collapsed" />
+                                        <Button
+                                            x:Name="btnSubscriptionQuotaClear"
+                                            Height="32"
+                                            Margin="5,0,0,0"
+                                            Padding="7,0"
+                                            FontSize="11"
+                                            Click="SubscriptionQuotaClear_Click"
+                                            AutomationProperties.Name="清除订阅登录信息"
+                                            Content="清除登录"
+                                            Visibility="Collapsed" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
 

@@ -13,6 +13,8 @@ public class SubItem
     public string MoreUrl { get; set; }
 
     public string OfficialUrl { get; set; } = string.Empty;
+    public string OfficialUrlTrustedOrigin { get; set; } = string.Empty;
+    public int OfficialUrlTrustVersion { get; set; }
 
     public bool Enabled { get; set; } = true;
 

@@ -43,6 +43,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\ServiceLib\ServiceLib.csproj" />
+		<Compile Include="..\Xuantong.AuthHost\AuthSecurityPrimitives.cs" Link="Services\AuthSecurityPrimitives.cs" />
+		<Compile Include="..\Xuantong.AuthHost\ProtocolUriPolicy.cs" Link="Services\ProtocolUriPolicy.cs" />
 	</ItemGroup>
 
 </Project>

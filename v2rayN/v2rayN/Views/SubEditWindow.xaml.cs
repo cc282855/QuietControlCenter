@@ -38,7 +38,15 @@ public partial class SubEditWindow
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        txtRemarks.Focus();
+        if (ViewModel?.FocusOfficialUrlOnOpen == true)
+        {
+            txtOfficialUrl.Focus();
+            txtOfficialUrl.SelectAll();
+        }
+        else
+        {
+            txtRemarks.Focus();
+        }
     }
 
     private void OpenOfficialUrl_Click(object sender, RoutedEventArgs e)

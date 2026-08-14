@@ -1,6 +1,7 @@
 using System.Reactive.Disposables;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -24,6 +25,7 @@ public partial class MainWindow
     private readonly ProxyPingClient _livePingClient;
     private readonly ConnectionQualityMonitor _connectionQualityMonitor;
     private readonly SubscriptionQuotaService _subscriptionQuotaService = new();
+    private readonly AuthHostClient _authHostClient = new();
     private readonly SemaphoreSlim _subscriptionQuotaSingleFlight = new(1, 1);
     private Task? _quietUpdateLoop;
     private QuietUpdateResult? _lastHandledQuietUpdateResult;
@@ -34,6 +36,7 @@ public partial class MainWindow
     private string _subscriptionQuotaProfileId = string.Empty;
     private string _subscriptionQuotaSubId = string.Empty;
     private long _subscriptionQuotaGeneration;
+    private bool _subscriptionQuotaAllowsStoppedCore;
     private double _responsiveFontScale = -1;
     private int _liveMetricsTickRunning;
     private readonly DispatcherTimer _sidebarNoticeTimer = new();
@@ -891,7 +894,106 @@ public partial class MainWindow
 
     private void SubscriptionQuotaRefresh_Click(object sender, RoutedEventArgs e)
     {
-        ScheduleSubscriptionQuotaRefresh(force: true, showMissingOfficialWebsiteGuidance: true);
+        ScheduleSubscriptionQuotaRefresh(force: true);
+    }
+
+    private async void SubscriptionQuotaAction_Click(object sender, RoutedEventArgs e)
+    {
+        var capturedSubId = _subscriptionQuotaSubId;
+        if (capturedSubId.Length == 0) return;
+        if (_subscriptionQuotaResult?.Status is SubscriptionQuotaStatusCode.MissingOfficialUrl
+            or SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
+        {
+            var active = await AppManager.Instance.GetProfileItem(_config.IndexId);
+            var item = await AppManager.Instance.GetSubItem(capturedSubId);
+            if (item is null
+                || !string.Equals(active?.Subid, capturedSubId, StringComparison.Ordinal)
+                || !string.Equals(capturedSubId, _subscriptionQuotaSubId, StringComparison.Ordinal)) return;
+            var editor = new SubEditViewModel(item, focusOfficialUrlOnOpen: true);
+            var saved = await AppManager.Instance.WindowDialog.ShowDialogAsync(editor);
+            RestoreSubscriptionQuotaFocus(btnSubscriptionQuotaAction);
+            if (saved == true) ScheduleSubscriptionQuotaRefresh(force: true);
+            return;
+        }
+        StartSubscriptionAuth(capturedSubId, clear: false);
+    }
+
+    private void SubscriptionQuotaClear_Click(object sender, RoutedEventArgs e)
+        => StartSubscriptionAuth(_subscriptionQuotaSubId, clear: true);
+
+    private void StartSubscriptionAuth(string capturedSubId, bool clear)
+    {
+        if (capturedSubId.Length == 0 || (!clear && !CoreManager.Instance.IsRunning)) return;
+        CancelSubscriptionQuotaRequest();
+        var profileId = _config.IndexId ?? string.Empty;
+        var generation = ++_subscriptionQuotaGeneration;
+        var requestCancellation = new CancellationTokenSource();
+        _subscriptionQuotaRequestCancellation = requestCancellation;
+        _subscriptionQuotaAllowsStoppedCore = clear;
+        _subscriptionQuotaRefreshTask = RunSubscriptionAuthAsync(
+            profileId, capturedSubId, generation, clear, requestCancellation);
+        RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+    }
+
+    private async Task RunSubscriptionAuthAsync(
+        string profileId,
+        string capturedSubId,
+        long generation,
+        bool clear,
+        CancellationTokenSource requestCancellation)
+    {
+        var entered = false;
+        try
+        {
+            await _subscriptionQuotaSingleFlight.WaitAsync(requestCancellation.Token);
+            entered = true;
+            var profile = await AppManager.Instance.GetProfileItem(profileId);
+            var subscription = await AppManager.Instance.GetSubItem(capturedSubId);
+            if (generation != _subscriptionQuotaGeneration
+                || !string.Equals(profileId, _config.IndexId, StringComparison.Ordinal)
+                || !string.Equals(profile?.Subid, capturedSubId, StringComparison.Ordinal)
+                || subscription is null || (!clear && !CoreManager.Instance.IsRunning))
+            {
+                return;
+            }
+            var result = clear
+                ? !IsTrustedOfficialOrigin(subscription)
+                    ? new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
+                    : await _authHostClient.ClearSessionAsync(
+                    capturedSubId, subscription.OfficialUrl,
+                    AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token)
+                : !IsTrustedOfficialOrigin(subscription)
+                    ? new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
+                    : await _authHostClient.LoginAndQueryAsync(
+                    capturedSubId, subscription.OfficialUrl,
+                    AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token);
+            await ApplySubscriptionQuotaResultAsync(profileId, capturedSubId, generation, result);
+        }
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested) { }
+        catch
+        {
+            await ApplySubscriptionQuotaResultAsync(profileId, capturedSubId, generation,
+                new(SubscriptionQuotaStatusCode.AuthHostUnavailable));
+        }
+        finally
+        {
+            if (entered) _subscriptionQuotaSingleFlight.Release();
+            var shouldRender = ReferenceEquals(_subscriptionQuotaRequestCancellation, requestCancellation);
+            if (shouldRender)
+            {
+                _subscriptionQuotaRequestCancellation = null;
+                _subscriptionQuotaRefreshTask = null;
+                _subscriptionQuotaAllowsStoppedCore = false;
+            }
+            requestCancellation.Dispose();
+            if (shouldRender && !Dispatcher.HasShutdownStarted)
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+                    RaiseSubscriptionQuotaLiveRegionChanged();
+                    RestoreSubscriptionQuotaFocus(clear ? btnSubscriptionQuotaClear : btnSubscriptionQuotaAction);
+                });
+        }
     }
 
     private void UpdateSubscriptionQuotaAgeAndSchedule()
@@ -918,7 +1020,7 @@ public partial class MainWindow
         RenderSubscriptionQuota(DateTimeOffset.UtcNow);
         if (currentProfileId.Length == 0 || !CoreManager.Instance.IsRunning)
         {
-            if (_subscriptionQuotaRefreshTask is { IsCompleted: false })
+            if (_subscriptionQuotaRefreshTask is { IsCompleted: false } && !_subscriptionQuotaAllowsStoppedCore)
             {
                 CancelSubscriptionQuotaRequest();
             }
@@ -931,9 +1033,7 @@ public partial class MainWindow
         }
     }
 
-    private void ScheduleSubscriptionQuotaRefresh(
-        bool force,
-        bool showMissingOfficialWebsiteGuidance = false)
+    private void ScheduleSubscriptionQuotaRefresh(bool force)
     {
         if (_subscriptionQuotaQaMode)
         {
@@ -979,20 +1079,19 @@ public partial class MainWindow
         var generation = ++_subscriptionQuotaGeneration;
         var requestCancellation = new CancellationTokenSource();
         _subscriptionQuotaRequestCancellation = requestCancellation;
+        _subscriptionQuotaAllowsStoppedCore = false;
         _subscriptionQuotaLastCompletedUtc = null;
         _subscriptionQuotaRefreshTask = RefreshSubscriptionQuotaAsync(
             currentProfileId,
             generation,
-            requestCancellation,
-            showMissingOfficialWebsiteGuidance);
+            requestCancellation);
         RenderSubscriptionQuota(DateTimeOffset.UtcNow);
     }
 
     private async Task RefreshSubscriptionQuotaAsync(
         string profileId,
         long generation,
-        CancellationTokenSource requestCancellation,
-        bool showMissingOfficialWebsiteGuidance)
+        CancellationTokenSource requestCancellation)
     {
         var entered = false;
         var subId = string.Empty;
@@ -1041,19 +1140,21 @@ public partial class MainWindow
                 return;
             }
 
-            var result = await _subscriptionQuotaService.FetchWithOfficialFallbackAsync(
+            var result = await _subscriptionQuotaService.FetchAsync(
                 subscription.Url,
-                subscription.OfficialUrl,
                 useLocalSocksProxy: true,
                 AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
                 subscription.UserAgent,
                 requestCancellation.Token);
-            if (showMissingOfficialWebsiteGuidance
-                && result.Status == SubscriptionQuotaStatusCode.Unsupported
-                && string.IsNullOrWhiteSpace(subscription.OfficialUrl))
+            if (result.Status == SubscriptionQuotaStatusCode.Unsupported)
             {
-                result = new(SubscriptionQuotaStatusCode.OfficialWebsiteRequired);
-                NoticeManager.Instance.Enqueue("请在订阅设置中添加官方网址并登录账号");
+                if (SubscriptionOfficialUrlParser.Normalize(subscription.OfficialUrl) is null)
+                    result = new(SubscriptionQuotaStatusCode.MissingOfficialUrl);
+                else if (!IsTrustedOfficialOrigin(subscription))
+                    result = new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired);
+                else
+                    result = await _authHostClient.QuerySessionAsync(subId, subscription.OfficialUrl,
+                        AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token);
             }
             await ApplySubscriptionQuotaResultAsync(profileId, subId, generation, result);
         }
@@ -1106,6 +1207,7 @@ public partial class MainWindow
             _subscriptionQuotaResult = result;
             _subscriptionQuotaLastCompletedUtc = DateTimeOffset.UtcNow;
             RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            RaiseSubscriptionQuotaLiveRegionChanged();
         });
     }
 
@@ -1122,6 +1224,8 @@ public partial class MainWindow
     private void RenderSubscriptionQuota(DateTimeOffset now)
     {
         btnSubscriptionQuotaRefresh.IsEnabled = _subscriptionQuotaRefreshTask is not { IsCompleted: false };
+        btnSubscriptionQuotaAction.Visibility = Visibility.Collapsed;
+        btnSubscriptionQuotaClear.Visibility = Visibility.Collapsed;
         borderSubscriptionQuotaSource.Visibility = Visibility.Collapsed;
         txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
         if (_subscriptionQuotaQaMode)
@@ -1141,6 +1245,12 @@ public partial class MainWindow
         {
             txtSubscriptionQuotaPrimary.Text = "未选择活动节点";
             txtSubscriptionQuotaSecondary.Text = "连接订阅节点后显示";
+            return;
+        }
+        if (_subscriptionQuotaResult?.Status is SubscriptionQuotaStatusCode.SessionCleared
+            or SubscriptionQuotaStatusCode.SessionClearFailed)
+        {
+            RenderSubscriptionQuotaResult(_subscriptionQuotaResult, now);
             return;
         }
         if (!CoreManager.Instance.IsRunning)
@@ -1168,10 +1278,60 @@ public partial class MainWindow
         if (!result.IsSuccess)
         {
             txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
-            if (result.Status == SubscriptionQuotaStatusCode.OfficialWebsiteRequired)
+            if (result.Status == SubscriptionQuotaStatusCode.MissingOfficialUrl)
             {
                 txtSubscriptionQuotaPrimary.Text = "请添加官方网址";
-                txtSubscriptionQuotaSecondary.Text = "订阅设置中添加网页并登录账号";
+                txtSubscriptionQuotaSecondary.Text = "为当前活动节点所属订阅添加 HTTPS 官网";
+                btnSubscriptionQuotaAction.Content = "添加网址";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
+            {
+                txtSubscriptionQuotaPrimary.Text = "请确认官方网址";
+                txtSubscriptionQuotaSecondary.Text = "确认当前 HTTPS 官网后才能使用登录会话";
+                btnSubscriptionQuotaAction.Content = "确认官方网址";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.LoginRequired)
+            {
+                txtSubscriptionQuotaPrimary.Text = "需要登录官网";
+                txtSubscriptionQuotaSecondary.Text = "登录仅在隔离的安全窗口中进行";
+                btnSubscriptionQuotaAction.Content = "打开并登录";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+                btnSubscriptionQuotaClear.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.AuthenticatedUnsupported)
+            {
+                txtSubscriptionQuotaPrimary.Text = "登录后仍无法读取余量";
+                txtSubscriptionQuotaSecondary.Text = "该服务暂未提供受支持的余量格式";
+                btnSubscriptionQuotaClear.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.AuthHostUnavailable)
+            {
+                txtSubscriptionQuotaPrimary.Text = "安全登录组件不可用";
+                txtSubscriptionQuotaSecondary.Text = "请确认登录组件与 WebView2 Runtime 已安装";
+                btnSubscriptionQuotaAction.Content = "重试登录";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.WebView2RuntimeMissing)
+            {
+                txtSubscriptionQuotaPrimary.Text = "需要安装 WebView2 Runtime";
+                txtSubscriptionQuotaSecondary.Text = "请安装 Microsoft Edge WebView2 Runtime，安装完成后重试";
+                btnSubscriptionQuotaAction.Content = "安装后重试";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.SessionCleared)
+            {
+                txtSubscriptionQuotaPrimary.Text = "登录信息已清除";
+                txtSubscriptionQuotaSecondary.Text = "已删除该订阅的登录会话和临时浏览数据";
+                btnSubscriptionQuotaAction.Content = "重新登录";
+                btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+            }
+            else if (result.Status == SubscriptionQuotaStatusCode.SessionClearFailed)
+            {
+                txtSubscriptionQuotaPrimary.Text = "登录信息清除失败";
+                txtSubscriptionQuotaSecondary.Text = "仍有会话或临时浏览数据被占用，请稍后重试";
+                btnSubscriptionQuotaClear.Visibility = Visibility.Visible;
             }
             else
             {
@@ -1184,6 +1344,7 @@ public partial class MainWindow
         }
 
         var snapshot = result.Snapshot!;
+        if (usesOfficialWebsite) btnSubscriptionQuotaClear.Visibility = Visibility.Visible;
         var expired = snapshot.ExpiresAtUtc.HasValue && snapshot.ExpiresAtUtc.Value <= now;
         txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource(expired ? "QccDanger" : usesOfficialWebsite ? "QccSuccess" : "QccText");
         txtSubscriptionQuotaPrimary.Text = expired
@@ -1227,6 +1388,31 @@ public partial class MainWindow
         }
         return $"{value:0.##} {units[unit]}";
     }
+
+    private static bool IsTrustedOfficialOrigin(SubItem subscription)
+        => subscription.OfficialUrlTrustVersion == 1
+           && SubscriptionOfficialUrlParser.GetCanonicalOrigin(subscription.OfficialUrl) is { } origin
+           && string.Equals(origin, subscription.OfficialUrlTrustedOrigin, StringComparison.Ordinal);
+
+    private void RestoreSubscriptionQuotaFocus(FrameworkElement? preferred)
+    {
+        FrameworkElement[] candidates =
+        [
+            preferred ?? btnSubscriptionQuotaAction,
+            btnSubscriptionQuotaAction,
+            btnSubscriptionQuotaClear,
+            btnSubscriptionQuotaRefresh,
+            cardSubscriptionQuota
+        ];
+        foreach (var candidate in candidates.Distinct())
+        {
+            if (candidate.Visibility == Visibility.Visible && candidate.IsEnabled && candidate.Focus()) return;
+        }
+    }
+
+    private void RaiseSubscriptionQuotaLiveRegionChanged()
+        => UIElementAutomationPeer.CreatePeerForElement(txtSubscriptionQuotaPrimary)?
+            .RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
 
     private static string FormatSubscriptionQuotaAge(TimeSpan age)
     {

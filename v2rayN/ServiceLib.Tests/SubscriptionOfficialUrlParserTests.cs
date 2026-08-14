@@ -25,9 +25,30 @@ public sealed class SubscriptionOfficialUrlParserTests
     [Theory]
     [InlineData("file:///C:/secret.txt")]
     [InlineData("javascript:alert(1)")]
+    [InlineData("http://provider.example/")]
     [InlineData("https://user:password@provider.example/")]
+    [InlineData("https://localhost/")]
+    [InlineData("https://127.0.0.1/")]
+    [InlineData("https://192.168.1.1/")]
+    [InlineData("https://192.0.2.1/")]
+    [InlineData("https://198.51.100.1/")]
+    [InlineData("https://[::]/")]
+    [InlineData("https://[2001:db8::1]/")]
     public void Normalize_RejectsUnsafeOrCredentialedLinks(string value)
     {
         Assert.Null(SubscriptionOfficialUrlParser.Normalize(value));
+    }
+
+    [Fact]
+    public void OriginPolicy_CanonicalizesAndRequiresExactPort()
+    {
+        Assert.Equal("https://provider.example/",
+            SubscriptionOfficialUrlParser.GetCanonicalOrigin("https://provider.example/account?q=1"));
+        Assert.True(SubscriptionOfficialUrlParser.HasExactOrigin(
+            "https://provider.example/other", "https://provider.example/"));
+        Assert.False(SubscriptionOfficialUrlParser.HasExactOrigin(
+            "https://provider.example:8443/", "https://provider.example/"));
+        Assert.False(SubscriptionOfficialUrlParser.HasExactOrigin(
+            "https://login.example/", "https://provider.example/"));
     }
 }
