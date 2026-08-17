@@ -202,6 +202,18 @@ public sealed class SubscriptionQuotaParserTests
         Assert.Equal(9UL * 1024 * 1024 * 1024, result.Snapshot!.RemainingBytes);
     }
 
+    [Fact]
+    public void Body_ParsesOuterBase64TrojanFragmentDecoratedWithHammerAndWrench()
+    {
+        var marker = Uri.EscapeDataString("\U0001F6E0\uFE0F剩余流量：208.41 GB");
+        var subscription = $"trojan://synthetic-password@synthetic.invalid:123#{marker}";
+
+        var result = SubscriptionQuotaParser.ParseBody(EncodeOuter(subscription), RetrievedAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal((ulong)(208.41m * 1024 * 1024 * 1024), result.Snapshot!.RemainingBytes);
+    }
+
     [Theory]
     [InlineData("notice 剩余流量：1 GB")]
     [InlineData("剩余流量：1 GB suffix")]

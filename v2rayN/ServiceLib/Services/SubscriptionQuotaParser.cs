@@ -322,7 +322,7 @@ public static partial class SubscriptionQuotaParser
         return normalized.Length > 0;
     }
 
-    private static bool IsAllowedDecoration(Rune rune) => rune.Value is 0x1F527 or 0x2692;
+    private static bool IsAllowedDecoration(Rune rune) => rune.Value is 0x1F527 or 0x2692 or 0x1F6E0;
 
     private static bool TryTrafficBytes(string valueText, string unit, out ulong bytes)
     {
