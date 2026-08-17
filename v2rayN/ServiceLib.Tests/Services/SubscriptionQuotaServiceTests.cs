@@ -225,7 +225,9 @@ public sealed class SubscriptionQuotaServiceTests
         {
             if (request.RequestUri!.AbsolutePath == "/sub")
             {
-                return new(HttpStatusCode.OK) { Content = new StringContent("vmess://sample") };
+                var ordinaryJson = "{\"v\":\"2\",\"add\":\"synthetic.invalid\",\"id\":\"synthetic-id\"}";
+                var ordinaryVmess = "vmess://" + Convert.ToBase64String(Encoding.UTF8.GetBytes(ordinaryJson)).TrimEnd('=');
+                return new(HttpStatusCode.OK) { Content = new StringContent(ordinaryVmess) };
             }
             return new(HttpStatusCode.OK)
             {
