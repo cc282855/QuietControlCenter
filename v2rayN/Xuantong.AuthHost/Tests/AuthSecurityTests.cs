@@ -12,6 +12,14 @@ namespace Xuantong.AuthHost.Tests;
 public sealed class AuthSecurityTests
 {
     [Fact]
+    public void MediumIntegrityCheck_NeverThrowsForCurrentWindowsProcess()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var exception = Record.Exception(() => HostSecurity.IsMediumIntegrityInteractiveUser());
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void ContextProtection_IsolatesSubscriptionAndOriginAndRejectsTamper()
     {
         if (!OperatingSystem.IsWindows()) return;

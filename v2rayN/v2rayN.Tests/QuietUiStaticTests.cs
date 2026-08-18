@@ -1169,9 +1169,13 @@ public sealed class QuietUiStaticTests
 
         Assert.Contains("<OutputType>WinExe</OutputType>", project, StringComparison.Ordinal);
         Assert.Contains("Microsoft.Web.WebView2", project, StringComparison.Ordinal);
+        Assert.Contains("<IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>", project, StringComparison.Ordinal);
         Assert.DoesNotContain("Microsoft.Web.WebView2", mainProject, StringComparison.Ordinal);
         Assert.Contains("requestedExecutionLevel level=\"asInvoker\"", manifest, StringComparison.Ordinal);
         Assert.Contains("IsMediumIntegrityInteractiveUser", hostSecurity, StringComparison.Ordinal);
+        Assert.DoesNotContain(".IsGuest", hostSecurity, StringComparison.Ordinal);
+        Assert.DoesNotContain(".IsAnonymous", hostSecurity, StringComparison.Ordinal);
+        Assert.DoesNotContain(".IsSystem", hostSecurity, StringComparison.Ordinal);
         Assert.DoesNotContain("PipeOptions.CurrentUserOnly", hostProtocol, StringComparison.Ordinal);
         Assert.Contains("CurrentUserMediumPipe.Create", client, StringComparison.Ordinal);
         Assert.Contains("D:P(A;;GA;;;{sid})S:(ML;;NW;;;ME)", client, StringComparison.Ordinal);

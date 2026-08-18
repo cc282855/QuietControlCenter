@@ -114,7 +114,17 @@ internal sealed class AuthHostClient
             var connectTask = pipe.WaitForConnectionAsync(linked.Token);
             var exitTask = owned.Process.WaitForExitAsync(CancellationToken.None);
             if (await Task.WhenAny(connectTask, exitTask) != connectTask)
-                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
+            {
+                var exitCode = 0;
+                try
+                {
+                    await exitTask.ConfigureAwait(false);
+                    exitCode = owned.Process.ExitCode;
+                }
+                catch { }
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null,
+                    SubscriptionQuotaDiagnosticCode.None, exitCode);
+            }
             await connectTask;
             if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var actualClientPid)
                 || !AuthBounds.IsExpectedPeer(actualClientPid, owned.Pid))

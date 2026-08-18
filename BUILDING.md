@@ -30,6 +30,15 @@ The helper accepts only `AmazTool qcc-upgrade <absolute-instruction.json> <inher
 
 `tools/package-qcc.ps1` removes runtime databases, logs, temporary directories, and generated configuration before producing `qcc-package.json`. The marker contains only relative immutable payload paths and hashes.
 
+## Mandatory local handoff links
+
+Every completed local version must end with exactly two prominent clickable links:
+
+1. `local-continuity/qcc-win-x64/玄同.exe` — the continuity launcher that keeps the user's existing subscription and local settings through its adjacent `guiConfigs` and runtime-state directories.
+2. `玄同-<version>-win-x64.zip` — the clean complete package, containing no user subscription, configuration, database, log, session, Cookie, or key data.
+
+Never substitute `qcc-win-x64/玄同.exe` for the continuity launcher in the final response. The subscription is not stored inside the EXE itself; the continuity EXE must remain beside its copied local configuration directories. Final task responses must link both paths directly.
+
 ## Reproducible build
 
 The required `v2rayN/GlobalHotKeys` submodule is pinned at `162d401dfe0140b41d1fa349b9aadb4060e739b1`.

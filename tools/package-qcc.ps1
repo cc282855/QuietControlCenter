@@ -137,7 +137,15 @@ Get-ChildItem -LiteralPath $AuthHost -File -Force |
     ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $Artifact -Recurse -Force
 }
-$requiredAuthFiles = @('Xuantong.AuthHost.exe', 'WebView2Loader.dll')
+$requiredAuthFiles = @(
+    'Xuantong.AuthHost.exe',
+    'WebView2Loader.dll',
+    'PresentationNative_cor3.dll',
+    'vcruntime140_cor3.dll',
+    'wpfgfx_cor3.dll',
+    'D3DCompiler_47_cor3.dll',
+    'PenImc_cor3.dll'
+)
 foreach ($relative in $requiredAuthFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $Artifact $relative) -PathType Leaf)) {
         throw "Required authenticated login helper payload is missing: $relative"
