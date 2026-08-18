@@ -68,6 +68,11 @@ public sealed class SQLiteHelper
         return await _dbAsync.QueryAsync<T>(sql);
     }
 
+    public async Task<List<T>> QueryAsync<T>(string sql, params object[] args) where T : new()
+    {
+        return await _dbAsync.QueryAsync<T>(sql, args);
+    }
+
     public AsyncTableQuery<T> TableAsync<T>() where T : new()
     {
         return _dbAsync.Table<T>();

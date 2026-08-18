@@ -28,7 +28,24 @@ public enum SubscriptionQuotaSource
 {
     Header,
     ResponseBody,
+    ImportedNodeCache,
     OfficialWebsite
+}
+
+public enum SubscriptionQuotaDiagnosticCode
+{
+    None,
+    TicketDirectoryFailed,
+    TicketProtectionFailed,
+    HelperVerificationFailed,
+    TicketWriteFailed,
+    PipeCreationFailed,
+    InteractiveShellUnavailable,
+    ShellTokenUnavailable,
+    MediumProcessCreateFailed,
+    ChildExitedEarly,
+    ChildIdentityValidationFailed,
+    UnknownStartFailure
 }
 
 public sealed record SubscriptionQuotaSnapshot(
@@ -42,7 +59,8 @@ public sealed record SubscriptionQuotaSnapshot(
 
 public sealed record SubscriptionQuotaResult(
     SubscriptionQuotaStatusCode Status,
-    SubscriptionQuotaSnapshot? Snapshot = null)
+    SubscriptionQuotaSnapshot? Snapshot = null,
+    SubscriptionQuotaDiagnosticCode Diagnostic = SubscriptionQuotaDiagnosticCode.None)
 {
     public bool IsSuccess => Status == SubscriptionQuotaStatusCode.Success && Snapshot is not null;
 }

@@ -378,6 +378,53 @@ public sealed class SubscriptionQuotaParserTests
             SubscriptionQuotaParser.ParseBody(validPayloadWithQuotaFragment, RetrievedAt).Status);
     }
 
+    [Fact]
+    public void ImportedRemarks_ParsesSameSubscriptionQuotaMarkerAsCache()
+    {
+        string?[] remarks = ["ordinary node", "\U0001F6E0\uFE0F\u5269\u4F59\u6D41\u91CF\uFF1A208.41 GB"];
+
+        var result = SubscriptionQuotaParser.ParseImportedRemarks(remarks, RetrievedAt);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal((ulong)(208.41m * 1024 * 1024 * 1024), result.Snapshot!.RemainingBytes);
+        Assert.Equal(SubscriptionQuotaSource.ImportedNodeCache, result.Snapshot.Source);
+        Assert.Equal(RetrievedAt, result.Snapshot.RetrievedAtUtc);
+    }
+
+    [Fact]
+    public void ImportedRemarks_FailsClosedOnConflictsAndEmbeddedLines()
+    {
+        string?[] conflict = ["\u5269\u4F59\u6D41\u91CF\uFF1A1 GB", "\u5269\u4F59\u6D41\u91CF\uFF1A2 GB"];
+        string?[] embedded = ["ordinary\n\u5269\u4F59\u6D41\u91CF\uFF1A1 GB"];
+
+        Assert.Equal(SubscriptionQuotaStatusCode.Malformed,
+            SubscriptionQuotaParser.ParseImportedRemarks(conflict, RetrievedAt).Status);
+        Assert.Equal(SubscriptionQuotaStatusCode.Malformed,
+            SubscriptionQuotaParser.ParseImportedRemarks(embedded, RetrievedAt).Status);
+    }
+
+    [Theory]
+    [InlineData("notice \u5269\u4F59\u6D41\u91CF\uFF1A1 GB")]
+    [InlineData("\u5269\u4F59\u6D41\u91CF\uFF1A1 GB suffix")]
+    public void ImportedRemarks_RequiresACompleteMarker(string remark)
+    {
+        var result = SubscriptionQuotaParser.ParseImportedRemarks([remark], RetrievedAt);
+
+        Assert.Equal(SubscriptionQuotaStatusCode.Unsupported, result.Status);
+    }
+
+    [Fact]
+    public void ImportedRemarks_EnforcesRowAndTotalCharacterBounds()
+    {
+        var tooMany = Enumerable.Repeat<string?>("ordinary", SubscriptionQuotaParser.MaxImportedRemarkCount + 1).ToArray();
+        var tooLarge = Enumerable.Repeat<string?>(new string('x', 2048), 513).ToArray();
+
+        Assert.Equal(SubscriptionQuotaStatusCode.Malformed,
+            SubscriptionQuotaParser.ParseImportedRemarks(tooMany, RetrievedAt).Status);
+        Assert.Equal(SubscriptionQuotaStatusCode.Malformed,
+            SubscriptionQuotaParser.ParseImportedRemarks(tooLarge, RetrievedAt).Status);
+    }
+
     private static byte[] EncodeOuter(string text) =>
         Encoding.UTF8.GetBytes(Convert.ToBase64String(Encoding.UTF8.GetBytes(text)));
 

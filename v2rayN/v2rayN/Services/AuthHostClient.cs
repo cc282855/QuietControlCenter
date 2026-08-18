@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -54,10 +55,12 @@ internal sealed class AuthHostClient
         }
 
         var failureStatus = SubscriptionQuotaStatusCode.AuthHostStartFailed;
+        var failureDiagnostic = SubscriptionQuotaDiagnosticCode.UnknownStartFailure;
         string? ticketPath = null;
         OwnedProcess? owned = null;
         try
         {
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.TicketDirectoryFailed;
             var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
             var pipeName = "xuantong-auth-" + Guid.NewGuid().ToString("N");
             var ticketRoot = Path.Combine(
@@ -65,7 +68,9 @@ internal sealed class AuthHostClient
                 "Xuantong", "AuthTickets");
             Directory.CreateDirectory(ticketRoot);
             ticketPath = Path.Combine(ticketRoot, "ticket-" + Guid.NewGuid().ToString("N") + ".bin");
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.TicketProtectionFailed;
             var context = AuthContext.Create(subId, origin)!;
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.HelperVerificationFailed;
             string helperHash;
             using (var helperStream = File.OpenRead(helper))
                 helperHash = Convert.ToHexString(SHA256.HashData(helperStream)).ToLowerInvariant();
@@ -73,11 +78,14 @@ internal sealed class AuthHostClient
                 Protocol, nonce, Environment.ProcessId, Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks,
                 DateTimeOffset.UtcNow.AddMinutes(2).ToUnixTimeSeconds(),
                 operation, subId, normalized, origin, socksPort, pipeName, helperHash);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.TicketProtectionFailed;
             var ciphertext = ContextProtection.Protect(ticket, context);
             var ticketBytes = JsonSerializer.SerializeToUtf8Bytes(
                 new ProtectedEnvelope(context.Version, context.SubscriptionHash, context.Origin, ciphertext));
             if (ticketBytes.Length > 32 * 1024)
-                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed);
+                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed, null,
+                    SubscriptionQuotaDiagnosticCode.TicketProtectionFailed);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.TicketWriteFailed;
             await using (var ticketFile = new FileStream(
                 ticketPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 4096, FileOptions.WriteThrough))
@@ -86,14 +94,18 @@ internal sealed class AuthHostClient
                 await ticketFile.FlushAsync(cancellationToken);
             }
 
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.PipeCreationFailed;
             await using var pipe = new NamedPipeServerStream(
                 pipeName, PipeDirection.InOut, 1,
                 PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly,
                 4096, MaxMessageBytes);
-            owned = SecureProcessLauncher.TryLaunchMedium(helper, ticketPath, pipeName);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.UnknownStartFailure;
+            var launch = await SecureProcessLauncher.TryLaunchMediumAsync(
+                helper, ticketPath, pipeName, cancellationToken);
+            owned = launch.Process;
             if (owned is null)
-                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed);
+                return new(SubscriptionQuotaStatusCode.AuthHostStartFailed, null, launch.Diagnostic);
             failureStatus = SubscriptionQuotaStatusCode.AuthHostCommunicationFailed;
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -136,7 +148,9 @@ internal sealed class AuthHostClient
         }
         catch
         {
-            return new(failureStatus);
+            return failureStatus == SubscriptionQuotaStatusCode.AuthHostStartFailed
+                ? new(failureStatus, null, failureDiagnostic)
+                : new(failureStatus);
         }
         finally
         {
@@ -232,11 +246,21 @@ internal sealed class AuthHostClient
     private static extern bool GetNamedPipeClientProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientProcessId);
 }
 
+internal sealed record AuthHostLaunchResult(
+    OwnedProcess? Process,
+    SubscriptionQuotaDiagnosticCode Diagnostic);
+
 internal static class SecureProcessLauncher
 {
-    public static OwnedProcess? TryLaunchMedium(string executable, string ticketPath, string pipeName)
+    public static async Task<AuthHostLaunchResult> TryLaunchMediumAsync(
+        string executable,
+        string ticketPath,
+        string pipeName,
+        CancellationToken cancellationToken)
     {
-        if (!OperatingSystem.IsWindows() || Process.GetCurrentProcess().SessionId == 0) return null;
+        using var currentProcess = Process.GetCurrentProcess();
+        if (!OperatingSystem.IsWindows() || currentProcess.SessionId == 0)
+            return Failed(SubscriptionQuotaDiagnosticCode.InteractiveShellUnavailable);
         var currentIntegrity = GetCurrentIntegrityRid();
         if (currentIntegrity is >= 0x2000 and < 0x3000)
         {
@@ -248,51 +272,121 @@ internal static class SecureProcessLauncher
                     WorkingDirectory = AppContext.BaseDirectory,
                     ArgumentList = { "--ticket", ticketPath, "--pipe", pipeName }
                 });
-                return process is null ? null : OwnedProcess.TryCreate(process, executable);
+                if (process is null)
+                    return Failed(SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed);
+                var (owned, diagnostic) = await OwnedProcess.TryCreateAsync(
+                    process, executable, cancellationToken).ConfigureAwait(false);
+                return new(owned, diagnostic);
             }
-            catch { return null; }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch { return Failed(SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed); }
         }
-        if (currentIntegrity is not (>= 0x3000 and < 0x5000)) return null;
-        return TryLaunchFromInteractiveShell(executable, ticketPath, pipeName);
+        if (currentIntegrity is not (>= 0x3000 and < 0x5000))
+            return Failed(SubscriptionQuotaDiagnosticCode.UnknownStartFailure);
+        return await TryLaunchFromInteractiveShellAsync(
+            executable, ticketPath, pipeName, currentProcess.SessionId, cancellationToken).ConfigureAwait(false);
     }
 
-    private static OwnedProcess? TryLaunchFromInteractiveShell(string executable, string ticketPath, string pipeName)
+    private static async Task<AuthHostLaunchResult> TryLaunchFromInteractiveShellAsync(
+        string executable,
+        string ticketPath,
+        string pipeName,
+        int sessionId,
+        CancellationToken cancellationToken)
     {
         var expectedSid = WindowsIdentity.GetCurrent().User;
-        if (expectedSid is null) return null;
-        foreach (var explorer in Process.GetProcessesByName("explorer")
-                     .Where(p => p.SessionId == Process.GetCurrentProcess().SessionId))
+        if (expectedSid is null)
+            return Failed(SubscriptionQuotaDiagnosticCode.ShellTokenUnavailable);
+        var explorers = Process.GetProcessesByName("explorer");
+        try
         {
-            try
+            if (!explorers.Any(p => p.SessionId == sessionId))
+                return Failed(SubscriptionQuotaDiagnosticCode.InteractiveShellUnavailable);
+
+            foreach (var explorer in explorers)
             {
-                if (!OpenProcessToken(explorer.Handle, 0x0001 | 0x0002 | 0x0008, out var token)) continue;
                 try
                 {
-                    using var identity = new WindowsIdentity(token);
-                    if (!expectedSid.Equals(identity.User) || GetTokenIntegrityRid(token) is not (>= 0x2000 and < 0x3000))
+                    if (explorer.SessionId != sessionId
+                        || !OpenProcessToken(explorer.Handle, 0x0001 | 0x0002 | 0x0008, out var token))
                         continue;
-                    var command = $"\"{executable}\" --ticket \"{ticketPath}\" --pipe \"{pipeName}\"";
-                    var startup = new StartupInfo { cb = Marshal.SizeOf<StartupInfo>(), lpDesktop = "winsta0\\default" };
-                    if (!CreateProcessWithTokenW(token, 1, executable, command, 0x00000400,
-                            IntPtr.Zero, AppContext.BaseDirectory, ref startup, out var info)) continue;
                     try
                     {
-                        var process = Process.GetProcessById(unchecked((int)info.dwProcessId));
-                        return OwnedProcess.TryCreate(process, executable);
+                        using var identity = new WindowsIdentity(token);
+                        if (!expectedSid.Equals(identity.User)
+                            || GetTokenIntegrityRid(token) is not (>= 0x2000 and < 0x3000))
+                            continue;
+                        var command = new StringBuilder(
+                            $"\"{executable}\" --ticket \"{ticketPath}\" --pipe \"{pipeName}\"");
+                        var startup = new StartupInfo
+                        {
+                            cb = Marshal.SizeOf<StartupInfo>(),
+                            lpDesktop = "winsta0\\default"
+                        };
+                        if (!CreateProcessWithTokenW(token, 1, executable, command, 0x00000400,
+                                IntPtr.Zero, AppContext.BaseDirectory, ref startup, out var info))
+                            return Failed(SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed);
+                        try
+                        {
+                            Process process;
+                            try
+                            {
+                                process = Process.GetProcessById(unchecked((int)info.dwProcessId));
+                            }
+                            catch
+                            {
+                                TerminateCreatedProcess(info.hProcess);
+                                return Failed(SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed);
+                            }
+                            try
+                            {
+                                var (owned, diagnostic) = await OwnedProcess.TryCreateAsync(
+                                    process, executable, cancellationToken).ConfigureAwait(false);
+                                if (owned is null) TerminateCreatedProcess(info.hProcess);
+                                return new(owned, diagnostic);
+                            }
+                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            {
+                                TerminateCreatedProcess(info.hProcess);
+                                throw;
+                            }
+                            catch
+                            {
+                                TerminateCreatedProcess(info.hProcess);
+                                return Failed(SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed);
+                            }
+                        }
+                        finally
+                        {
+                            CloseHandle(info.hThread);
+                            CloseHandle(info.hProcess);
+                        }
                     }
-                    finally { CloseHandle(info.hThread); CloseHandle(info.hProcess); }
+                    finally { CloseHandle(token); }
                 }
-                finally { CloseHandle(token); }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch { }
             }
-            catch { }
-            finally { explorer.Dispose(); }
+            return Failed(SubscriptionQuotaDiagnosticCode.ShellTokenUnavailable);
         }
-        return null;
+        finally
+        {
+            foreach (var explorer in explorers) explorer.Dispose();
+        }
     }
+
+    private static void TerminateCreatedProcess(IntPtr processHandle)
+    {
+        if (processHandle != IntPtr.Zero) _ = TerminateProcess(processHandle, 1);
+    }
+
+    private static AuthHostLaunchResult Failed(SubscriptionQuotaDiagnosticCode diagnostic)
+        => new(null, diagnostic);
 
     private static int GetCurrentIntegrityRid()
     {
-        if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x0008, out var token)) return -1;
+        using var currentProcess = Process.GetCurrentProcess();
+        if (!OpenProcessToken(currentProcess.Handle, 0x0008, out var token)) return -1;
         try { return GetTokenIntegrityRid(token); }
         finally { CloseHandle(token); }
     }
@@ -331,9 +425,10 @@ internal static class SecureProcessLauncher
     [DllImport("advapi32.dll", SetLastError = true)] private static extern bool GetTokenInformation(IntPtr token, int infoClass, IntPtr info, int length, out int returnLength);
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateProcessWithTokenW(IntPtr token, int logonFlags, string applicationName,
-        string commandLine, uint creationFlags, IntPtr environment, string currentDirectory,
+        StringBuilder commandLine, uint creationFlags, IntPtr environment, string currentDirectory,
         ref StartupInfo startupInfo, out ProcessInformation processInformation);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateProcess(IntPtr process, uint exitCode);
 }
 
 internal sealed class OwnedProcess : IDisposable
@@ -355,16 +450,77 @@ internal sealed class OwnedProcess : IDisposable
         Active[Pid] = this;
     }
 
-    internal static OwnedProcess? TryCreate(Process process, string expectedPath)
+    internal static async Task<(OwnedProcess? Process, SubscriptionQuotaDiagnosticCode Diagnostic)> TryCreateAsync(
+        Process process,
+        string expectedPath,
+        CancellationToken cancellationToken)
+    {
+        var diagnostic = SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                process.Refresh();
+                if (process.HasExited)
+                {
+                    diagnostic = SubscriptionQuotaDiagnosticCode.ChildExitedEarly;
+                    process.Dispose();
+                    return (null, diagnostic);
+                }
+                var actual = process.MainModule?.FileName;
+                if (actual is null)
+                    throw new InvalidOperationException("The child executable is not ready for validation.");
+                if (!string.Equals(Path.GetFullPath(actual), Path.GetFullPath(expectedPath),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    TerminateAndDisposeUnaccepted(process);
+                    return (null, diagnostic);
+                }
+                var owned = new OwnedProcess(process, expectedPath);
+                diagnostic = SubscriptionQuotaDiagnosticCode.None;
+                return (owned, diagnostic);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                if (attempt < 19)
+                {
+                    try
+                    {
+                        await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        TerminateAndDisposeUnaccepted(process);
+                        throw;
+                    }
+                    continue;
+                }
+            }
+            catch
+            {
+                break;
+            }
+        }
+        try
+        {
+            process.Refresh();
+            if (process.HasExited)
+                diagnostic = SubscriptionQuotaDiagnosticCode.ChildExitedEarly;
+        }
+        catch { }
+        TerminateAndDisposeUnaccepted(process);
+        return (null, diagnostic);
+    }
+
+    private static void TerminateAndDisposeUnaccepted(Process process)
     {
         try
         {
-            var actual = process.MainModule?.FileName;
-            if (actual is null || !string.Equals(Path.GetFullPath(actual), Path.GetFullPath(expectedPath), StringComparison.OrdinalIgnoreCase))
-            { process.Dispose(); return null; }
-            return new(process, expectedPath);
+            process.Refresh();
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
         }
-        catch { process.Dispose(); return null; }
+        catch { }
+        finally { process.Dispose(); }
     }
 
     internal void TerminateIfOwned()

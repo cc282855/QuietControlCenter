@@ -9,6 +9,8 @@ public static partial class SubscriptionQuotaParser
     public const int MaxHeaderCharacters = 4096;
     public const int MaxHeaderFields = 16;
     public const int MaxBodyBytes = 8 * 1024 * 1024;
+    public const int MaxImportedRemarkCount = 4096;
+    public const int MaxImportedRemarkTotalCharacters = 1024 * 1024;
 
     private const int MaxMarkerLines = 65_536;
     private const int MaxMarkerLineCharacters = 2048;
@@ -134,6 +136,37 @@ public static partial class SubscriptionQuotaParser
     {
         if (body.Length > MaxBodyBytes) return new(SubscriptionQuotaStatusCode.BodyTooLarge);
         return new(SubscriptionQuotaStatusCode.Unsupported);
+    }
+
+    public static SubscriptionQuotaResult ParseImportedRemarks(
+        IReadOnlyCollection<string?>? remarks,
+        DateTimeOffset retrievedAtUtc)
+    {
+        if (remarks is null || remarks.Count == 0)
+            return new(SubscriptionQuotaStatusCode.Unsupported);
+        if (remarks.Count > MaxImportedRemarkCount)
+            return new(SubscriptionQuotaStatusCode.Malformed);
+
+        var totalCharacters = 0;
+        var markers = new MarkerAccumulator();
+        foreach (var remark in remarks)
+        {
+            if (string.IsNullOrWhiteSpace(remark)) continue;
+            if (remark.Length > MaxMarkerLineCharacters
+                || remark.IndexOfAny(['\r', '\n']) >= 0)
+                return new(SubscriptionQuotaStatusCode.Malformed);
+            totalCharacters += remark.Length;
+            if (totalCharacters > MaxImportedRemarkTotalCharacters)
+                return new(SubscriptionQuotaStatusCode.Malformed);
+            ReadMarkerLine(remark.Trim(), markers);
+        }
+
+        if (markers.IsMalformed) return new(SubscriptionQuotaStatusCode.Malformed);
+        if (!markers.Remaining.HasValue) return new(SubscriptionQuotaStatusCode.Unsupported);
+        return new(
+            SubscriptionQuotaStatusCode.Success,
+            new(0, 0, null, markers.Remaining.Value, markers.Expiry, retrievedAtUtc,
+                SubscriptionQuotaSource.ImportedNodeCache));
     }
 
     private static void ReadMarkers(string text, MarkerAccumulator markers)

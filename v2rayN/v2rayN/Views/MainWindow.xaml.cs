@@ -1146,15 +1146,23 @@ public partial class MainWindow
                 AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
                 subscription.UserAgent,
                 requestCancellation.Token);
-            if (result.Status == SubscriptionQuotaStatusCode.Unsupported)
+            if (result.Status is SubscriptionQuotaStatusCode.Unsupported
+                or SubscriptionQuotaStatusCode.LoginRequired)
             {
-                if (SubscriptionOfficialUrlParser.Normalize(subscription.OfficialUrl) is null)
-                    result = new(SubscriptionQuotaStatusCode.MissingOfficialUrl);
-                else if (!IsTrustedOfficialOrigin(subscription))
-                    result = new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired);
-                else
-                    result = await _authHostClient.QuerySessionAsync(subId, subscription.OfficialUrl,
-                        AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token);
+                var remarks = await AppManager.Instance.ProfileQuotaRemarks(
+                    subId, SubscriptionQuotaParser.MaxImportedRemarkCount + 1);
+                // This is the cache observation time. The imported content's exact generation time is unknown.
+                result = SubscriptionQuotaParser.ParseImportedRemarks(remarks, DateTimeOffset.UtcNow);
+                if (!result.IsSuccess)
+                {
+                    if (SubscriptionOfficialUrlParser.Normalize(subscription.OfficialUrl) is null)
+                        result = new(SubscriptionQuotaStatusCode.MissingOfficialUrl);
+                    else if (!IsTrustedOfficialOrigin(subscription))
+                        result = new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired);
+                    else
+                        result = await _authHostClient.QuerySessionAsync(subId, subscription.OfficialUrl,
+                            AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token);
+                }
             }
             await ApplySubscriptionQuotaResultAsync(profileId, subId, generation, result);
         }
@@ -1274,7 +1282,12 @@ public partial class MainWindow
     {
         var usesOfficialWebsite = result.IsSuccess
             && result.Snapshot!.Source == SubscriptionQuotaSource.OfficialWebsite;
-        borderSubscriptionQuotaSource.Visibility = usesOfficialWebsite ? Visibility.Visible : Visibility.Collapsed;
+        var usesImportedNodeCache = result.IsSuccess
+            && result.Snapshot!.Source == SubscriptionQuotaSource.ImportedNodeCache;
+        borderSubscriptionQuotaSource.Visibility = usesOfficialWebsite || usesImportedNodeCache
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        txtSubscriptionQuotaSource.Text = usesOfficialWebsite ? "官网" : "连接缓存";
         if (!result.IsSuccess)
         {
             txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
@@ -1323,7 +1336,7 @@ public partial class MainWindow
             else if (result.Status == SubscriptionQuotaStatusCode.AuthHostStartFailed)
             {
                 txtSubscriptionQuotaPrimary.Text = "安全登录组件无法启动";
-                txtSubscriptionQuotaSecondary.Text = "请重新解压完整安装包，关闭可能的拦截后重试";
+                txtSubscriptionQuotaSecondary.Text = GetAuthHostStartFailureMessage(result.Diagnostic);
                 btnSubscriptionQuotaAction.Content = "重试登录";
                 btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
             }
@@ -1374,7 +1387,15 @@ public partial class MainWindow
                 ? $"剩余 {FormatSubscriptionQuotaBytes(snapshot.RemainingBytes)}"
                 : FormatSubscriptionQuotaBytes(snapshot.RemainingBytes);
         var age = FormatSubscriptionQuotaAge(now - snapshot.RetrievedAtUtc);
-        if (usesOfficialWebsite && snapshot.ExpiresAtUtc.HasValue)
+        if (usesImportedNodeCache && snapshot.ExpiresAtUtc.HasValue)
+        {
+            txtSubscriptionQuotaSecondary.Text = $"到期 {snapshot.ExpiresAtUtc.Value.ToLocalTime():yyyy-MM-dd} · 来自已导入连接名称，以最近一次订阅更新为准";
+        }
+        else if (usesImportedNodeCache)
+        {
+            txtSubscriptionQuotaSecondary.Text = "来自已导入连接名称，以最近一次订阅更新为准";
+        }
+        else if (usesOfficialWebsite && snapshot.ExpiresAtUtc.HasValue)
         {
             txtSubscriptionQuotaSecondary.Text = $"到期 {snapshot.ExpiresAtUtc.Value.ToLocalTime():yyyy-MM-dd} · 官网查询 · {age}";
         }
@@ -1396,6 +1417,22 @@ public partial class MainWindow
             txtSubscriptionQuotaSecondary.Text = $"更新 {age}";
         }
     }
+
+    private static string GetAuthHostStartFailureMessage(SubscriptionQuotaDiagnosticCode diagnostic)
+        => diagnostic switch
+        {
+            SubscriptionQuotaDiagnosticCode.TicketDirectoryFailed => "登录临时目录不可用（阶段 A01）",
+            SubscriptionQuotaDiagnosticCode.TicketProtectionFailed => "登录请求保护失败（阶段 A02）",
+            SubscriptionQuotaDiagnosticCode.HelperVerificationFailed => "登录组件校验失败（阶段 A03）",
+            SubscriptionQuotaDiagnosticCode.TicketWriteFailed => "登录请求写入失败（阶段 A04）",
+            SubscriptionQuotaDiagnosticCode.PipeCreationFailed => "登录通信通道创建失败（阶段 A05）",
+            SubscriptionQuotaDiagnosticCode.InteractiveShellUnavailable => "未找到当前桌面会话（阶段 A06）",
+            SubscriptionQuotaDiagnosticCode.ShellTokenUnavailable => "无法取得普通权限桌面令牌（阶段 A07）",
+            SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed => "普通权限登录窗口创建失败（阶段 A08）",
+            SubscriptionQuotaDiagnosticCode.ChildExitedEarly => "登录窗口启动后立即退出（阶段 A09）",
+            SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed => "登录窗口身份校验失败（阶段 A10）",
+            _ => "登录组件在建立通信前失败（阶段 A00）"
+        };
 
     private static string FormatSubscriptionQuotaBytes(ulong bytes)
     {
