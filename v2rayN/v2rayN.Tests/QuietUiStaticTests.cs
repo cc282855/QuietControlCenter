@@ -480,13 +480,18 @@ public sealed class QuietUiStaticTests
         Assert.Contains("RenderSubscriptionQuotaResult(_subscriptionQuotaResult, SubscriptionQuotaQaRenderTime)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("_subscriptionQuotaService.FetchAsync", codeBehind, StringComparison.Ordinal);
         var liveQuotaIndex = codeBehind.IndexOf("_subscriptionQuotaService.FetchAsync", StringComparison.Ordinal);
-        var importedRemarksIndex = codeBehind.IndexOf("ProfileQuotaRemarks", liveQuotaIndex, StringComparison.Ordinal);
+        var coordinatorIndex = codeBehind.IndexOf("_subscriptionQuotaCoordinator.ResolveAsync", liveQuotaIndex, StringComparison.Ordinal);
+        var importedRemarksIndex = codeBehind.IndexOf("ProfileQuotaRemarks", coordinatorIndex, StringComparison.Ordinal);
         var savedSessionIndex = codeBehind.IndexOf("_authHostClient.QuerySessionAsync", importedRemarksIndex, StringComparison.Ordinal);
-        Assert.True(liveQuotaIndex >= 0 && importedRemarksIndex > liveQuotaIndex && savedSessionIndex > importedRemarksIndex);
-        Assert.Contains("if (!result.IsSuccess)", codeBehind[importedRemarksIndex..savedSessionIndex], StringComparison.Ordinal);
+        Assert.True(liveQuotaIndex >= 0 && coordinatorIndex > liveQuotaIndex
+                    && importedRemarksIndex > coordinatorIndex && savedSessionIndex > importedRemarksIndex);
+        Assert.Contains("SubscriptionQuotaCacheStatus.NoMarker", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("resolution.AccountResult", codeBehind, StringComparison.Ordinal);
         Assert.Contains("SubscriptionQuotaParser.MaxImportedRemarkCount + 1", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("SubscriptionQuotaParser.ParseImportedRemarks", codeBehind, StringComparison.Ordinal);
-        Assert.Contains("or SubscriptionQuotaStatusCode.LoginRequired", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaCoordinator", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("or SubscriptionQuotaStatusCode.LoginRequired",
+            File.ReadAllText(Path.Combine(root, "v2rayN", "ServiceLib", "Services", "SubscriptionQuotaCoordinator.cs")),
+            StringComparison.Ordinal);
         Assert.Contains("SubscriptionQuotaSource.ImportedNodeCache", codeBehind, StringComparison.Ordinal);
         Assert.Contains("usesOfficialWebsite || usesImportedNodeCache", codeBehind, StringComparison.Ordinal);
         Assert.DoesNotContain("FetchWithOfficialFallbackAsync", quotaCode, StringComparison.Ordinal);
@@ -1167,8 +1172,11 @@ public sealed class QuietUiStaticTests
         Assert.DoesNotContain("Microsoft.Web.WebView2", mainProject, StringComparison.Ordinal);
         Assert.Contains("requestedExecutionLevel level=\"asInvoker\"", manifest, StringComparison.Ordinal);
         Assert.Contains("IsMediumIntegrityInteractiveUser", hostSecurity, StringComparison.Ordinal);
-        Assert.Contains("PipeOptions.CurrentUserOnly", hostProtocol, StringComparison.Ordinal);
-        Assert.Contains("PipeOptions.CurrentUserOnly", client, StringComparison.Ordinal);
+        Assert.DoesNotContain("PipeOptions.CurrentUserOnly", hostProtocol, StringComparison.Ordinal);
+        Assert.Contains("CurrentUserMediumPipe.Create", client, StringComparison.Ordinal);
+        Assert.Contains("D:P(A;;GA;;;{sid})S:(ML;;NW;;;ME)", client, StringComparison.Ordinal);
+        Assert.Contains("PipeRejectRemoteClients", client, StringComparison.Ordinal);
+        Assert.Contains("CreateNamedPipeW", client, StringComparison.Ordinal);
         Assert.Contains("SendAndAwaitAckAsync", hostProtocol, StringComparison.Ordinal);
         Assert.Contains("CommitAckValidator", hostProtocol, StringComparison.Ordinal);
         Assert.Contains("SendCommitResultAsync", hostProtocol, StringComparison.Ordinal);
@@ -1182,12 +1190,19 @@ public sealed class QuietUiStaticTests
         Assert.Contains("GetNamedPipeServerProcessId", hostProtocol, StringComparison.Ordinal);
         Assert.Contains("envelope.HelperPid != owned.Pid", client, StringComparison.Ordinal);
         Assert.Contains("CreateProcessWithTokenW", client, StringComparison.Ordinal);
+        Assert.Contains("DuplicateTokenEx", client, StringComparison.Ordinal);
+        Assert.Contains("CreateProcessWithTokenW(launchToken, 0", client, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateProcessWithTokenW(launchToken, 1", client, StringComparison.Ordinal);
+        Assert.Contains("CreateEnvironmentBlock", client, StringComparison.Ordinal);
+        Assert.Contains("DestroyEnvironmentBlock", client, StringComparison.Ordinal);
+        Assert.Contains("Marshal.GetLastPInvokeError()", client, StringComparison.Ordinal);
         Assert.Contains("StringBuilder commandLine", client, StringComparison.Ordinal);
         Assert.Contains("await Task.Delay(50, cancellationToken)", client, StringComparison.Ordinal);
         Assert.Contains("ChildExitedEarly", client, StringComparison.Ordinal);
         Assert.Contains("ChildIdentityValidationFailed", client, StringComparison.Ordinal);
         Assert.Contains("TerminateAndDisposeUnaccepted", client, StringComparison.Ordinal);
-        Assert.Contains("TerminateCreatedProcess(info.hProcess)", client, StringComparison.Ordinal);
+        Assert.Contains("ValidateCreatedProcessAsync", client, StringComparison.Ordinal);
+        Assert.Contains("CreatedProcessReaper.TerminateOrOwn", client, StringComparison.Ordinal);
         Assert.Contains("TryLaunchMediumAsync", client, StringComparison.Ordinal);
         Assert.Contains("TicketDirectoryFailed", client, StringComparison.Ordinal);
         Assert.Contains("PipeCreationFailed", client, StringComparison.Ordinal);

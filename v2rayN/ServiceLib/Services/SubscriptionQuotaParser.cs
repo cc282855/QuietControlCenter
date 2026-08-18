@@ -27,8 +27,14 @@ public static partial class SubscriptionQuotaParser
     [GeneratedRegex(@"\A(?:\u5269\u4F59\u6D41\u91CF|\u5269\u4F59\u6D41\u91CF\s*remaining|Remaining\s+(?:Traffic|Flow))\s*[:\uFF1A]\s*(?<value>[0-9]+(?:\.[0-9]{1,3})?)\s*(?<unit>B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
     private static partial Regex RemainingMarkerRegex();
 
+    [GeneratedRegex(@"\A(?:\u5269\u4F59\u6D41\u91CF|\u5269\u4F59\u6D41\u91CF\s*remaining|Remaining\s+(?:Traffic|Flow))\s*[:\uFF1A]\s*\S+\s*(?:B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
+    private static partial Regex RemainingMarkerCandidateRegex();
+
     [GeneratedRegex(@"\A(?:\u5230\u671F\u65F6\u95F4|\u8FC7\u671F\u65F6\u95F4|\u6709\u6548\u671F\u81F3|Expiry|Expiration\s+Date|Expires)\s*[:\uFF1A]\s*(?<date>[0-9]{4}-[0-9]{2}-[0-9]{2}(?:[ T][0-9]{2}:[0-9]{2}:[0-9]{2})?)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
     private static partial Regex ExpiryMarkerRegex();
+
+    [GeneratedRegex(@"\A(?:\u5230\u671F\u65F6\u95F4|\u8FC7\u671F\u65F6\u95F4|\u6709\u6548\u671F\u81F3|Expiry|Expiration\s+Date|Expires)\s*[:\uFF1A]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 100)]
+    private static partial Regex ExpiryMarkerPrefixRegex();
 
     public static SubscriptionQuotaResult ParseHeader(string? header, DateTimeOffset retrievedAtUtc)
     {
@@ -126,7 +132,7 @@ public static partial class SubscriptionQuotaParser
         var markers = new MarkerAccumulator();
         foreach (var candidate in candidates) ReadMarkers(candidate, markers);
 
-        if (markers.IsMalformed) return new(SubscriptionQuotaStatusCode.Malformed);
+        if (markers.IsMalformed || markers.IsConflict) return new(SubscriptionQuotaStatusCode.Malformed);
         if (!markers.Remaining.HasValue) return new(SubscriptionQuotaStatusCode.Unsupported);
         return new(SubscriptionQuotaStatusCode.Success,
             new(0, 0, null, markers.Remaining.Value, markers.Expiry, retrievedAtUtc, SubscriptionQuotaSource.ResponseBody));
@@ -161,12 +167,55 @@ public static partial class SubscriptionQuotaParser
             ReadMarkerLine(remark.Trim(), markers);
         }
 
-        if (markers.IsMalformed) return new(SubscriptionQuotaStatusCode.Malformed);
+        if (markers.IsMalformed || markers.IsConflict) return new(SubscriptionQuotaStatusCode.Malformed);
         if (!markers.Remaining.HasValue) return new(SubscriptionQuotaStatusCode.Unsupported);
         return new(
             SubscriptionQuotaStatusCode.Success,
             new(0, 0, null, markers.Remaining.Value, markers.Expiry, retrievedAtUtc,
                 SubscriptionQuotaSource.ImportedNodeCache));
+    }
+
+    public static SubscriptionQuotaCacheResult ParseImportedRemarkRows(
+        string capturedSubId,
+        IReadOnlyCollection<ProfileQuotaRemarkRow>? rows,
+        DateTimeOffset retrievedAtUtc)
+    {
+        if (string.IsNullOrEmpty(capturedSubId))
+            return new(SubscriptionQuotaCacheStatus.MissingSubscriptionBinding);
+        if (rows is null || rows.Count == 0)
+            return new(SubscriptionQuotaCacheStatus.NoRows);
+        if (rows.Count > MaxImportedRemarkCount)
+            return new(SubscriptionQuotaCacheStatus.Malformed);
+
+        var totalCharacters = 0;
+        var markers = new MarkerAccumulator();
+        foreach (var row in rows)
+        {
+            if (!string.Equals(row.Subid, capturedSubId, StringComparison.Ordinal))
+                return new(SubscriptionQuotaCacheStatus.SubIdMismatch);
+            var remark = row.Remarks;
+            if (string.IsNullOrWhiteSpace(remark)) continue;
+            if (remark.Length > MaxMarkerLineCharacters || remark.IndexOfAny(['\r', '\n']) >= 0)
+                return new(SubscriptionQuotaCacheStatus.Malformed);
+            totalCharacters += remark.Length;
+            if (totalCharacters > MaxImportedRemarkTotalCharacters)
+                return new(SubscriptionQuotaCacheStatus.Malformed);
+            ReadMarkerLine(remark.Trim(), markers);
+        }
+
+        if (markers.IsConflict)
+            return new(SubscriptionQuotaCacheStatus.Conflict);
+        if (markers.IsMalformed)
+            return new(SubscriptionQuotaCacheStatus.Malformed);
+        if (!markers.Remaining.HasValue)
+            return new(SubscriptionQuotaCacheStatus.NoMarker);
+
+        return new(
+            SubscriptionQuotaCacheStatus.Success,
+            new(
+                SubscriptionQuotaStatusCode.Success,
+                new(0, 0, null, markers.Remaining.Value, markers.Expiry, retrievedAtUtc,
+                    SubscriptionQuotaSource.ImportedNodeCache)));
     }
 
     private static void ReadMarkers(string text, MarkerAccumulator markers)
@@ -317,6 +366,10 @@ public static partial class SubscriptionQuotaParser
             else
                 markers.IsMalformed = true;
         }
+        else if (RemainingMarkerCandidateRegex().IsMatch(normalized))
+        {
+            markers.IsMalformed = true;
+        }
 
         var expiryMatch = ExpiryMarkerRegex().Match(normalized);
         if (expiryMatch.Success)
@@ -325,6 +378,10 @@ public static partial class SubscriptionQuotaParser
                 markers.AddExpiry(parsed);
             else
                 markers.IsMalformed = true;
+        }
+        else if (ExpiryMarkerPrefixRegex().IsMatch(normalized))
+        {
+            markers.IsMalformed = true;
         }
     }
 
@@ -476,16 +533,17 @@ public static partial class SubscriptionQuotaParser
         public ulong? Remaining { get; private set; }
         public DateTimeOffset? Expiry { get; private set; }
         public bool IsMalformed { get; set; }
+        public bool IsConflict { get; private set; }
 
         public void AddRemaining(ulong value)
         {
-            if (Remaining.HasValue && Remaining.Value != value) IsMalformed = true;
+            if (Remaining.HasValue && Remaining.Value != value) IsConflict = true;
             else Remaining = value;
         }
 
         public void AddExpiry(DateTimeOffset value)
         {
-            if (Expiry.HasValue && Expiry.Value != value) IsMalformed = true;
+            if (Expiry.HasValue && Expiry.Value != value) IsConflict = true;
             else Expiry = value;
         }
     }

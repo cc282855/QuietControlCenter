@@ -45,7 +45,34 @@ public enum SubscriptionQuotaDiagnosticCode
     MediumProcessCreateFailed,
     ChildExitedEarly,
     ChildIdentityValidationFailed,
-    UnknownStartFailure
+    UnknownStartFailure,
+    ProcessCreatePrivilege,
+    ProcessCreateAccessOrPolicy,
+    ProcessCreateImageOrElevation,
+    ProcessCreateParameter,
+    ProcessCreateProfileOrLogon,
+    ProcessCreateResource,
+    ProcessCreateOther,
+    EnvironmentBlockFailed,
+    ChildCleanupFailed
+}
+
+public enum SubscriptionQuotaCacheStatus
+{
+    NotAttempted,
+    Success,
+    NoRows,
+    NoMarker,
+    Conflict,
+    Malformed,
+    SubIdMismatch,
+    MissingSubscriptionBinding
+}
+
+public sealed class ProfileQuotaRemarkRow
+{
+    public string? Subid { get; set; }
+    public string? Remarks { get; set; }
 }
 
 public sealed record SubscriptionQuotaSnapshot(
@@ -60,7 +87,21 @@ public sealed record SubscriptionQuotaSnapshot(
 public sealed record SubscriptionQuotaResult(
     SubscriptionQuotaStatusCode Status,
     SubscriptionQuotaSnapshot? Snapshot = null,
-    SubscriptionQuotaDiagnosticCode Diagnostic = SubscriptionQuotaDiagnosticCode.None)
+    SubscriptionQuotaDiagnosticCode Diagnostic = SubscriptionQuotaDiagnosticCode.None,
+    int NativeErrorCode = 0)
 {
     public bool IsSuccess => Status == SubscriptionQuotaStatusCode.Success && Snapshot is not null;
 }
+
+public sealed record SubscriptionQuotaCacheResult(
+    SubscriptionQuotaCacheStatus Status,
+    SubscriptionQuotaResult? Quota = null)
+{
+    public bool IsSuccess => Status == SubscriptionQuotaCacheStatus.Success && Quota?.IsSuccess == true;
+}
+
+public sealed record SubscriptionQuotaResolution(
+    SubscriptionQuotaResult DisplayResult,
+    SubscriptionQuotaResult LiveResult,
+    SubscriptionQuotaCacheStatus CacheStatus,
+    SubscriptionQuotaResult? AccountResult = null);

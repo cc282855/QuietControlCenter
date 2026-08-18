@@ -679,21 +679,8 @@ public sealed class AppManager
             _config.CoreBasicItem.EnableAutoCoreSelection);
     }
 
-    public async Task<List<string?>> ProfileQuotaRemarks(string subid, int maximumRows)
-    {
-        if (subid.IsNullOrEmpty() || maximumRows is <= 0 or > 4097)
-        {
-            return [];
-        }
-        var rows = await SQLiteHelper.Instance.QueryAsync<ProfileQuotaRemark>(
-            "select Remarks from ProfileItem where Subid = ? limit ?", subid, maximumRows);
-        return rows.Select(row => row.Remarks).ToList();
-    }
-
-    private sealed class ProfileQuotaRemark
-    {
-        public string? Remarks { get; set; }
-    }
+    public Task<IReadOnlyList<ProfileQuotaRemarkRow>> ProfileQuotaRemarks(string subid, int maximumRows)
+        => SQLiteHelper.Instance.QuerySubscriptionQuotaRemarksAsync(subid, maximumRows);
 
     public static ECoreType SelectCoreType(
         ProfileItem? profileItem,

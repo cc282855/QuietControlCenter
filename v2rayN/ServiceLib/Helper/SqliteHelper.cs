@@ -78,6 +78,11 @@ public sealed class SQLiteHelper
         return _dbAsync.Table<T>();
     }
 
+    public Task<IReadOnlyList<ProfileQuotaRemarkRow>> QuerySubscriptionQuotaRemarksAsync(
+        string subId,
+        int maximumRows)
+        => SubscriptionQuotaRemarkRepository.QueryAsync(_dbAsync, subId, maximumRows);
+
     public async Task DisposeDbConnectionAsync()
     {
         await Task.Factory.StartNew(() =>

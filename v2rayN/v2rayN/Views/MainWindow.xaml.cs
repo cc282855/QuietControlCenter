@@ -25,6 +25,7 @@ public partial class MainWindow
     private readonly ProxyPingClient _livePingClient;
     private readonly ConnectionQualityMonitor _connectionQualityMonitor;
     private readonly SubscriptionQuotaService _subscriptionQuotaService = new();
+    private readonly SubscriptionQuotaCoordinator _subscriptionQuotaCoordinator = new();
     private readonly AuthHostClient _authHostClient = new();
     private readonly SemaphoreSlim _subscriptionQuotaSingleFlight = new(1, 1);
     private Task? _quietUpdateLoop;
@@ -32,6 +33,7 @@ public partial class MainWindow
     private CancellationTokenSource? _subscriptionQuotaRequestCancellation;
     private Task? _subscriptionQuotaRefreshTask;
     private SubscriptionQuotaResult? _subscriptionQuotaResult;
+    private SubscriptionQuotaResolution? _subscriptionQuotaResolution;
     private DateTimeOffset? _subscriptionQuotaLastCompletedUtc;
     private string _subscriptionQuotaProfileId = string.Empty;
     private string _subscriptionQuotaSubId = string.Empty;
@@ -901,7 +903,9 @@ public partial class MainWindow
     {
         var capturedSubId = _subscriptionQuotaSubId;
         if (capturedSubId.Length == 0) return;
-        if (_subscriptionQuotaResult?.Status is SubscriptionQuotaStatusCode.MissingOfficialUrl
+        var actionStatus = _subscriptionQuotaResolution?.AccountResult?.Status
+                           ?? _subscriptionQuotaResult?.Status;
+        if (actionStatus is SubscriptionQuotaStatusCode.MissingOfficialUrl
             or SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
         {
             var active = await AppManager.Instance.GetProfileItem(_config.IndexId);
@@ -1011,6 +1015,7 @@ public partial class MainWindow
             _subscriptionQuotaProfileId = currentProfileId;
             _subscriptionQuotaSubId = string.Empty;
             _subscriptionQuotaResult = null;
+            _subscriptionQuotaResolution = null;
             _subscriptionQuotaLastCompletedUtc = null;
             RenderSubscriptionQuota(DateTimeOffset.UtcNow);
             ScheduleSubscriptionQuotaRefresh(force: true);
@@ -1059,6 +1064,7 @@ public partial class MainWindow
             _subscriptionQuotaProfileId = currentProfileId;
             _subscriptionQuotaSubId = string.Empty;
             _subscriptionQuotaResult = null;
+            _subscriptionQuotaResolution = null;
             _subscriptionQuotaLastCompletedUtc = null;
             force = true;
         }
@@ -1130,41 +1136,48 @@ public partial class MainWindow
             {
                 return;
             }
-            if (subscription is null || !subscription.Enabled || string.IsNullOrWhiteSpace(subscription.Url))
-            {
-                await ApplySubscriptionQuotaResultAsync(
-                    profileId,
-                    subId,
-                    generation,
-                    new(SubscriptionQuotaStatusCode.InvalidRequest));
-                return;
-            }
+            var liveResult = subscription is null || !subscription.Enabled || string.IsNullOrWhiteSpace(subscription.Url)
+                ? new(SubscriptionQuotaStatusCode.InvalidRequest)
+                : await _subscriptionQuotaService.FetchAsync(
+                    subscription.Url,
+                    useLocalSocksProxy: true,
+                    AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
+                    subscription.UserAgent,
+                    requestCancellation.Token);
 
-            var result = await _subscriptionQuotaService.FetchAsync(
-                subscription.Url,
-                useLocalSocksProxy: true,
-                AppManager.Instance.GetLocalPort(EInboundProtocol.socks),
-                subscription.UserAgent,
-                requestCancellation.Token);
-            if (result.Status is SubscriptionQuotaStatusCode.Unsupported
-                or SubscriptionQuotaStatusCode.LoginRequired)
-            {
-                var remarks = await AppManager.Instance.ProfileQuotaRemarks(
-                    subId, SubscriptionQuotaParser.MaxImportedRemarkCount + 1);
-                // This is the cache observation time. The imported content's exact generation time is unknown.
-                result = SubscriptionQuotaParser.ParseImportedRemarks(remarks, DateTimeOffset.UtcNow);
-                if (!result.IsSuccess)
+            var resolution = await _subscriptionQuotaCoordinator.ResolveAsync(
+                liveResult,
+                subId,
+                async cancellationToken =>
                 {
-                    if (SubscriptionOfficialUrlParser.Normalize(subscription.OfficialUrl) is null)
-                        result = new(SubscriptionQuotaStatusCode.MissingOfficialUrl);
-                    else if (!IsTrustedOfficialOrigin(subscription))
-                        result = new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired);
-                    else
-                        result = await _authHostClient.QuerySessionAsync(subId, subscription.OfficialUrl,
-                            AppManager.Instance.GetLocalPort(EInboundProtocol.socks), requestCancellation.Token);
-                }
-            }
-            await ApplySubscriptionQuotaResultAsync(profileId, subId, generation, result);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return await AppManager.Instance.ProfileQuotaRemarks(
+                        subId, SubscriptionQuotaParser.MaxImportedRemarkCount + 1);
+                },
+                async cancellationToken =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var current = await AppManager.Instance.GetProfileItem(profileId);
+                    return generation == _subscriptionQuotaGeneration
+                           && string.Equals(profileId, _config.IndexId, StringComparison.Ordinal)
+                           && string.Equals(current?.Subid, subId, StringComparison.Ordinal);
+                },
+                subscription is null
+                    ? null
+                    : async cancellationToken =>
+                    {
+                        if (SubscriptionOfficialUrlParser.Normalize(subscription.OfficialUrl) is null)
+                            return new(SubscriptionQuotaStatusCode.MissingOfficialUrl);
+                        if (!IsTrustedOfficialOrigin(subscription))
+                            return new(SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired);
+                        return await _authHostClient.QuerySessionAsync(
+                            subId, subscription.OfficialUrl,
+                            AppManager.Instance.GetLocalPort(EInboundProtocol.socks), cancellationToken);
+                    },
+                requestCancellation.Token);
+
+            await ApplySubscriptionQuotaResultAsync(
+                profileId, subId, generation, resolution.DisplayResult, resolution);
         }
         catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
         {
@@ -1201,7 +1214,8 @@ public partial class MainWindow
         string profileId,
         string subId,
         long generation,
-        SubscriptionQuotaResult result)
+        SubscriptionQuotaResult result,
+        SubscriptionQuotaResolution? resolution = null)
     {
         await Dispatcher.InvokeAsync(() =>
         {
@@ -1213,6 +1227,7 @@ public partial class MainWindow
             }
             _subscriptionQuotaSubId = subId;
             _subscriptionQuotaResult = result;
+            _subscriptionQuotaResolution = resolution;
             _subscriptionQuotaLastCompletedUtc = DateTimeOffset.UtcNow;
             RenderSubscriptionQuota(DateTimeOffset.UtcNow);
             RaiseSubscriptionQuotaLiveRegionChanged();
@@ -1275,8 +1290,62 @@ public partial class MainWindow
                 : "等待安全代理查询";
             return;
         }
-        RenderSubscriptionQuotaResult(_subscriptionQuotaResult, now);
+        if (!TryRenderSubscriptionQuotaResolution(now))
+            RenderSubscriptionQuotaResult(_subscriptionQuotaResult, now);
     }
+
+    private bool TryRenderSubscriptionQuotaResolution(DateTimeOffset now)
+    {
+        var resolution = _subscriptionQuotaResolution;
+        if (resolution is null || resolution.DisplayResult.IsSuccess
+            || resolution.CacheStatus == SubscriptionQuotaCacheStatus.NotAttempted)
+            return false;
+
+        txtSubscriptionQuotaPrimary.Foreground = (Brush)FindResource("QccText");
+        txtSubscriptionQuotaPrimary.Text = resolution.CacheStatus switch
+        {
+            SubscriptionQuotaCacheStatus.NoRows => "当前订阅没有已导入连接",
+            SubscriptionQuotaCacheStatus.NoMarker => "连接名称中没有可识别余量",
+            SubscriptionQuotaCacheStatus.Conflict => "连接名称中的余量互相冲突",
+            SubscriptionQuotaCacheStatus.Malformed => "连接名称中的余量格式无效",
+            SubscriptionQuotaCacheStatus.SubIdMismatch => "当前连接已切换，请重新刷新",
+            SubscriptionQuotaCacheStatus.MissingSubscriptionBinding => "当前连接未绑定订阅",
+            _ => SubscriptionQuotaService.GetFixedChineseMessage(resolution.LiveResult.Status)
+        };
+
+        var account = resolution.AccountResult;
+        txtSubscriptionQuotaSecondary.Text = account is null
+            ? $"实时查询：{SubscriptionQuotaService.GetFixedChineseMessage(resolution.LiveResult.Status)}"
+            : $"账号查询：{GetSubscriptionQuotaSecondaryMessage(account)}";
+
+        if (account?.Status is SubscriptionQuotaStatusCode.MissingOfficialUrl)
+        {
+            btnSubscriptionQuotaAction.Content = "添加网址";
+            btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+        }
+        else if (account?.Status is SubscriptionQuotaStatusCode.OfficialUrlConfirmationRequired)
+        {
+            btnSubscriptionQuotaAction.Content = "确认官方网址";
+            btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+        }
+        else if (account?.Status is SubscriptionQuotaStatusCode.LoginRequired)
+        {
+            btnSubscriptionQuotaAction.Content = "打开并登录";
+            btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+        }
+        else if (account is not null && !account.IsSuccess)
+        {
+            btnSubscriptionQuotaAction.Content = "重试登录";
+            btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
+        }
+
+        return true;
+    }
+
+    private static string GetSubscriptionQuotaSecondaryMessage(SubscriptionQuotaResult result)
+        => result.Status == SubscriptionQuotaStatusCode.AuthHostStartFailed
+            ? GetAuthHostStartFailureMessage(result.Diagnostic, result.NativeErrorCode)
+            : SubscriptionQuotaService.GetFixedChineseMessage(result.Status);
 
     private void RenderSubscriptionQuotaResult(SubscriptionQuotaResult result, DateTimeOffset now)
     {
@@ -1336,7 +1405,8 @@ public partial class MainWindow
             else if (result.Status == SubscriptionQuotaStatusCode.AuthHostStartFailed)
             {
                 txtSubscriptionQuotaPrimary.Text = "安全登录组件无法启动";
-                txtSubscriptionQuotaSecondary.Text = GetAuthHostStartFailureMessage(result.Diagnostic);
+                txtSubscriptionQuotaSecondary.Text = GetAuthHostStartFailureMessage(
+                    result.Diagnostic, result.NativeErrorCode);
                 btnSubscriptionQuotaAction.Content = "重试登录";
                 btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
             }
@@ -1418,7 +1488,9 @@ public partial class MainWindow
         }
     }
 
-    private static string GetAuthHostStartFailureMessage(SubscriptionQuotaDiagnosticCode diagnostic)
+    private static string GetAuthHostStartFailureMessage(
+        SubscriptionQuotaDiagnosticCode diagnostic,
+        int nativeErrorCode = 0)
         => diagnostic switch
         {
             SubscriptionQuotaDiagnosticCode.TicketDirectoryFailed => "登录临时目录不可用（阶段 A01）",
@@ -1428,11 +1500,31 @@ public partial class MainWindow
             SubscriptionQuotaDiagnosticCode.PipeCreationFailed => "登录通信通道创建失败（阶段 A05）",
             SubscriptionQuotaDiagnosticCode.InteractiveShellUnavailable => "未找到当前桌面会话（阶段 A06）",
             SubscriptionQuotaDiagnosticCode.ShellTokenUnavailable => "无法取得普通权限桌面令牌（阶段 A07）",
-            SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed => "普通权限登录窗口创建失败（阶段 A08）",
+            SubscriptionQuotaDiagnosticCode.MediumProcessCreateFailed => "普通权限登录窗口创建失败（阶段 A08-P00）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreatePrivilege =>
+                $"普通权限登录窗口创建失败（阶段 A08-P01{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateAccessOrPolicy =>
+                $"普通权限登录窗口创建失败（阶段 A08-P02{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateImageOrElevation =>
+                $"普通权限登录窗口创建失败（阶段 A08-P03{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateParameter =>
+                $"普通权限登录窗口创建失败（阶段 A08-P04{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateProfileOrLogon or SubscriptionQuotaDiagnosticCode.EnvironmentBlockFailed =>
+                $"普通权限登录环境创建失败（阶段 A08-P05{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateResource =>
+                $"普通权限登录窗口创建失败（阶段 A08-P06{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.ProcessCreateOther =>
+                nativeErrorCode > 0
+                    ? $"普通权限登录窗口创建失败（阶段 A08-P00{FormatNativeError(nativeErrorCode)}）"
+                    : "普通权限登录窗口创建失败（阶段 A08-P00/W-MIXED）",
             SubscriptionQuotaDiagnosticCode.ChildExitedEarly => "登录窗口启动后立即退出（阶段 A09）",
             SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed => "登录窗口身份校验失败（阶段 A10）",
+            SubscriptionQuotaDiagnosticCode.ChildCleanupFailed => "登录窗口清理失败（阶段 A11）",
             _ => "登录组件在建立通信前失败（阶段 A00）"
         };
+
+    private static string FormatNativeError(int nativeErrorCode)
+        => nativeErrorCode > 0 ? $"/W{nativeErrorCode}" : string.Empty;
 
     private static string FormatSubscriptionQuotaBytes(ulong bytes)
     {

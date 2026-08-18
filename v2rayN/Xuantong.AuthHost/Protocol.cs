@@ -149,7 +149,7 @@ internal sealed class AuthPipeConnection : IAsyncDisposable
         {
             var pipe = new NamedPipeClientStream(
                 ".", ticket.PipeName, PipeDirection.InOut,
-                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                PipeOptions.Asynchronous);
             await pipe.ConnectAsync(cancellationToken);
             if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var serverPid)
                 || !AuthBounds.IsExpectedPeer(serverPid, ticket.ParentPid))

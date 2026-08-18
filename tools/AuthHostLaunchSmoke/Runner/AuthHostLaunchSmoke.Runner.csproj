@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AssemblyName>AuthHostLaunchSmoke.Runner</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Reference Include="ServiceLib">
+      <HintPath>..\..\..\v2rayN\ServiceLib\bin\Debug\net10.0\ServiceLib.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Compile Include="..\..\..\v2rayN\v2rayN\Services\AuthHostClient.cs" Link="AuthHostClient.cs" />
+    <Compile Include="..\..\..\v2rayN\Xuantong.AuthHost\AuthSecurityPrimitives.cs" Link="AuthSecurityPrimitives.cs" />
+    <Compile Include="..\..\..\v2rayN\Xuantong.AuthHost\ProtocolUriPolicy.cs" Link="ProtocolUriPolicy.cs" />
+  </ItemGroup>
+</Project>

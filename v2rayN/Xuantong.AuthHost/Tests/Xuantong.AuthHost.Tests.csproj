@@ -9,5 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>
     <PackageReference Include="xunit.v3" />
     <ProjectReference Include="..\Xuantong.AuthHost.csproj" />
+    <ProjectReference Include="..\..\ServiceLib\ServiceLib.csproj" />
+    <Compile Include="..\..\v2rayN\Services\AuthHostClient.cs" Link="AuthHostClient.cs" />
   </ItemGroup>
 </Project>
