@@ -54,7 +54,15 @@ public enum SubscriptionQuotaDiagnosticCode
     ProcessCreateResource,
     ProcessCreateOther,
     EnvironmentBlockFailed,
-    ChildCleanupFailed
+    ChildCleanupFailed,
+    ChildExitedBeforeConnection,
+    PipeConnectionFailed,
+    PipePeerValidationFailed,
+    ResponseReadFailed,
+    ResponseValidationFailed,
+    AckWriteFailed,
+    CommitReadFailed,
+    CommitValidationFailed
 }
 
 public enum SubscriptionQuotaCacheStatus

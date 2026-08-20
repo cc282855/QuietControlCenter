@@ -1210,6 +1210,18 @@ public sealed class QuietUiStaticTests
         Assert.Contains("TryLaunchMediumAsync", client, StringComparison.Ordinal);
         Assert.Contains("TicketDirectoryFailed", client, StringComparison.Ordinal);
         Assert.Contains("PipeCreationFailed", client, StringComparison.Ordinal);
+        foreach (var stage in new[]
+                 {
+                     "ChildExitedBeforeConnection", "PipeConnectionFailed", "PipePeerValidationFailed",
+                     "ResponseReadFailed", "ResponseValidationFailed", "AckWriteFailed",
+                     "CommitReadFailed", "CommitValidationFailed"
+                 })
+        {
+            Assert.Contains(stage, client, StringComparison.Ordinal);
+        }
+        Assert.Contains("\"AuthHostUnavailable\" => SubscriptionQuotaStatusCode.AuthHostUnavailable", client,
+            StringComparison.Ordinal);
+        Assert.Contains("SubscriptionQuotaDiagnosticCode.ChildCleanupFailed", client, StringComparison.Ordinal);
         Assert.DoesNotContain("ex.Message", client, StringComparison.Ordinal);
         Assert.Contains("--proxy-server=", uriPolicy, StringComparison.Ordinal);
         Assert.Contains("socks5://127.0.0.1", uriPolicy, StringComparison.Ordinal);
@@ -1222,6 +1234,12 @@ public sealed class QuietUiStaticTests
         Assert.Contains("AreHostObjectsAllowed = false", browser, StringComparison.Ordinal);
         Assert.Contains("e.Cancel = true", browser, StringComparison.Ordinal);
         Assert.Contains("AuthenticatedUnsupported", browser, StringComparison.Ordinal);
+        Assert.Contains("case \"LoginRequired\":", browser, StringComparison.Ordinal);
+        Assert.Contains("case \"NetworkError\":", browser, StringComparison.Ordinal);
+        Assert.Contains("case \"HttpError\":", browser, StringComparison.Ordinal);
+        Assert.Contains("case \"BodyTooLarge\":", browser, StringComparison.Ordinal);
+        Assert.DoesNotContain("Complete(new(\"NetworkError\"))", browser, StringComparison.Ordinal);
+        Assert.DoesNotContain("Complete(result);\n        }\n        catch", browser, StringComparison.Ordinal);
         Assert.Contains("SessionStore.PrepareAsync", browser, StringComparison.Ordinal);
         Assert.DoesNotContain("SessionStore.SaveAsync", browser, StringComparison.Ordinal);
         Assert.Contains("CommitPendingSessionAsync", hostApp, StringComparison.Ordinal);
@@ -1249,6 +1267,32 @@ public sealed class QuietUiStaticTests
         Assert.Contains("item.OfficialUrlTrustedOrigin = subItem.OfficialUrlTrustedOrigin", configHandler, StringComparison.Ordinal);
         Assert.Contains("item.OfficialUrlTrustVersion = subItem.OfficialUrlTrustVersion", configHandler, StringComparison.Ordinal);
         Assert.DoesNotContain("SQLite", sessions, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ManualSubscriptionAuthentication_IsSingleFlightAndBlocksAutomaticRefresh()
+    {
+        var root = FindProjectRoot();
+        var main = File.ReadAllText(Path.Combine(root, "v2rayN", "v2rayN", "Views", "MainWindow.xaml.cs"));
+        var smoke = File.ReadAllText(Path.Combine(root, "tools", "AuthHostLaunchSmoke", "Runner", "Program.cs"));
+
+        Assert.Contains("Interlocked.CompareExchange(ref _subscriptionQuotaManualAuthBusy, 1, 0)", main,
+            StringComparison.Ordinal);
+        Assert.Contains("Volatile.Read(ref _subscriptionQuotaManualAuthBusy) != 0", main,
+            StringComparison.Ordinal);
+        Assert.Contains("CancelSubscriptionQuotaRequest(bool includeManualAuth = false)", main,
+            StringComparison.Ordinal);
+        Assert.Contains("btnSubscriptionQuotaRefresh.IsEnabled = !manualAuthBusy", main,
+            StringComparison.Ordinal);
+        Assert.Contains("btnSubscriptionQuotaAction.IsEnabled = !manualAuthBusy", main,
+            StringComparison.Ordinal);
+        Assert.Contains("btnSubscriptionQuotaClear.IsEnabled = !manualAuthBusy", main,
+            StringComparison.Ordinal);
+        Assert.Contains("正在打开安全登录…", main, StringComparison.Ordinal);
+        Assert.Contains("status = precheckMatched ? \"PRECHECK_ONLY\" : \"FAIL\"", smoke,
+            StringComparison.Ordinal);
+        Assert.Contains("verifiedLoginFlow = false", smoke, StringComparison.Ordinal);
+        Assert.DoesNotContain("status = actualPassed ? \"PASS\"", smoke, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

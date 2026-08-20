@@ -178,13 +178,37 @@ public partial class LoginWindow : Window
             if (_aborted || !_ownerAlive())
             {
                 RollbackPendingSession();
+                Complete(new("Cancelled"));
                 return;
             }
-            Complete(result);
+            switch (result.Status)
+            {
+                case "LoginRequired":
+                    SetStatus("尚未完成登录，请继续登录后重试。");
+                    break;
+                case "NetworkError":
+                    SetStatus("网络查询失败，请检查网络后重试。");
+                    break;
+                case "HttpError":
+                    SetStatus("官网暂时无法完成查询，请稍后重试。");
+                    break;
+                case "BodyTooLarge":
+                    SetStatus("官网返回内容超出安全限制，请稍后重试。");
+                    break;
+                default:
+                    Complete(result);
+                    break;
+            }
         }
         catch
         {
-            Complete(new("NetworkError"));
+            if (!_aborted && _ownerAlive())
+                SetStatus("网络查询失败，请检查网络后重试。");
+            else
+            {
+                RollbackPendingSession();
+                Complete(new("Cancelled"));
+            }
         }
         finally
         {

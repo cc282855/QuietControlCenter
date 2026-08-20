@@ -39,6 +39,7 @@ public partial class MainWindow
     private string _subscriptionQuotaSubId = string.Empty;
     private long _subscriptionQuotaGeneration;
     private bool _subscriptionQuotaAllowsStoppedCore;
+    private int _subscriptionQuotaManualAuthBusy;
     private double _responsiveFontScale = -1;
     private int _liveMetricsTickRunning;
     private readonly DispatcherTimer _sidebarNoticeTimer = new();
@@ -442,7 +443,7 @@ public partial class MainWindow
     private async void Current_SessionEnding(object sender, SessionEndingCancelEventArgs e)
     {
         _quietUpdateCancellation.Cancel();
-        CancelSubscriptionQuotaRequest();
+        CancelSubscriptionQuotaRequest(includeManualAuth: true);
         StopLiveMetrics();
         Logging.SaveLog("Current_SessionEnding");
         StorageUI();
@@ -452,7 +453,7 @@ public partial class MainWindow
     private void Shutdown(bool obj)
     {
         _quietUpdateCancellation.Cancel();
-        CancelSubscriptionQuotaRequest();
+        CancelSubscriptionQuotaRequest(includeManualAuth: true);
         StopLiveMetrics();
         Application.Current.Shutdown();
     }
@@ -755,7 +756,7 @@ public partial class MainWindow
             {
                 StorageUI();
                 _quietUpdateCancellation.Cancel();
-                CancelSubscriptionQuotaRequest();
+                CancelSubscriptionQuotaRequest(includeManualAuth: true);
                 StopLiveMetrics();
                 Application.Current.Shutdown();
             }
@@ -861,7 +862,7 @@ public partial class MainWindow
         finally
         {
             _quietUpdateCancellation.Cancel();
-            CancelSubscriptionQuotaRequest();
+            CancelSubscriptionQuotaRequest(includeManualAuth: true);
             StopLiveMetrics();
             Application.Current.Shutdown();
         }
@@ -928,7 +929,8 @@ public partial class MainWindow
     private void StartSubscriptionAuth(string capturedSubId, bool clear)
     {
         if (capturedSubId.Length == 0 || (!clear && !CoreManager.Instance.IsRunning)) return;
-        CancelSubscriptionQuotaRequest();
+        if (Interlocked.CompareExchange(ref _subscriptionQuotaManualAuthBusy, 1, 0) != 0) return;
+        CancelSubscriptionQuotaRequest(includeManualAuth: true);
         var profileId = _config.IndexId ?? string.Empty;
         var generation = ++_subscriptionQuotaGeneration;
         var requestCancellation = new CancellationTokenSource();
@@ -989,6 +991,7 @@ public partial class MainWindow
                 _subscriptionQuotaRefreshTask = null;
                 _subscriptionQuotaAllowsStoppedCore = false;
             }
+            Interlocked.Exchange(ref _subscriptionQuotaManualAuthBusy, 0);
             requestCancellation.Dispose();
             if (shouldRender && !Dispatcher.HasShutdownStarted)
                 await Dispatcher.InvokeAsync(() =>
@@ -1003,6 +1006,12 @@ public partial class MainWindow
     private void UpdateSubscriptionQuotaAgeAndSchedule()
     {
         if (_subscriptionQuotaQaMode)
+        {
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
+            return;
+        }
+
+        if (Volatile.Read(ref _subscriptionQuotaManualAuthBusy) != 0)
         {
             RenderSubscriptionQuota(DateTimeOffset.UtcNow);
             return;
@@ -1042,6 +1051,12 @@ public partial class MainWindow
     {
         if (_subscriptionQuotaQaMode)
         {
+            return;
+        }
+
+        if (Volatile.Read(ref _subscriptionQuotaManualAuthBusy) != 0)
+        {
+            RenderSubscriptionQuota(DateTimeOffset.UtcNow);
             return;
         }
 
@@ -1234,8 +1249,9 @@ public partial class MainWindow
         });
     }
 
-    private void CancelSubscriptionQuotaRequest()
+    private void CancelSubscriptionQuotaRequest(bool includeManualAuth = false)
     {
+        if (!includeManualAuth && Volatile.Read(ref _subscriptionQuotaManualAuthBusy) != 0) return;
         _subscriptionQuotaGeneration++;
         var cancellation = _subscriptionQuotaRequestCancellation;
         if (cancellation is not null && !cancellation.IsCancellationRequested)
@@ -1246,7 +1262,11 @@ public partial class MainWindow
 
     private void RenderSubscriptionQuota(DateTimeOffset now)
     {
-        btnSubscriptionQuotaRefresh.IsEnabled = _subscriptionQuotaRefreshTask is not { IsCompleted: false };
+        var manualAuthBusy = Volatile.Read(ref _subscriptionQuotaManualAuthBusy) != 0;
+        btnSubscriptionQuotaRefresh.IsEnabled = !manualAuthBusy
+            && _subscriptionQuotaRefreshTask is not { IsCompleted: false };
+        btnSubscriptionQuotaAction.IsEnabled = !manualAuthBusy;
+        btnSubscriptionQuotaClear.IsEnabled = !manualAuthBusy;
         btnSubscriptionQuotaAction.Visibility = Visibility.Collapsed;
         btnSubscriptionQuotaClear.Visibility = Visibility.Collapsed;
         borderSubscriptionQuotaSource.Visibility = Visibility.Collapsed;
@@ -1262,6 +1282,12 @@ public partial class MainWindow
                 txtSubscriptionQuotaPrimary.Text = "QA 样例待加载";
                 txtSubscriptionQuotaSecondary.Text = "不读取配置或网络";
             }
+            return;
+        }
+        if (manualAuthBusy)
+        {
+            txtSubscriptionQuotaPrimary.Text = "正在打开安全登录…";
+            txtSubscriptionQuotaSecondary.Text = "请在安全登录窗口完成登录并点击查询";
             return;
         }
         if (string.IsNullOrEmpty(_config.IndexId))
@@ -1345,6 +1371,8 @@ public partial class MainWindow
     private static string GetSubscriptionQuotaSecondaryMessage(SubscriptionQuotaResult result)
         => result.Status == SubscriptionQuotaStatusCode.AuthHostStartFailed
             ? GetAuthHostStartFailureMessage(result.Diagnostic, result.NativeErrorCode)
+            : result.Status == SubscriptionQuotaStatusCode.AuthHostCommunicationFailed
+                ? GetAuthHostCommunicationFailureMessage(result.Diagnostic, result.NativeErrorCode)
             : SubscriptionQuotaService.GetFixedChineseMessage(result.Status);
 
     private void RenderSubscriptionQuotaResult(SubscriptionQuotaResult result, DateTimeOffset now)
@@ -1413,7 +1441,8 @@ public partial class MainWindow
             else if (result.Status == SubscriptionQuotaStatusCode.AuthHostCommunicationFailed)
             {
                 txtSubscriptionQuotaPrimary.Text = "安全登录连接失败";
-                txtSubscriptionQuotaSecondary.Text = "请关闭残留的登录窗口或冲突程序后重试";
+                txtSubscriptionQuotaSecondary.Text = GetAuthHostCommunicationFailureMessage(
+                    result.Diagnostic, result.NativeErrorCode);
                 btnSubscriptionQuotaAction.Content = "重新连接";
                 btnSubscriptionQuotaAction.Visibility = Visibility.Visible;
             }
@@ -1521,6 +1550,24 @@ public partial class MainWindow
             SubscriptionQuotaDiagnosticCode.ChildIdentityValidationFailed => "登录窗口身份校验失败（阶段 A10）",
             SubscriptionQuotaDiagnosticCode.ChildCleanupFailed => "登录窗口清理失败（阶段 A11）",
             _ => "登录组件在建立通信前失败（阶段 A00）"
+        };
+
+    private static string GetAuthHostCommunicationFailureMessage(
+        SubscriptionQuotaDiagnosticCode diagnostic,
+        int nativeErrorCode = 0)
+        => diagnostic switch
+        {
+            SubscriptionQuotaDiagnosticCode.ChildExitedBeforeConnection =>
+                $"登录窗口在连接前退出（阶段 C01{FormatNativeError(nativeErrorCode)}）",
+            SubscriptionQuotaDiagnosticCode.PipeConnectionFailed => "登录通信通道连接失败（阶段 C02）",
+            SubscriptionQuotaDiagnosticCode.PipePeerValidationFailed => "登录通信对象校验失败（阶段 C03）",
+            SubscriptionQuotaDiagnosticCode.ResponseReadFailed => "登录结果读取失败（阶段 C04）",
+            SubscriptionQuotaDiagnosticCode.ResponseValidationFailed => "登录结果校验失败（阶段 C05）",
+            SubscriptionQuotaDiagnosticCode.AckWriteFailed => "登录确认写入失败（阶段 C06）",
+            SubscriptionQuotaDiagnosticCode.CommitReadFailed => "登录保存结果读取失败（阶段 C07）",
+            SubscriptionQuotaDiagnosticCode.CommitValidationFailed => "登录保存结果校验失败（阶段 C08）",
+            SubscriptionQuotaDiagnosticCode.ChildCleanupFailed => "登录窗口清理失败（阶段 C09）",
+            _ => "请关闭残留的登录窗口或冲突程序后重试"
         };
 
     private static string FormatNativeError(int nativeErrorCode)

@@ -15,15 +15,16 @@ if (actualEvidencePath is not null)
     using var actualTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
     var actualResult = await new AuthHostClient().QuerySessionAsync(
         "qcc-synthetic-auth-smoke", "https://example.com/", 10808, actualTimeout.Token);
-    var actualPassed = actualResult.Status == ServiceLib.Models.Dto.SubscriptionQuotaStatusCode.LoginRequired;
+    var precheckMatched = actualResult.Status == ServiceLib.Models.Dto.SubscriptionQuotaStatusCode.LoginRequired;
     await WriteEvidenceAsync(actualEvidencePath, new
     {
-        status = actualPassed ? "PASS" : "FAIL",
+        status = precheckMatched ? "PRECHECK_ONLY" : "FAIL",
+        verifiedLoginFlow = false,
         result = actualResult.Status.ToString(),
         diagnostic = actualResult.Diagnostic.ToString(),
         nativeErrorCode = actualResult.NativeErrorCode
     });
-    return actualPassed ? 0 : 20;
+    return precheckMatched ? 21 : 20;
 }
 
 var probePath = ValueAfter(arguments, "--probe");

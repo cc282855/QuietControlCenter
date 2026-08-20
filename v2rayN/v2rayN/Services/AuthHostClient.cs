@@ -111,6 +111,7 @@ internal sealed class AuthHostClient
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             linked.CancelAfter(InteractionTimeout);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.PipeConnectionFailed;
             var connectTask = pipe.WaitForConnectionAsync(linked.Token);
             var exitTask = owned.Process.WaitForExitAsync(CancellationToken.None);
             if (await Task.WhenAny(connectTask, exitTask) != connectTask)
@@ -123,14 +124,17 @@ internal sealed class AuthHostClient
                 }
                 catch { }
                 return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null,
-                    SubscriptionQuotaDiagnosticCode.None, exitCode);
+                    SubscriptionQuotaDiagnosticCode.ChildExitedBeforeConnection, exitCode);
             }
             await connectTask;
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.PipePeerValidationFailed;
             if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var actualClientPid)
                 || !AuthBounds.IsExpectedPeer(actualClientPid, owned.Pid))
-                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null, failureDiagnostic);
 
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.ResponseReadFailed;
             var envelope = await ReadFrameAsync<AuthEnvelope>(pipe, linked.Token);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.ResponseValidationFailed;
             if (envelope is null
                 || envelope.Protocol != Protocol
                 || envelope.HelperPid != owned.Pid
@@ -138,10 +142,13 @@ internal sealed class AuthHostClient
                 || !CryptographicOperations.FixedTimeEquals(
                     Encoding.UTF8.GetBytes(envelope.Nonce ?? string.Empty), Encoding.UTF8.GetBytes(nonce))
                 || !TryMapResponse(envelope.Response, out var mapped))
-                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null, failureDiagnostic);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.AckWriteFailed;
             await WriteFrameAsync(pipe,
                 new AuthAck(Protocol, nonce, operation, envelope.Response.Status), linked.Token);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.CommitReadFailed;
             var commit = await ReadFrameAsync<AuthCommitEnvelope>(pipe, linked.Token);
+            failureDiagnostic = SubscriptionQuotaDiagnosticCode.CommitValidationFailed;
             if (commit is null || commit.Protocol != Protocol
                 || commit.Nonce.Length != nonce.Length
                 || !CryptographicOperations.FixedTimeEquals(
@@ -150,7 +157,7 @@ internal sealed class AuthHostClient
                 || (commit.Status == "Committed"
                     && (operation != "login-query"
                         || envelope.Response.Status is not ("Success" or "AuthenticatedUnsupported"))))
-                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed);
+                return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null, failureDiagnostic);
             return mapped;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -161,7 +168,7 @@ internal sealed class AuthHostClient
         {
             return failureStatus == SubscriptionQuotaStatusCode.AuthHostStartFailed
                 ? new(failureStatus, null, failureDiagnostic)
-                : new(failureStatus);
+                : new(failureStatus, null, failureDiagnostic);
         }
         finally
         {
@@ -198,6 +205,9 @@ internal sealed class AuthHostClient
     private static SubscriptionQuotaResult MapResponse(AuthResponse? response)
     {
         if (response is null) return new(SubscriptionQuotaStatusCode.AuthHostUnavailable);
+        if (response.Status == "CleanupFailed")
+            return new(SubscriptionQuotaStatusCode.AuthHostCommunicationFailed, null,
+                SubscriptionQuotaDiagnosticCode.ChildCleanupFailed);
         if (response.Status == "Success" && response.TotalBytes.HasValue
             && response.UploadBytes <= response.TotalBytes.Value
             && response.DownloadBytes <= response.TotalBytes.Value - response.UploadBytes
@@ -217,6 +227,7 @@ internal sealed class AuthHostClient
             "LoginRequired" => SubscriptionQuotaStatusCode.LoginRequired,
             "AuthenticatedUnsupported" => SubscriptionQuotaStatusCode.AuthenticatedUnsupported,
             "WebView2RuntimeMissing" => SubscriptionQuotaStatusCode.WebView2RuntimeMissing,
+            "AuthHostUnavailable" => SubscriptionQuotaStatusCode.AuthHostUnavailable,
             "ProxyUnavailable" => SubscriptionQuotaStatusCode.ProxyUnavailable,
             "NetworkError" => SubscriptionQuotaStatusCode.NetworkError,
             "BodyTooLarge" => SubscriptionQuotaStatusCode.BodyTooLarge,
