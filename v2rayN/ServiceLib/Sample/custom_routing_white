@@ -1,12 +1,5 @@
 [
   {
-    "remarks": "代理海外游戏平台与联机游戏",
-    "outboundTag": "proxy",
-    "domain": [
-      "geosite:category-games-!cn"
-    ]
-  },
-  {
     "remarks": "阻断udp443",
     "outboundTag": "block",
     "port": "443",
