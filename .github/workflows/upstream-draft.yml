@@ -402,7 +402,7 @@ jobs:
           $existing = gh release view $releaseTag --repo $repository --json assets | ConvertFrom-Json
           foreach ($asset in @($existing.assets)) {
             if ($asset.name -notin $expectedAssets) {
-              gh release delete-asset $releaseTag $asset.name --yes --repo $repository
+              gh api --method DELETE $asset.apiUrl
             }
           }
           gh release upload $releaseTag $zip quiet-update-manifest.json --clobber --repo $repository
