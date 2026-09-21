@@ -202,10 +202,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $version = '${{ steps.prepare.outputs.version }}'
           & ./tools/package-qcc.ps1 -Artifact artifacts/qcc-win-x64 -Helper artifacts/qcc-helper/AmazTool.exe -AuthHost artifacts/qcc-auth-host -Version $version
-          $zip = "QuietControlCenter-$version-win-x64.zip"
+          $zip = "玄同-$version-win-x64.zip"
+          $releaseZip = "QuietControlCenter-$version-win-x64.zip"
           Compress-Archive artifacts/qcc-win-x64/* $zip
+          Copy-Item -LiteralPath $zip -Destination $releaseZip -Force
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "zip=$zip" >> $env:GITHUB_OUTPUT
+          "release_zip=$releaseZip" >> $env:GITHUB_OUTPUT
           "sha=$sha" >> $env:GITHUB_OUTPUT
 
       - name: Smoke test final ZIP startup
@@ -324,7 +327,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $tag = '${{ steps.prepare.outputs.version }}'
-          $zip = '${{ steps.package.outputs.zip }}'
+          $zip = '${{ steps.package.outputs.release_zip }}'
           $sha = '${{ steps.package.outputs.sha }}'
           if ([string]::IsNullOrWhiteSpace($env:QCC_SIGNING_PRIVATE_KEY_PEM)) {
             throw 'QCC_SIGNING_PRIVATE_KEY_PEM is required; unsigned releases are forbidden.'
@@ -366,7 +369,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $releaseTag = "quiet-${{ steps.prepare.outputs.version }}"
-          $zip = "${{ steps.package.outputs.zip }}"
+          $zip = "${{ steps.package.outputs.release_zip }}"
           $repository = "${{ github.repository }}"
           $version = "${{ steps.prepare.outputs.version }}"
           $upstreamTag = "${{ steps.prepare.outputs.tag }}"
