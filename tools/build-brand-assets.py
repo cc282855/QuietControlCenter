@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the frozen Quiet Control Center brand assets deterministically.
+"""Build the approved Xuantong Xuanwu brand assets deterministically.
 
-The generated-image chroma source and its locally extracted alpha source are
-immutable provenance inputs.  This script only resizes and packages the alpha
-source; it never invokes an image model and never reads runtime configuration.
+The approved source image is an immutable provenance input. This script only
+crops, masks, resizes, and packages that source; it never invokes an image
+model and never reads runtime configuration.
 """
 
 from __future__ import annotations
@@ -18,8 +18,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
-CHROMA_SHA256 = "C4A7CBE53799F29077BEC13202C6D6C702327D9965F2F1D9B0A3378A2E02590B"
-ALPHA_SOURCE_SHA256 = "D2B2A67174FA0496E07B9C0B237B55D25B3DB23EE39F00B5B29754325298F1F3"
+SOURCE_SHA256 = "12E88F8F7AE6D4643AB85CC3548D9416BBA84A3A2E301998F813C35CC5D5DF81"
 ICO_SIZES = ((16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256))
 
 
@@ -53,17 +52,28 @@ def icns_bytes(image: Image.Image) -> bytes:
     return stream.getvalue()
 
 
-def normalized_master(alpha_source: bytes) -> Image.Image:
-    with Image.open(io.BytesIO(alpha_source)) as loaded:
+def normalized_master(source: bytes) -> Image.Image:
+    with Image.open(io.BytesIO(source)) as loaded:
         image = loaded.convert("RGBA")
-    if image.getchannel("A").getbbox() is None:
-        raise RuntimeError("Transparent brand source has no visible pixels")
-    if any(image.getpixel(point)[3] != 0 for point in ((0, 0), (image.width - 1, 0), (0, image.height - 1), (image.width - 1, image.height - 1))):
-        raise RuntimeError("Transparent brand source corners must be fully transparent")
-    image = image.resize((1024, 1024), Image.Resampling.LANCZOS)
-    # Alpha-composite onto transparent black so fully transparent RGB samples
-    # cannot create colored fringes during later downsampling.
-    return Image.alpha_composite(Image.new("RGBA", image.size, (0, 0, 0, 0)), image)
+    if image.width != image.height:
+        edge = min(image.width, image.height)
+        left = (image.width - edge) // 2
+        top = (image.height - edge) // 2
+        image = image.crop((left, top, left + edge, top + edge))
+
+    # Preserve the approved composition while adding a transparent safety
+    # margin and antialiased circular edge for taskbar, shortcut, and tray use.
+    image = image.resize((984, 984), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+    canvas.alpha_composite(image, (20, 20))
+    scale = 4
+    mask = Image.new("L", (1024 * scale, 1024 * scale), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((12 * scale, 12 * scale, 1012 * scale, 1012 * scale), fill=255)
+    mask = mask.resize((1024, 1024), Image.Resampling.LANCZOS)
+    alpha = Image.composite(canvas.getchannel("A"), Image.new("L", canvas.size, 0), mask)
+    canvas.putalpha(alpha)
+    return Image.alpha_composite(Image.new("RGBA", canvas.size, (0, 0, 0, 0)), canvas)
 
 
 def contact_sheet(master: Image.Image, *, dark: bool) -> Image.Image:
@@ -78,7 +88,7 @@ def contact_sheet(master: Image.Image, *, dark: bool) -> Image.Image:
     font = ImageFont.load_default(size=20)
     small = ImageFont.load_default(size=16)
 
-    draw.text((56, 42), f"MIKA BRAND ICON / {'DARK' if dark else 'LIGHT'} PREVIEW", fill=foreground, font=font)
+    draw.text((56, 42), f"XUANTONG XUANWU ICON / {'DARK' if dark else 'LIGHT'} PREVIEW", fill=foreground, font=font)
     draw.text((56, 74), "1024 px transparent master -> Windows multi-size assets", fill=foreground, font=small)
 
     draw.rounded_rectangle((56, 116, 536, 596), radius=36, fill=panel, outline=border, width=2)
@@ -102,7 +112,7 @@ def contact_sheet(master: Image.Image, *, dark: bool) -> Image.Image:
         draw.text((x + 12, y + slot_h - 27), f"{size} x {size}", fill=foreground, font=small)
 
     draw.text((56, 638), "Small-size legibility", fill=foreground, font=font)
-    draw.text((56, 674), "One silhouette / one gold node / no text", fill=foreground, font=small)
+    draw.text((56, 674), "White tortoise / red serpent / gold ring / no text", fill=foreground, font=small)
     for index, size in enumerate((16, 20, 24, 32, 48, 64)):
         x = 56 + index * 82
         draw.rounded_rectangle((x, 718, x + 66, 808), radius=12, fill=panel, outline=border, width=2)
@@ -123,20 +133,18 @@ def contact_sheet(master: Image.Image, *, dark: bool) -> Image.Image:
 
 def build_outputs(repo_root: Path) -> dict[Path, bytes]:
     branding = repo_root / "branding"
-    chroma_path = branding / "source" / "mika-wind-gate-chroma-source.png"
-    alpha_path = branding / "source" / "mika-wind-gate-alpha-extracted-source.png"
-    read_verified(chroma_path, CHROMA_SHA256)
-    alpha_source = read_verified(alpha_path, ALPHA_SOURCE_SHA256)
-    master = normalized_master(alpha_source)
+    source_path = branding / "source" / "xuanwu-porcelain-red-source.png"
+    source = read_verified(source_path, SOURCE_SHA256)
+    master = normalized_master(source)
 
     master_payload = png_bytes(master)
     header_payload = png_bytes(master.resize((512, 512), Image.Resampling.LANCZOS))
     desktop_payload = png_bytes(master.resize((256, 256), Image.Resampling.LANCZOS))
     icon_payload = ico_bytes(master)
     outputs: dict[Path, bytes] = {
-        branding / "master" / "mika-wind-gate-transparent-1024.png": master_payload,
-        branding / "evidence" / "mika-brand-contact-light-1024.png": png_bytes(contact_sheet(master, dark=False)),
-        branding / "evidence" / "mika-brand-contact-dark-1024.png": png_bytes(contact_sheet(master, dark=True)),
+        branding / "master" / "xuanwu-porcelain-red-transparent-1024.png": master_payload,
+        branding / "evidence" / "xuanwu-brand-contact-light-1024.png": png_bytes(contact_sheet(master, dark=False)),
+        branding / "evidence" / "xuanwu-brand-contact-dark-1024.png": png_bytes(contact_sheet(master, dark=True)),
         repo_root / "v2rayN" / "v2rayN" / "Resources" / "MikaLogo.png": header_payload,
         repo_root / "v2rayN" / "v2rayN" / "Resources" / "v2rayN.ico": icon_payload,
         repo_root / "v2rayN" / "v2rayN.Desktop" / "v2rayN.png": desktop_payload,
@@ -152,10 +160,8 @@ def build_outputs(repo_root: Path) -> dict[Path, bytes]:
         "schema": 1,
         "brand": "玄同",
         "source": {
-            "chroma": str(chroma_path.relative_to(repo_root)).replace("\\", "/"),
-            "chromaSha256": CHROMA_SHA256,
-            "alpha": str(alpha_path.relative_to(repo_root)).replace("\\", "/"),
-            "alphaSha256": ALPHA_SOURCE_SHA256,
+            "approved": str(source_path.relative_to(repo_root)).replace("\\", "/"),
+            "approvedSha256": SOURCE_SHA256,
         },
         "master": {"width": 1024, "height": 1024, "sha256": sha256_bytes(master_payload)},
         "icoSizes": [size[0] for size in ICO_SIZES],

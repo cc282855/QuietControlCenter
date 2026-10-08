@@ -870,17 +870,17 @@ public sealed class QuietUiStaticTests
         var appIcon = File.ReadAllBytes(Path.Combine(resources, "v2rayN.ico"));
         foreach (var name in new[] { "NotifyIcon1.ico", "NotifyIcon2.ico", "NotifyIcon3.ico", "NotifyIcon4.ico" })
         {
-            Assert.True(appIcon.SequenceEqual(File.ReadAllBytes(Path.Combine(resources, name))), $"{name} must use the Mika tray icon.");
+            Assert.True(appIcon.SequenceEqual(File.ReadAllBytes(Path.Combine(resources, name))), $"{name} must use the Xuanwu tray icon.");
         }
     }
 
     [Fact]
-    public void MikaBrandAssets_AreFrozenMultiSizeAndCoverDesktopAndUpdaterSurfaces()
+    public void XuanwuBrandAssets_AreFrozenMultiSizeAndCoverDesktopAndUpdaterSurfaces()
     {
-        const string expectedChromaHash = "C4A7CBE53799F29077BEC13202C6D6C702327D9965F2F1D9B0A3378A2E02590B";
-        const string expectedMasterHash = "DF739064E84E9F038923268D997CD0FB1D6FBDDCA51F0B38CFE96E9BF512C9F4";
-        const string expectedLogoHash = "DA38A8F947350EE5F30D4521E57F9A6B7ABDA6EE665839C8145B65380B018F63";
-        const string expectedIconHash = "D64BFDC8BF4FCA88F485A19BA65BF6F559AA68C33065FFBB79432FCEA9650B1D";
+        const string expectedSourceHash = "12E88F8F7AE6D4643AB85CC3548D9416BBA84A3A2E301998F813C35CC5D5DF81";
+        const string expectedMasterHash = "1B9883F083E01AA6E3EF1FB1A021C14144E20E6F60A60E72CA62308E083AC122";
+        const string expectedLogoHash = "287944D37713CDAB99A2847AFE3C4FA2383161FC1163DF7BF63ED09CF7096E4E";
+        const string expectedIconHash = "655063EAEC64812156887850999CEC30D0961B0D8749DA64513180FE28EFE0C0";
         var root = FindProjectRoot();
         var branding = Path.Combine(root, "branding");
         var wpfResources = Path.Combine(root, "v2rayN", "v2rayN", "Resources");
@@ -898,8 +898,8 @@ public sealed class QuietUiStaticTests
                 bytes[25]);
         }
 
-        Assert.Equal(expectedChromaHash, Sha256(Path.Combine(branding, "source", "mika-wind-gate-chroma-source.png")));
-        var master = Path.Combine(branding, "master", "mika-wind-gate-transparent-1024.png");
+        Assert.Equal(expectedSourceHash, Sha256(Path.Combine(branding, "source", "xuanwu-porcelain-red-source.png")));
+        var master = Path.Combine(branding, "master", "xuanwu-porcelain-red-transparent-1024.png");
         Assert.Equal(expectedMasterHash, Sha256(master));
         Assert.Equal((1024, 1024, (byte)6), ReadPngHeader(master));
         Assert.Equal(expectedLogoHash, Sha256(Path.Combine(wpfResources, "MikaLogo.png")));

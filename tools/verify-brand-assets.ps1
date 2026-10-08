@@ -6,9 +6,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$expectedChroma = 'C4A7CBE53799F29077BEC13202C6D6C702327D9965F2F1D9B0A3378A2E02590B'
-$expectedMaster = 'DF739064E84E9F038923268D997CD0FB1D6FBDDCA51F0B38CFE96E9BF512C9F4'
-$expectedIcon = 'D64BFDC8BF4FCA88F485A19BA65BF6F559AA68C33065FFBB79432FCEA9650B1D'
+$expectedSource = '12E88F8F7AE6D4643AB85CC3548D9416BBA84A3A2E301998F813C35CC5D5DF81'
+$expectedMaster = '1B9883F083E01AA6E3EF1FB1A021C14144E20E6F60A60E72CA62308E083AC122'
+$expectedIcon = '655063EAEC64812156887850999CEC30D0961B0D8749DA64513180FE28EFE0C0'
 $expectedSizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
 $mainExecutableName = ([char]0x7384).ToString() + [char]0x540C + '.exe'
 
@@ -25,10 +25,10 @@ function Assert-Hash([string]$Path, [string]$Expected) {
 & python (Join-Path $repoRoot 'tools\build-brand-assets.py') --repo-root $repoRoot --check
 Assert-True ($LASTEXITCODE -eq 0) 'Deterministic brand asset check failed.'
 
-$chroma = Join-Path $repoRoot 'branding\source\mika-wind-gate-chroma-source.png'
-$master = Join-Path $repoRoot 'branding\master\mika-wind-gate-transparent-1024.png'
+$source = Join-Path $repoRoot 'branding\source\xuanwu-porcelain-red-source.png'
+$master = Join-Path $repoRoot 'branding\master\xuanwu-porcelain-red-transparent-1024.png'
 $icon = Join-Path $repoRoot 'v2rayN\v2rayN\Resources\v2rayN.ico'
-Assert-Hash $chroma $expectedChroma
+Assert-Hash $source $expectedSource
 Assert-Hash $master $expectedMaster
 Assert-Hash $icon $expectedIcon
 
